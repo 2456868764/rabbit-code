@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Build context: rabbit-code/ (module root, same directory as go.mod).
-FROM golang:1.22-bookworm AS build
+FROM golang:1.25-bookworm AS build
 WORKDIR /src
 
 COPY go.mod ./

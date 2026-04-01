@@ -1,0 +1,37 @@
+{
+  "transcript_version": 1,
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "history_snip",
+          "snip_id": "s1",
+          "snip_edge": "start"
+        },
+        {
+          "type": "text",
+          "text": "visible"
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "connector_text",
+          "text": "from connector"
+        }
+      ]
+    },
+    {
+      "role": "progress",
+      "content": [
+        {
+          "type": "progress",
+          "label": "think"
+        }
+      ]
+    }
+  ]
+}

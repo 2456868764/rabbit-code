@@ -1,5 +1,9 @@
 # rabbit-code
 
+<p align="center">
+  <img src="assets/rabbit.png" alt="rabbit-code mascot" width="160" height="160" />
+</p>
+
 **rabbit-code** is a Go reimplementation of an **interactive coding agent** in the same product class as **Claude Code**: a long-running **query engine** that talks to a model API, streams replies, runs **tools** (file edits, shell, search, etc.), negotiates **permissions**, speaks **MCP** to external servers, and persists **sessions / transcripts**. Everything is meant to ship as a **single CLI binary** with a **full-screen terminal UI** for day-to-day use, plus a rich **subcommand surface** for doctor flows, resume, configuration, and automation-friendly entry points.
 
 The project aims for **behavioral parity** with a well-defined reference architecture (engine states, tool loop, compacting, hooks, slash commands, tasks/agents/skills/plugins, bridge and remote modes, policy and telemetry hooks, and voice where the OS allows). It is **not** scoped as a toy REPL or a “later we will add X” codebase: each major capability is supposed to land as a complete, testable slice rather than a permanent stub.
@@ -27,12 +31,14 @@ IDE **bridge**, **direct connect / server** modes, **remote** and **upstream pro
 ## Architecture choices
 
 - **Core vs UI:** Packages such as `internal/engine`, `internal/query`, and `internal/tools` **do not import** the TUI framework. The UI subscribes to **`EngineEvent`** streams and emits **`UserIntent`** through channels or narrow interfaces so the engine can be unit-tested and run without a terminal.
-- **UI stack:** [Bubble Tea](https://github.com/charmbracelet/bubbletea) for the Elm-style loop, with [Bubbles](https://github.com/charmbracelet/bubbles) for reusable widgets (lists, text areas, viewports, spinners, …) and [Lip Gloss](https://github.com/charmbracelet/lipgloss) for layout and theming.
+- **UI stack:** [Bubble Tea v2](https://github.com/charmbracelet/bubbletea) (`charm.land/bubbletea/v2`, e.g. **v2.0.2**) for the Elm-style loop, [Bubbles v2](https://github.com/charmbracelet/bubbles) (`charm.land/bubbles/v2`) for reusable widgets (text inputs, lists, viewports, spinners, …), and [Lip Gloss v2](https://github.com/charmbracelet/lipgloss) (`charm.land/lipgloss/v2`, e.g. **v2.0.2**) for layout and theming.
 - **Quality bar:** Non-UI packages target high line coverage on critical paths; TUI code favors **model reduction tests** and **stable string snapshots** of rendered views so refactors do not silently break layouts or key handling.
 
 ---
 
 ## Quick start
+
+Requires **Go 1.25+** (Charm **Bubble Tea / Lip Gloss / Bubbles v2** stacks).
 
 ```bash
 cd rabbit-code
@@ -40,6 +46,8 @@ go test ./... -count=1
 make build          # output: bin/rabbit-code
 ./bin/rabbit-code version
 ```
+
+**启动画面（TTY）**：默认在标准错误输出打印吉祥物（iTerm2 / WezTerm 等支持 **内联 PNG**；其余终端为 Lip Gloss 文字框）。CI 或管道可设 `RABBIT_CODE_NO_STARTUP_BANNER=1` 或 `RABBIT_CODE_EXIT_AFTER_INIT=1` 关闭。
 
 - **Lint:** install [golangci-lint](https://golangci-lint.run/), then `make lint`.
 - **Docker:** `docker build -t rabbit-code:local .` and `docker run --rm rabbit-code:local version` (build context = this directory).

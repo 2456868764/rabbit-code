@@ -2,7 +2,11 @@
 BIN := bin/rabbit-code
 MODULE := ./...
 
-.PHONY: build test test-race lint e2e e2e-tui clean
+.PHONY: build test test-race lint e2e e2e-tui clean assets-mascot
+
+# Write assets/rabbit-code-mascot.png using the same resolution order as CLI (assets/rabbit.png when cwd is module root).
+assets-mascot:
+	go run ./cmd/mascot-export
 
 build:
 	mkdir -p bin
