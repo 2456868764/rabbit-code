@@ -1,20 +1,69 @@
 # rabbit-code
 
-Go 实现 Claude Code 能力全集（规划见 `docs/GOLANG_CLAUDE_CODE_FULL_IMPLEMENTATION_PLAN.md`）。**模块根目录即本仓库 `rabbit-code/`，不再使用单独的 `codego/` 目录。**
+**rabbit-code** is a Go reimplementation of an **interactive coding agent** in the same product class as **Claude Code**: a long-running **query engine** that talks to a model API, streams replies, runs **tools** (file edits, shell, search, etc.), negotiates **permissions**, speaks **MCP** to external servers, and persists **sessions / transcripts**. Everything is meant to ship as a **single CLI binary** with a **full-screen terminal UI** for day-to-day use, plus a rich **subcommand surface** for doctor flows, resume, configuration, and automation-friendly entry points.
 
-## Phase 0
+The project aims for **behavioral parity** with a well-defined reference architecture (engine states, tool loop, compacting, hooks, slash commands, tasks/agents/skills/plugins, bridge and remote modes, policy and telemetry hooks, and voice where the OS allows). It is **not** scoped as a toy REPL or a “later we will add X” codebase: each major capability is supposed to land as a complete, testable slice rather than a permanent stub.
+
+Go module: [`github.com/2456868764/rabbit-code`](https://github.com/2456868764/rabbit-code). Treat **`rabbit-code/`** (alongside `go.mod`) as the module root.
+
+---
+
+## What gets built
+
+**Runtime core (headless-capable)**  
+Orchestrates the agent loop: submit prompts, handle streaming tokens, schedule tool calls, apply permission rules and audit trails, merge MCP resources and tool results back into context, manage session identity and transcript storage, and enforce compaction and token budget policies where the architecture calls for them. Slash commands, task runners, and plugin boundaries are first-class so the CLI and TUI do not reimplement business rules in duplicate.
+
+**Terminal UI**  
+A Bubble Tea application provides the primary interactive experience: **REPL-style** conversation, **Doctor**-style diagnostics, **session resume** pickers, **permission** and **MCP approval** dialogs, structured **diff** and log views, **spinners** and status chrome, **light/dark/custom themes**, a coherent **keybinding** layer (including **Vim-style** input modes where specified), and multi-pane layouts when the product model requires them.
+
+**CLI**  
+The same binary exposes a structured command tree for non-interactive and scripted use: help text, stable flags, consistent exit codes, and automated tests or scripted checks so regressions are caught in CI.
+
+**Integrations**  
+IDE **bridge**, **direct connect / server** modes, **remote** and **upstream proxy** paths, **managed policy** settings, **telemetry** (off by default or user-controlled per policy), and **voice** input/output are part of the same product surface—not optional side repos—subject only to honest **platform exemptions** where an OS cannot support a feature.
+
+---
+
+## Architecture choices
+
+- **Core vs UI:** Packages such as `internal/engine`, `internal/query`, and `internal/tools` **do not import** the TUI framework. The UI subscribes to **`EngineEvent`** streams and emits **`UserIntent`** through channels or narrow interfaces so the engine can be unit-tested and run without a terminal.
+- **UI stack:** [Bubble Tea](https://github.com/charmbracelet/bubbletea) for the Elm-style loop, with [Bubbles](https://github.com/charmbracelet/bubbles) for reusable widgets (lists, text areas, viewports, spinners, …) and [Lip Gloss](https://github.com/charmbracelet/lipgloss) for layout and theming.
+- **Quality bar:** Non-UI packages target high line coverage on critical paths; TUI code favors **model reduction tests** and **stable string snapshots** of rendered views so refactors do not silently break layouts or key handling.
+
+---
+
+## Quick start
 
 ```bash
 cd rabbit-code
 go test ./... -count=1
-make build    # 输出 bin/rabbit-code
+make build          # output: bin/rabbit-code
 ./bin/rabbit-code version
 ```
 
-- **Lint**：需安装 [golangci-lint](https://golangci-lint.run/)，然后 `make lint`。
-- **CI**：父仓库（`bot/`）使用 `.github/workflows/rabbit-code-ci.yml`；若本目录单独作为 git 根，请按该文件顶部说明复制/调整 workflow。
-- **验收**：`docs/phases/PHASE00_SPEC_AND_ACCEPTANCE.md`、`PHASE00_E2E_ACCEPTANCE.md`。
+- **Lint:** install [golangci-lint](https://golangci-lint.run/), then `make lint`.
+- **Docker:** `docker build -t rabbit-code:local .` and `docker run --rm rabbit-code:local version` (build context = this directory).
 
-## 二进制名
+**Makefile:** `build`, `test`, `test-race`, `lint`, `e2e`, `e2e-tui`. The `e2e*` targets exist for future integration pipelines; until those suites exist they may succeed as no-ops.
 
-- 命令行工具：**`rabbit-code`**（`cmd/rabbit-code`）。
+---
+
+## CI
+
+If this tree sits inside a monorepo (e.g. parent folder **`bot/`**), automation typically lives under the parent’s `.github/workflows/` and sets **`working-directory: rabbit-code`** for Go steps. If **`rabbit-code/`** is the git repository root, use the same jobs from your own `.github/workflows/` at that root and drop the nested working-directory.
+
+---
+
+## Binary
+
+Entry command: **`rabbit-code`** (`cmd/rabbit-code`).
+
+---
+
+## License
+
+See [`LICENSE`](LICENSE).
+
+---
+
+*Compliance note:* implement behavior from public specifications and your own design artifacts; do not ship verbatim copies of third-party source you are not entitled to redistribute; honor API and trademark terms of external services.
