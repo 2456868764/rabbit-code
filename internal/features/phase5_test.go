@@ -50,6 +50,18 @@ func TestHistorySnipThresholds(t *testing.T) {
 	}
 }
 
+func TestSnipCompactThresholds(t *testing.T) {
+	t.Setenv(EnvSnipCompact, "true")
+	t.Setenv(EnvSnipCompactMaxBytes, "100")
+	if SnipCompactMaxBytes() != 100 {
+		t.Fatal()
+	}
+	t.Setenv(EnvHistorySnip, "")
+	if HistorySnipMaxBytes() != 0 {
+		t.Fatal("history snip should be off")
+	}
+}
+
 func TestTemplateNames(t *testing.T) {
 	t.Setenv(EnvTemplates, "true")
 	t.Setenv(EnvTemplateNames, " a , b ")

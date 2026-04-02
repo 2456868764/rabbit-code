@@ -227,6 +227,14 @@ func (e *Engine) loopObservers() *query.LoopObservers {
 				PhaseAuxInt2: after,
 			})
 		},
+		OnSnipCompact: func(before, after, rounds int) {
+			e.trySend(EngineEvent{
+				Kind:         EventKindSnipCompactApplied,
+				PhaseDetail:  fmt.Sprintf("rounds=%d", rounds),
+				PhaseAuxInt:  before,
+				PhaseAuxInt2: after,
+			})
+		},
 	}
 }
 
@@ -321,6 +329,8 @@ func (e *Engine) runTurnLoop(userText string) {
 			Observe:              e.loopObservers(),
 			HistorySnipMaxBytes:  features.HistorySnipMaxBytes(),
 			HistorySnipMaxRounds: features.HistorySnipMaxRounds(),
+			SnipCompactMaxBytes:  features.SnipCompactMaxBytes(),
+			SnipCompactMaxRounds: features.SnipCompactMaxRounds(),
 		}
 
 		var runErr error

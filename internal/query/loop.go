@@ -20,6 +20,9 @@ type LoopDriver struct {
 	// HistorySnipMaxBytes / HistorySnipMaxRounds implement P5.F.10 when both > 0 (engine sets from features).
 	HistorySnipMaxBytes  int
 	HistorySnipMaxRounds int
+	// SnipCompactMaxBytes / SnipCompactMaxRounds implement P5.2.2 when both > 0 (RABBIT_CODE_SNIP_COMPACT).
+	SnipCompactMaxBytes  int
+	SnipCompactMaxRounds int
 }
 
 func (d *LoopDriver) streamer() querydeps.StreamAssistant {
@@ -115,6 +118,16 @@ func (d *LoopDriver) RunTurnLoop(ctx context.Context, st *LoopState, userText st
 			}
 			if n > 0 && d.Observe != nil && d.Observe.OnHistorySnip != nil {
 				d.Observe.OnHistorySnip(len(msgs), len(newMsgs), n)
+			}
+			msgs = newMsgs
+		}
+		if d.SnipCompactMaxBytes > 0 && d.SnipCompactMaxRounds > 0 {
+			newMsgs, n, err := TrimTranscriptPrefixWhileOverBudget(msgs, d.SnipCompactMaxBytes, d.SnipCompactMaxRounds)
+			if err != nil {
+				return msgs, lastAssistantText, err
+			}
+			if n > 0 && d.Observe != nil && d.Observe.OnSnipCompact != nil {
+				d.Observe.OnSnipCompact(len(msgs), len(newMsgs), n)
 			}
 			msgs = newMsgs
 		}

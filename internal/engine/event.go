@@ -21,6 +21,7 @@ const (
 	EventKindTemplatesActive
 	EventKindCachedMicrocompactActive
 	EventKindHistorySnipApplied
+	EventKindSnipCompactApplied
 )
 
 // EngineEvent is a single unit on the engine event channel.

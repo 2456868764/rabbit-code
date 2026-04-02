@@ -801,6 +801,41 @@ func TestEngine_Phase5_historySnipBetweenRounds(t *testing.T) {
 	}
 }
 
+func TestEngine_SnipCompactBetweenRounds(t *testing.T) {
+	t.Setenv(features.EnvSnipCompact, "true")
+	t.Setenv(features.EnvSnipCompactMaxBytes, "280")
+	t.Setenv(features.EnvSnipCompactMaxRounds, "2")
+	long := strings.Repeat("s", 350)
+	seq := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+		{Text: long, ToolUses: []querydeps.ToolUseCall{{ID: "1", Name: "bash", Input: json.RawMessage(`{}`)}}},
+		{Text: "end"},
+	}}
+	e := New(context.Background(), &Config{
+		Deps:  querydeps.Deps{Turn: seq, Tools: querydeps.BashStubToolRunner{}},
+		Model: "m", MaxTokens: 8,
+	})
+	e.Submit("hi")
+	ch := e.Events()
+	var saw bool
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindSnipCompactApplied {
+				saw = true
+			}
+			if ev.Kind == EventKindDone {
+				if !saw {
+					t.Fatal("expected snip compact event")
+				}
+				e.Wait()
+				return
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
 func TestEngine_SubmitCancelRace(t *testing.T) {
 	for i := 0; i < 40; i++ {
 		e := NewEngine(context.Background())

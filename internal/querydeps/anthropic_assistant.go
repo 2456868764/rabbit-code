@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/2456868764/rabbit-code/internal/anthropic"
+	"github.com/2456868764/rabbit-code/internal/features"
 )
 
 // AnthropicAssistant implements StreamAssistant using internal/anthropic.Client (Phase 4 + Phase 5 bridge).
@@ -24,6 +25,18 @@ func (a *AnthropicAssistant) readOpts(ctx context.Context) []anthropic.ReadAssis
 	}
 	opts = append(opts, a.ExtraReadOptions...)
 	return opts
+}
+
+func (a *AnthropicAssistant) streamBody(model string, maxTokens int, messagesJSON []byte) anthropic.MessagesStreamBody {
+	body := anthropic.MessagesStreamBody{
+		Model:     model,
+		MaxTokens: maxTokens,
+		Messages:  json.RawMessage(messagesJSON),
+	}
+	if features.CachedMicrocompactEnabled() {
+		body.AnthropicBeta = []string{anthropic.BetaCachedMicrocompactBody}
+	}
+	return body
 }
 
 // StreamAssistant calls PostMessagesStreamReadAssistant with messagesJSON as the Messages field.
@@ -47,11 +60,7 @@ func (a *AnthropicAssistant) StreamAssistant(ctx context.Context, model string, 
 	if pol.MaxAttempts == 0 {
 		pol = anthropic.DefaultPolicy()
 	}
-	body := anthropic.MessagesStreamBody{
-		Model:     model,
-		MaxTokens: maxTokens,
-		Messages:  json.RawMessage(messagesJSON),
-	}
+	body := a.streamBody(model, maxTokens, messagesJSON)
 	text, _, err := a.Client.PostMessagesStreamReadAssistant(ctx, body, pol, a.readOpts(ctx)...)
 	return text, err
 }
@@ -77,11 +86,7 @@ func (a *AnthropicAssistant) AssistantTurn(ctx context.Context, model string, ma
 	if pol.MaxAttempts == 0 {
 		pol = anthropic.DefaultPolicy()
 	}
-	body := anthropic.MessagesStreamBody{
-		Model:     model,
-		MaxTokens: maxTokens,
-		Messages:  json.RawMessage(messagesJSON),
-	}
+	body := a.streamBody(model, maxTokens, messagesJSON)
 	turn, _, err := a.Client.PostMessagesStreamReadAssistantTurn(ctx, body, pol, a.readOpts(ctx)...)
 	if err != nil {
 		return TurnResult{}, err

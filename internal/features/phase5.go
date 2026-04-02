@@ -21,6 +21,9 @@ const (
 	EnvHistorySnip            = "RABBIT_CODE_HISTORY_SNIP"
 	// EnvSnipCompact gates snip-style transcript trimming hooks (pairs with query.SnipDropFirstMessages, P5.2.2).
 	EnvSnipCompact = "RABBIT_CODE_SNIP_COMPACT"
+	// EnvSnipCompactMaxBytes / EnvSnipCompactMaxRounds: when SNIP_COMPACT is on, trim prefix each assistant round (independent of HISTORY_SNIP).
+	EnvSnipCompactMaxBytes  = "RABBIT_CODE_SNIP_COMPACT_MAX_BYTES"
+	EnvSnipCompactMaxRounds = "RABBIT_CODE_SNIP_COMPACT_MAX_ROUNDS"
 	// EnvReactiveCompactMinBytes: when REACTIVE_COMPACT is on, suggest reactive compact if len(transcript JSON) >= this (default 8192).
 	EnvReactiveCompactMinBytes = "RABBIT_CODE_REACTIVE_COMPACT_MIN_BYTES"
 	// EnvHistorySnipMaxBytes / EnvHistorySnipMaxRounds gate P5.F.10 transcript prefix drops each assistant round.
@@ -58,6 +61,38 @@ func TemplatesEnabled() bool          { return truthy(os.Getenv(EnvTemplates)) }
 func CachedMicrocompactEnabled() bool { return truthy(os.Getenv(EnvCachedMicrocompact)) }
 func HistorySnipEnabled() bool        { return truthy(os.Getenv(EnvHistorySnip)) }
 func SnipCompactEnabled() bool        { return truthy(os.Getenv(EnvSnipCompact)) }
+
+// SnipCompactMaxBytes returns 0 when SNIP_COMPACT is off.
+func SnipCompactMaxBytes() int {
+	if !SnipCompactEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvSnipCompactMaxBytes))
+	if s == "" {
+		return 32768
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 32768
+	}
+	return v
+}
+
+// SnipCompactMaxRounds returns max prefix drops per assistant iteration when SNIP_COMPACT is on.
+func SnipCompactMaxRounds() int {
+	if !SnipCompactEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvSnipCompactMaxRounds))
+	if s == "" {
+		return 4
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 4
+	}
+	return v
+}
 
 // PromptCacheBreakDetectionEnabled aliases Phase 4 env (P5.F.9 shares anthropic client gates).
 func PromptCacheBreakDetectionEnabled() bool { return PromptCacheBreakDetection() }
