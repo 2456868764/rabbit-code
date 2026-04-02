@@ -16,6 +16,7 @@ type LoopDriver struct {
 	Deps      querydeps.Deps
 	Model     string
 	MaxTokens int
+	Observe   *LoopObservers
 }
 
 func (d *LoopDriver) streamer() querydeps.StreamAssistant {
@@ -111,8 +112,12 @@ func (d *LoopDriver) RunTurnLoop(ctx context.Context, st *LoopState, userText st
 		}
 		if st != nil {
 			*st = ApplyTransition(*st, TranReceiveAssistant)
+			st.LastStopReason = turn.StopReason
 		}
 		lastAssistantText = turn.Text
+		if o := d.Observe; o != nil && o.OnAssistantText != nil && turn.Text != "" {
+			o.OnAssistantText(turn.Text)
+		}
 		if len(turn.ToolUses) == 0 {
 			break
 		}
@@ -121,9 +126,19 @@ func (d *LoopDriver) RunTurnLoop(ctx context.Context, st *LoopState, userText st
 		}
 		results := make([]ToolResultBlock, 0, len(turn.ToolUses))
 		for _, u := range turn.ToolUses {
+			if o := d.Observe; o != nil && o.OnToolStart != nil {
+				in := u.Input
+				if len(in) == 0 {
+					in = []byte("{}")
+				}
+				o.OnToolStart(u.Name, u.ID, in)
+			}
 			out, err := d.RunToolStep(ctx, st, u.Name, u.Input)
 			if err != nil {
 				return msgs, lastAssistantText, err
+			}
+			if o := d.Observe; o != nil && o.OnToolDone != nil {
+				o.OnToolDone(u.Name, u.ID, out)
 			}
 			results = append(results, ToolResultBlock{ToolUseID: u.ID, Content: string(out)})
 		}

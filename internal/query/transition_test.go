@@ -9,13 +9,13 @@ func TestApplyTransition_table(t *testing.T) {
 		tr   Transition
 		want LoopState
 	}{
-		{"receive increments turn", LoopState{TurnCount: 0, PendingTools: 0}, TranReceiveAssistant, LoopState{1, 0, false, 0}},
-		{"schedule tools", LoopState{1, 0, false, 0}, TranScheduleTools, LoopState{1, 1, false, 0}},
-		{"tool done decrements", LoopState{1, 2, false, 0}, TranToolCallsDone, LoopState{1, 1, false, 0}},
-		{"tool done clamps at zero", LoopState{0, 0, false, 0}, TranToolCallsDone, LoopState{0, 0, false, 0}},
-		{"start compact preserves counts", LoopState{2, 1, false, 10}, TranStartCompact, LoopState{2, 1, true, 10}},
-		{"finish compact", LoopState{2, 1, true, 10}, TranFinishCompact, LoopState{2, 1, false, 10}},
-		{"unknown is no-op", LoopState{3, 1, true, 5}, Transition("nope"), LoopState{3, 1, true, 5}},
+		{"receive increments turn", LoopState{TurnCount: 0, PendingTools: 0}, TranReceiveAssistant, LoopState{TurnCount: 1, PendingTools: 0, InCompact: false, MaxTurns: 0}},
+		{"schedule tools", LoopState{TurnCount: 1, PendingTools: 0}, TranScheduleTools, LoopState{TurnCount: 1, PendingTools: 1, InCompact: false, MaxTurns: 0}},
+		{"tool done decrements", LoopState{TurnCount: 1, PendingTools: 2}, TranToolCallsDone, LoopState{TurnCount: 1, PendingTools: 1, InCompact: false, MaxTurns: 0}},
+		{"tool done clamps at zero", LoopState{TurnCount: 0, PendingTools: 0}, TranToolCallsDone, LoopState{TurnCount: 0, PendingTools: 0, InCompact: false, MaxTurns: 0}},
+		{"start compact preserves counts", LoopState{TurnCount: 2, PendingTools: 1, InCompact: false, MaxTurns: 10}, TranStartCompact, LoopState{TurnCount: 2, PendingTools: 1, InCompact: true, MaxTurns: 10}},
+		{"finish compact", LoopState{TurnCount: 2, PendingTools: 1, InCompact: true, MaxTurns: 10}, TranFinishCompact, LoopState{TurnCount: 2, PendingTools: 1, InCompact: false, MaxTurns: 10}},
+		{"unknown is no-op", LoopState{TurnCount: 3, PendingTools: 1, InCompact: true, MaxTurns: 5}, Transition("nope"), LoopState{TurnCount: 3, PendingTools: 1, InCompact: true, MaxTurns: 5}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
