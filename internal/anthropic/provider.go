@@ -21,6 +21,9 @@ const (
 	ProviderFoundry
 )
 
+// VertexDefaultAnthropicVersion is the JSON body anthropic_version for Vertex streamRawPredict (@anthropic-ai/vertex-sdk client.mjs).
+const VertexDefaultAnthropicVersion = "vertex-2023-10-16"
+
 // DetectProvider from rabbit-code feature env (maps CLAUDE_CODE_USE_* → RABBIT_CODE_USE_*).
 func DetectProvider() Provider {
 	switch {
@@ -56,25 +59,26 @@ func BaseURL(p Provider) string {
 		}
 		return fmt.Sprintf("https://bedrock-runtime.%s.amazonaws.com", r)
 	case ProviderVertex:
-		// Placeholder host pattern; real URL is region/project specific.
-		proj := os.Getenv("ANTHROPIC_VERTEX_PROJECT_ID")
-		loc := os.Getenv("CLOUD_ML_REGION")
+		if v := strings.TrimSpace(os.Getenv("ANTHROPIC_VERTEX_BASE_URL")); v != "" {
+			return strings.TrimRight(v, "/")
+		}
+		loc := strings.TrimSpace(os.Getenv("CLOUD_ML_REGION"))
 		if loc == "" {
 			loc = "us-east5"
 		}
-		if proj != "" {
-			return fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s", loc, proj, loc)
+		if loc == "global" {
+			return "https://aiplatform.googleapis.com/v1"
 		}
-		return "https://us-east5-aiplatform.googleapis.com"
+		return fmt.Sprintf("https://%s-aiplatform.googleapis.com/v1", loc)
 	case ProviderFoundry:
-		if v := os.Getenv("ANTHROPIC_FOUNDRY_BASE_URL"); v != "" {
+		if v := strings.TrimSpace(os.Getenv("ANTHROPIC_FOUNDRY_BASE_URL")); v != "" {
 			return strings.TrimRight(v, "/")
 		}
-		res := os.Getenv("ANTHROPIC_FOUNDRY_RESOURCE")
+		res := strings.TrimSpace(os.Getenv("ANTHROPIC_FOUNDRY_RESOURCE"))
 		if res != "" {
-			return fmt.Sprintf("https://%s.services.ai.azure.com", res)
+			return fmt.Sprintf("https://%s.services.ai.azure.com/anthropic", res)
 		}
-		return "https://example.azure.com"
+		return "https://example.azure.com/anthropic"
 	default:
 		return "https://api.anthropic.com"
 	}
@@ -88,6 +92,31 @@ func BedrockStreamPath(modelID string) string {
 		return "/model/invoke-with-response-stream"
 	}
 	return fmt.Sprintf("/model/%s/invoke-with-response-stream", url.PathEscape(modelID))
+}
+
+func envVertexProjectID() string {
+	return strings.TrimSpace(os.Getenv("ANTHROPIC_VERTEX_PROJECT_ID"))
+}
+
+func vertexRegion() string {
+	r := strings.TrimSpace(os.Getenv("CLOUD_ML_REGION"))
+	if r == "" {
+		return "us-east5"
+	}
+	return r
+}
+
+// VertexStreamPath returns the Vertex AI publishers path for streaming Messages (vertex-sdk :streamRawPredict).
+// modelID is passed through url.PathEscape; characters like '@' in Vertex model names may remain unescaped per Go's rules (same as SDK string interpolation).
+func VertexStreamPath(projectID, region, modelID string) string {
+	projectID = strings.TrimSpace(projectID)
+	region = strings.TrimSpace(region)
+	modelID = strings.TrimSpace(modelID)
+	if modelID == "" {
+		modelID = "unknown"
+	}
+	return fmt.Sprintf("/projects/%s/locations/%s/publishers/anthropic/models/%s:streamRawPredict",
+		projectID, region, url.PathEscape(modelID))
 }
 
 // MessagesPath returns HTTP path for Messages create (1P vs cloud differ; tests use 1P).

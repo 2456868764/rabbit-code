@@ -41,6 +41,37 @@ func TestMessagesPath_AllProviders(t *testing.T) {
 	}
 }
 
+func TestBaseURL_Vertex_sdkShape(t *testing.T) {
+	t.Setenv("ANTHROPIC_VERTEX_BASE_URL", "")
+	t.Setenv("CLOUD_ML_REGION", "europe-west4")
+	u := BaseURL(ProviderVertex)
+	if u != "https://europe-west4-aiplatform.googleapis.com/v1" {
+		t.Fatal(u)
+	}
+	t.Setenv("CLOUD_ML_REGION", "global")
+	u = BaseURL(ProviderVertex)
+	if u != "https://aiplatform.googleapis.com/v1" {
+		t.Fatal(u)
+	}
+}
+
+func TestBaseURL_Foundry_anthropicSuffix(t *testing.T) {
+	t.Setenv("ANTHROPIC_FOUNDRY_BASE_URL", "")
+	t.Setenv("ANTHROPIC_FOUNDRY_RESOURCE", "my-resource")
+	u := BaseURL(ProviderFoundry)
+	want := "https://my-resource.services.ai.azure.com/anthropic"
+	if u != want {
+		t.Fatalf("got %q want %q", u, want)
+	}
+}
+
+func TestVertexStreamPath(t *testing.T) {
+	want := "/projects/p1/locations/us-central1/publishers/anthropic/models/mymodel:streamRawPredict"
+	if g := VertexStreamPath("p1", "us-central1", "mymodel"); g != want {
+		t.Fatalf("got %q", g)
+	}
+}
+
 func TestBedrockStreamPath(t *testing.T) {
 	if p := BedrockStreamPath(""); p != "/model/invoke-with-response-stream" {
 		t.Fatal(p)

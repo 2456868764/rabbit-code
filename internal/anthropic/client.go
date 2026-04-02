@@ -61,10 +61,46 @@ func (c *Client) SetBetaNames(names []string) {
 
 func (c *Client) messagesURL(body MessagesStreamBody) string {
 	base := strings.TrimRight(c.BaseURL, "/")
-	if c.Provider == ProviderBedrock {
+	switch c.Provider {
+	case ProviderBedrock:
 		return base + BedrockStreamPath(body.Model)
+	case ProviderVertex:
+		if envVertexProjectID() != "" {
+			return base + VertexStreamPath(envVertexProjectID(), vertexRegion(), body.Model)
+		}
+		return base + MessagesPath(c.Provider)
+	default:
+		return base + MessagesPath(c.Provider)
 	}
-	return base + MessagesPath(c.Provider)
+}
+
+// vertexStreamJSONBody matches @anthropic-ai/vertex-sdk: model moves to path, body gets anthropic_version.
+type vertexStreamJSONBody struct {
+	MaxTokens        int             `json:"max_tokens"`
+	Stream           bool            `json:"stream"`
+	Messages         json.RawMessage `json:"messages"`
+	OutputConfig     *OutputConfig   `json:"output_config,omitempty"`
+	AnthropicBeta    []string        `json:"anthropic_beta,omitempty"`
+	AnthropicVersion string          `json:"anthropic_version"`
+}
+
+func (c *Client) marshalMessagesStreamJSON(body MessagesStreamBody) ([]byte, error) {
+	if c.Provider == ProviderBedrock && len(c.bedrockBodyBetas) > 0 && len(body.AnthropicBeta) == 0 {
+		body.AnthropicBeta = append([]string(nil), c.bedrockBodyBetas...)
+	}
+	body.Stream = true
+	if c.Provider == ProviderVertex && envVertexProjectID() != "" {
+		vb := vertexStreamJSONBody{
+			MaxTokens:        body.MaxTokens,
+			Stream:           true,
+			Messages:         body.Messages,
+			OutputConfig:     body.OutputConfig,
+			AnthropicBeta:    append([]string(nil), body.AnthropicBeta...),
+			AnthropicVersion: VertexDefaultAnthropicVersion,
+		}
+		return json.Marshal(vb)
+	}
+	return json.Marshal(body)
 }
 
 // MessagesStreamBody is the JSON body for POST .../messages with stream:true (subset).
@@ -84,11 +120,7 @@ func (c *Client) PostMessagesStream(ctx context.Context, body MessagesStreamBody
 	if c.HTTPClient == nil {
 		c.HTTPClient = http.DefaultClient
 	}
-	body.Stream = true
-	if c.Provider == ProviderBedrock && len(c.bedrockBodyBetas) > 0 && len(body.AnthropicBeta) == 0 {
-		body.AnthropicBeta = append([]string(nil), c.bedrockBodyBetas...)
-	}
-	raw, err := json.Marshal(body)
+	raw, err := c.marshalMessagesStreamJSON(body)
 	if err != nil {
 		return nil, err
 	}

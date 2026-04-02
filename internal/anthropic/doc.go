@@ -11,6 +11,8 @@
 // as the base RoundTripper for NewTransportChain / NewClient.
 // mTLS: HTTPTransportAPIOutbound / HTTPTransportAPIOutboundWithRoots load CLAUDE_CODE_CLIENT_CERT + CLAUDE_CODE_CLIENT_KEY when both are set.
 // Cloud: SigningTransport + CloudRequestSigner hook for Bedrock/Vertex signing (StubBedrockSigner until AC4-6 SigV4/OAuth).
+// Vertex: ANTHROPIC_VERTEX_PROJECT_ID + CLOUD_ML_REGION (or ANTHROPIC_VERTEX_BASE_URL) enable streamRawPredict path and vertex JSON body (see vertex-sdk).
+// Foundry: ANTHROPIC_FOUNDRY_RESOURCE builds https://{res}.services.ai.azure.com/anthropic (foundry-sdk).
 // ReadAssistantStream: optional WithThinkingAccumulator / WithCompactionAccumulator / WithToolInputAccumulators (Client fields).
 // Client.SetOnStreamUsageBootstrap wires OnStreamUsage to cost.ApplyUsageToBootstrap (P4.4.1).
 // Retry: Policy.StrictForeground529 mirrors withRetry.ts FOREGROUND_529_RETRY_SOURCES; RABBIT_CODE_STRICT_FOREGROUND_529 enables it in DefaultPolicy.
