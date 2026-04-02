@@ -7,6 +7,7 @@ const (
 	EventKindUserSubmit EventKind = iota
 	EventKindAssistantText
 	EventKindDone
+	EventKindError
 )
 
 // EngineEvent is a single unit on the engine event channel.
@@ -14,4 +15,5 @@ type EngineEvent struct {
 	Kind       EventKind
 	UserText   string
 	AssistText string
+	Err        error `json:"-"`
 }
