@@ -17,6 +17,10 @@ func TestPostMessagesStream_BedrockAnthropicBetaInBody(t *testing.T) {
 			http.Error(w, "method", http.StatusMethodNotAllowed)
 			return
 		}
+		if r.URL.Path != "/model/m/invoke-with-response-stream" {
+			http.Error(w, "path "+r.URL.Path, http.StatusBadRequest)
+			return
+		}
 		b, _ := io.ReadAll(r.Body)
 		var probe struct {
 			AnthropicBeta []string `json:"anthropic_beta"`
@@ -66,6 +70,10 @@ func TestPostMessagesStream_BedrockAnthropicBetaInBody(t *testing.T) {
 
 func TestPostMessagesStream_BedrockExplicitBodyBetasPreserved(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/model/m/invoke-with-response-stream" {
+			http.Error(w, r.URL.Path, http.StatusBadRequest)
+			return
+		}
 		b, _ := io.ReadAll(r.Body)
 		if !strings.Contains(string(b), `"anthropic_beta":["`+BetaContext1M+`"]`) &&
 			!strings.Contains(string(b), BetaContext1M) {

@@ -59,8 +59,12 @@ func (c *Client) SetBetaNames(names []string) {
 	c.BetaHeader = MergeBetaHeader(names)
 }
 
-func (c *Client) messagesURL() string {
-	return strings.TrimRight(c.BaseURL, "/") + MessagesPath(c.Provider)
+func (c *Client) messagesURL(body MessagesStreamBody) string {
+	base := strings.TrimRight(c.BaseURL, "/")
+	if c.Provider == ProviderBedrock {
+		return base + BedrockStreamPath(body.Model)
+	}
+	return base + MessagesPath(c.Provider)
 }
 
 // MessagesStreamBody is the JSON body for POST .../messages with stream:true (subset).
@@ -88,7 +92,7 @@ func (c *Client) PostMessagesStream(ctx context.Context, body MessagesStreamBody
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.messagesURL(), bytes.NewReader(raw))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.messagesURL(body), bytes.NewReader(raw))
 	if err != nil {
 		return nil, err
 	}

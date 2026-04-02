@@ -2,6 +2,7 @@ package anthropic
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"strings"
 	"testing"
@@ -82,8 +83,18 @@ func TestAppendInputJSONDelta(t *testing.T) {
 func TestReadAssistantStream_WithToolInputAccumulators(t *testing.T) {
 	var tool strings.Builder
 	by := map[int]*strings.Builder{0: &tool}
-	raw := "" +
-		"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"n\\\":\"}}}\n\n" +
+	ev0, err := json.Marshal(map[string]any{
+		"type":  "content_block_delta",
+		"index": 0,
+		"delta": map[string]string{
+			"type":          "input_json_delta",
+			"partial_json":  `{"n":`,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := "data: " + string(ev0) + "\n\n" +
 		"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hi\"}}\n\n" +
 		"data: {\"type\":\"message_stop\"}\n\n"
 	text, _, err := ReadAssistantStream(context.Background(), strings.NewReader(raw), WithToolInputAccumulators(by))
