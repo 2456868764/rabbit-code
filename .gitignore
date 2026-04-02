@@ -13,9 +13,5 @@
 !.env.example
 coverage.out
 coverage.html
-# Ignore docs/ except the tracked Phase iteration rules (do not `git add -f` other paths under docs/).
-docs/*
-!docs/phases/
-docs/phases/*
-!docs/phases/PHASE_ITERATION_RULES.md
-!docs/phases/PHASE05_SPEC_AND_ACCEPTANCE.md
+# Documentation stays local; do not commit anything under docs/.
+/docs/
