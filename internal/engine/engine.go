@@ -20,6 +20,10 @@ type Config struct {
 	MaxTokens   int
 	StubDelay   time.Duration // for tests when Assistant is nil; zero uses default
 	MemdirPaths []string      // optional: prepend session fragments to each Submit user text (P5.4.1)
+	// MaxAssistantTurns if > 0 sets query.LoopState.MaxTurns for each Submit (caps assistant API rounds).
+	MaxAssistantTurns int
+	// SuggestCompactOnRecoverableError emits EventKindCompactSuggest (auto) before EventKindError when the failure is RecoverableCompact (P5.1.3 hint).
+	SuggestCompactOnRecoverableError bool
 	// CompactAdvisor, if set, runs after a successful turn loop to surface scheduling hints (P5.2.1 stub).
 	CompactAdvisor func(st query.LoopState, transcriptJSONLen int) (autoCompact, reactiveCompact bool)
 	// StopHook runs after RunTurnLoop finishes (err nil on success). Same engine context (P5.1.4).
@@ -30,18 +34,20 @@ type Config struct {
 
 // Engine coordinates cancellable query turns (stub or real StreamAssistant / RunTurnLoop).
 type Engine struct {
-	ctx                     context.Context
-	cancel                  context.CancelFunc
-	ch                      chan EngineEvent
-	wg                      sync.WaitGroup
-	deps                    querydeps.Deps
-	model                   string
-	maxTokens               int
-	stubDelay               time.Duration
-	memdirPaths             []string
-	compactAdvisor          func(query.LoopState, int) (bool, bool)
-	stopHook                func(context.Context, query.LoopState, error)
-	orphanPermissionAdvisor func(query.LoopState) (string, bool)
+	ctx                              context.Context
+	cancel                           context.CancelFunc
+	ch                               chan EngineEvent
+	wg                               sync.WaitGroup
+	deps                             querydeps.Deps
+	model                            string
+	maxTokens                        int
+	stubDelay                        time.Duration
+	memdirPaths                      []string
+	compactAdvisor                   func(query.LoopState, int) (bool, bool)
+	stopHook                         func(context.Context, query.LoopState, error)
+	orphanPermissionAdvisor          func(query.LoopState) (string, bool)
+	maxAssistantTurns                int
+	suggestCompactOnRecoverableError bool
 }
 
 // NewEngine is equivalent to New(parent, nil) (stub assistant).
@@ -82,6 +88,10 @@ func New(parent context.Context, cfg *Config) *Engine {
 		e.compactAdvisor = cfg.CompactAdvisor
 		e.stopHook = cfg.StopHook
 		e.orphanPermissionAdvisor = cfg.OrphanPermissionAdvisor
+		if cfg.MaxAssistantTurns > 0 {
+			e.maxAssistantTurns = cfg.MaxAssistantTurns
+		}
+		e.suggestCompactOnRecoverableError = cfg.SuggestCompactOnRecoverableError
 	}
 	return e
 }
@@ -141,6 +151,9 @@ func (e *Engine) applyMemdir(userText string) (resolved string, nFrag int, err e
 
 func (e *Engine) runTurnLoop(userText string) {
 	st := &query.LoopState{}
+	if e.maxAssistantTurns > 0 {
+		st.MaxTurns = e.maxAssistantTurns
+	}
 	var loopErr error
 	defer func() {
 		if e.stopHook != nil {
@@ -204,6 +217,14 @@ func (e *Engine) runTurnLoop(userText string) {
 		st.LastAPIErrorKind = kind
 		if rec {
 			st.RecoveryAttempts++
+		}
+		if rec && e.suggestCompactOnRecoverableError {
+			phase := compact.RunIdle.Next(true, false)
+			e.trySend(EngineEvent{
+				Kind:               EventKindCompactSuggest,
+				CompactPhase:       phase.String(),
+				SuggestAutoCompact: true,
+			})
 		}
 		e.trySend(EngineEvent{
 			Kind:               EventKindError,

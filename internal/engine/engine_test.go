@@ -278,6 +278,59 @@ func TestEngine_StopHook_successAndFailure(t *testing.T) {
 	}
 }
 
+func TestEngine_MaxAssistantTurns(t *testing.T) {
+	// One assistant message with tools consumes a turn; a second assistant round must not start when MaxTurns==1.
+	seq := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+		{Text: "t1", ToolUses: []querydeps.ToolUseCall{{ID: "x", Name: "bash", Input: json.RawMessage(`{}`)}}},
+		{Text: "t2"},
+	}}
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Turn:  seq,
+			Tools: &countingToolRunner{},
+		},
+		MaxAssistantTurns: 1,
+	})
+	e.Submit("x")
+	var sawErr error
+	for {
+		ev := <-e.Events()
+		if ev.Kind == EventKindError {
+			sawErr = ev.Err
+			break
+		}
+	}
+	e.Wait()
+	if !errors.Is(sawErr, query.ErrMaxTurnsExceeded) {
+		t.Fatalf("got %v", sawErr)
+	}
+}
+
+func TestEngine_RecoverableError_emitsCompactSuggestWhenConfigured(t *testing.T) {
+	apiErr := &anthropic.APIError{Kind: anthropic.KindPromptTooLong, Status: 400, Msg: "ptl"}
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "", fmt.Errorf("w: %w", apiErr)
+			}),
+		},
+		SuggestCompactOnRecoverableError: true,
+	})
+	e.Submit("x")
+	var kinds []EventKind
+	for {
+		ev := <-e.Events()
+		kinds = append(kinds, ev.Kind)
+		if ev.Kind == EventKindError {
+			break
+		}
+	}
+	e.Wait()
+	if len(kinds) < 3 || kinds[0] != EventKindUserSubmit || kinds[1] != EventKindCompactSuggest || kinds[2] != EventKindError {
+		t.Fatalf("got %v", kinds)
+	}
+}
+
 func TestEngine_OrphanPermission_advisor(t *testing.T) {
 	e := New(context.Background(), &Config{
 		Deps: querydeps.Deps{
