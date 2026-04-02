@@ -286,6 +286,7 @@ func (e *Engine) runTurnLoop(userText string) {
 		ContextCollapse: features.ContextCollapseEnabled(),
 		Ultrathink:      features.UltrathinkEnabled(),
 		Ultraplan:       features.UltraplanEnabled(),
+		SessionRestore:  features.SessionRestoreEnabled(),
 	})
 
 	ctxLoop := e.ctx

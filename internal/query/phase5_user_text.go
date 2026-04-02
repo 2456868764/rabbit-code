@@ -5,12 +5,14 @@ type Phase5UserTextFlags struct {
 	ContextCollapse bool
 	Ultrathink      bool
 	Ultraplan       bool
+	SessionRestore  bool
 }
 
 const (
 	phase5ContextCollapseSuffix = "\n\n[CONTEXT_COLLAPSE: prefer collapsing stale context; avoid repeating large verbatim dumps.]\n"
 	phase5UltrathinkPrefix      = "[ULTRATHINK: reason step-by-step before answering.]\n\n"
 	phase5UltraplanSuffix       = "\n\n[ULTRAPLAN: outline a short plan before executing tool calls.]"
+	phase5SessionRestoreSuffix  = "\n\n[SESSION_RESTORE: prefer restoring durable session context over re-deriving from scratch.]"
 )
 
 // ApplyPhase5UserTextHints mutates the resolved user payload before InitialUserMessagesJSON (engine Submit path).
@@ -27,6 +29,9 @@ func ApplyPhase5UserTextHints(text string, f Phase5UserTextFlags) string {
 	}
 	if f.Ultraplan {
 		out = out + phase5UltraplanSuffix
+	}
+	if f.SessionRestore {
+		out = out + phase5SessionRestoreSuffix
 	}
 	return out
 }

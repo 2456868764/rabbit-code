@@ -49,6 +49,13 @@ func TestTokenBudgetMaxAttachmentBytes_whenEnabled(t *testing.T) {
 	}
 }
 
+func TestSessionRestoreEnabled(t *testing.T) {
+	t.Setenv(EnvSessionRestore, "true")
+	if !SessionRestoreEnabled() {
+		t.Fatal()
+	}
+}
+
 func TestSnipCompactEnabled(t *testing.T) {
 	t.Setenv(EnvSnipCompact, "true")
 	if !SnipCompactEnabled() {

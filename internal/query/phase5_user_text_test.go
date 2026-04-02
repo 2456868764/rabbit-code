@@ -16,4 +16,8 @@ func TestApplyPhase5UserTextHints(t *testing.T) {
 			t.Fatalf("missing %q in %q", sub, out2)
 		}
 	}
+	out3 := ApplyPhase5UserTextHints("z", Phase5UserTextFlags{SessionRestore: true})
+	if !strings.Contains(out3, "SESSION_RESTORE") {
+		t.Fatalf("%q", out3)
+	}
 }

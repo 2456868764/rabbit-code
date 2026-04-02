@@ -17,6 +17,8 @@ const (
 	EnvTokenBudgetMaxAttachmentBytes = "RABBIT_CODE_TOKEN_BUDGET_MAX_ATTACHMENT_BYTES"
 	EnvReactiveCompact        = "RABBIT_CODE_REACTIVE_COMPACT"
 	EnvContextCollapse        = "RABBIT_CODE_CONTEXT_COLLAPSE"
+	// EnvSessionRestore: headless hint for session-restore style context (full coordinator deferred).
+	EnvSessionRestore = "RABBIT_CODE_SESSION_RESTORE"
 	EnvUltrathink             = "RABBIT_CODE_ULTRATHINK"
 	EnvUltraplan              = "RABBIT_CODE_ULTRAPLAN"
 	EnvBreakCacheCommand      = "RABBIT_CODE_BREAK_CACHE_COMMAND"
@@ -92,6 +94,7 @@ func TokenBudgetMaxAttachmentBytes() int {
 
 func ReactiveCompactEnabled() bool   { return truthy(os.Getenv(EnvReactiveCompact)) }
 func ContextCollapseEnabled() bool    { return truthy(os.Getenv(EnvContextCollapse)) }
+func SessionRestoreEnabled() bool      { return truthy(os.Getenv(EnvSessionRestore)) }
 func UltrathinkEnabled() bool         { return truthy(os.Getenv(EnvUltrathink)) }
 func UltraplanEnabled() bool          { return truthy(os.Getenv(EnvUltraplan)) }
 func BreakCacheCommandEnabled() bool  { return truthy(os.Getenv(EnvBreakCacheCommand)) }
