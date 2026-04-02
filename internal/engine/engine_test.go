@@ -29,6 +29,55 @@ func drainChFor(d time.Duration, ch <-chan EngineEvent) {
 	}
 }
 
+func TestEngine_CompactE2E_longTranscriptTriggersExecutor(t *testing.T) {
+	longReply := strings.Repeat("xy ", 400)
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return longReply, nil
+			}),
+		},
+		Model: "m", MaxTokens: 64,
+		CompactAdvisor: func(_ query.LoopState, transcriptLen int) (bool, bool) {
+			return transcriptLen > 1200, false
+		},
+		CompactExecutor: func(_ context.Context, phase compact.RunPhase, _ []byte) (string, error) {
+			_ = phase
+			return "e2e-compact-summary", nil
+		},
+	})
+	e.Submit("hi")
+	ch := e.Events()
+	deadline := time.After(3 * time.Second)
+	var sawSuggest, sawResult, sawDone bool
+	for {
+		select {
+		case ev := <-ch:
+			switch ev.Kind {
+			case EventKindCompactSuggest:
+				sawSuggest = true
+			case EventKindCompactResult:
+				sawResult = true
+				if ev.CompactSummary != "e2e-compact-summary" || ev.Err != nil {
+					t.Fatalf("%+v", ev)
+				}
+			case EventKindDone:
+				sawDone = true
+				goto compactE2EDone
+			case EventKindError:
+				t.Fatal(ev.Err)
+			}
+		case <-deadline:
+			t.Fatalf("timeout suggest=%v result=%v done=%v", sawSuggest, sawResult, sawDone)
+		}
+	}
+compactE2EDone:
+	e.Wait()
+	if !sawSuggest || !sawResult {
+		t.Fatalf("suggest=%v result=%v", sawSuggest, sawResult)
+	}
+}
+
 func TestEngine_TokenBudget_blocksOversizeResolvedText(t *testing.T) {
 	t.Setenv(features.EnvTokenBudget, "true")
 	t.Setenv(features.EnvTokenBudgetMaxInputBytes, "10")
