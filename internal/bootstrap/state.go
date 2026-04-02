@@ -20,6 +20,35 @@ type State struct {
 	durationMs atomic.Uint64
 	// meterEvents counts lightweight metering ticks (placeholder).
 	meterEvents atomic.Uint64
+
+	usageMu   sync.Mutex
+	lastUsage TokenUsage
+}
+
+// TokenUsage holds token counts from the last Messages API usage block (align cost-tracker / usage.ts).
+type TokenUsage struct {
+	InputTokens              int64
+	CacheCreationInputTokens int64
+	CacheReadInputTokens     int64
+	OutputTokens             int64
+}
+
+// RecordTokenUsage updates the last snapshot and bumps TotalCost with a coarse per-1k-token placeholder.
+func (s *State) RecordTokenUsage(u TokenUsage) {
+	s.usageMu.Lock()
+	s.lastUsage = u
+	s.usageMu.Unlock()
+	combined := u.InputTokens + u.CacheCreationInputTokens + u.CacheReadInputTokens + u.OutputTokens
+	if combined > 0 {
+		s.AddTotalCost(uint64((combined + 999) / 1000))
+	}
+}
+
+// LastTokenUsage returns the last recorded usage.
+func (s *State) LastTokenUsage() TokenUsage {
+	s.usageMu.Lock()
+	defer s.usageMu.Unlock()
+	return s.lastUsage
 }
 
 // NewState returns an empty State.

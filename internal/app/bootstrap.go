@@ -7,9 +7,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"time"
 
+	"github.com/2456868764/rabbit-code/internal/anthropic"
 	"github.com/2456868764/rabbit-code/internal/bootstrap"
 	"github.com/2456868764/rabbit-code/internal/features"
 )
@@ -67,6 +69,11 @@ func Bootstrap(ctx context.Context) (*Runtime, error) {
 		reg.Run()
 		return nil, fmt.Errorf("cert pool: %w", err)
 	}
+
+	preconnectClient := &http.Client{
+		Transport: anthropic.HTTPTransportWithProxyFromEnvAndRoots(pool),
+	}
+	_ = anthropic.PreconnectHEAD(ctx, preconnectClient, anthropic.BaseURL(anthropic.DetectProvider()))
 
 	cwd, err := os.Getwd()
 	if err != nil {
