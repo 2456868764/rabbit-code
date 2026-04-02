@@ -1,0 +1,68 @@
+package querydeps
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/2456868764/rabbit-code/internal/anthropic"
+	"github.com/2456868764/rabbit-code/internal/features"
+)
+
+func TestAnthropicAssistant_nilClient(t *testing.T) {
+	a := &AnthropicAssistant{Client: nil}
+	_, err := a.StreamAssistant(context.Background(), "m", 1, []byte(`[]`))
+	if err != ErrNilAnthropicClient {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestAnthropicAssistant_httptest(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("x-api-key") != "k" {
+			http.Error(w, "auth", http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"hi\"}}\n\n")
+		_, _ = io.WriteString(w, "data: {\"type\":\"message_stop\"}\n\n")
+	}))
+	defer srv.Close()
+
+	t.Setenv(features.EnvUseBedrock, "")
+	t.Setenv(features.EnvUseVertex, "")
+	t.Setenv(features.EnvUseFoundry, "")
+
+	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl.BaseURL = srv.URL
+	cl.Provider = anthropic.ProviderAnthropic
+
+	a := &AnthropicAssistant{
+		Client:           cl,
+		DefaultModel:     "m",
+		DefaultMaxTokens: 8,
+		Policy:           anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+	}
+	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
+	text, err := a.StreamAssistant(context.Background(), "", 0, msgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text != "hi" {
+		t.Fatalf("got %q", text)
+	}
+}
+
+func TestStreamAssistantFunc(t *testing.T) {
+	var f StreamAssistantFunc = func(ctx context.Context, model string, maxTokens int, messagesJSON []byte) (string, error) {
+		return fmt.Sprintf("%s:%d:%s", model, maxTokens, string(messagesJSON)), nil
+	}
+	out, err := f.StreamAssistant(context.Background(), "x", 3, []byte(`[]`))
+	if err != nil || out != "x:3:[]" {
+		t.Fatalf("%q %v", out, err)
+	}
+}
