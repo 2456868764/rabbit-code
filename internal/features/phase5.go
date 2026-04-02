@@ -39,6 +39,8 @@ const (
 	EnvHistorySnipMaxRounds = "RABBIT_CODE_HISTORY_SNIP_MAX_ROUNDS"
 	// EnvTemplateNames comma-separated names emitted with EventKindTemplatesActive when TEMPLATES is on.
 	EnvTemplateNames = "RABBIT_CODE_TEMPLATE_NAMES"
+	// EnvTemplateDir: when TEMPLATES is on, load <name>.md from this directory and append to resolved user text.
+	EnvTemplateDir = "RABBIT_CODE_TEMPLATE_DIR"
 )
 
 func TokenBudgetEnabled() bool { return truthy(os.Getenv(EnvTokenBudget)) }
@@ -208,6 +210,14 @@ func TemplateNames() []string {
 		return nil
 	}
 	return splitCommaEnv(os.Getenv(EnvTemplateNames))
+}
+
+// TemplateMarkdownDir returns RABBIT_CODE_TEMPLATE_DIR when TEMPLATES is enabled.
+func TemplateMarkdownDir() string {
+	if !TemplatesEnabled() {
+		return ""
+	}
+	return strings.TrimSpace(os.Getenv(EnvTemplateDir))
 }
 
 func splitCommaEnv(s string) []string {

@@ -48,6 +48,8 @@ type Config struct {
 	RecoverStrategy RecoverStrategy
 	// OrphanPermissionAdvisor, if set, runs after a successful loop; emit EventKindOrphanPermission when ok (P5.3.3 stub).
 	OrphanPermissionAdvisor func(st query.LoopState) (orphanToolUseID string, ok bool)
+	// TemplateDir if set overrides RABBIT_CODE_TEMPLATE_DIR for loading <name>.md when TEMPLATES is on (P5.F.7).
+	TemplateDir string
 }
 
 // Engine coordinates cancellable query turns (stub or real StreamAssistant / RunTurnLoop).
@@ -68,6 +70,7 @@ type Engine struct {
 	orphanPermissionAdvisor          func(query.LoopState) (string, bool)
 	maxAssistantTurns                int
 	suggestCompactOnRecoverableError bool
+	templateDir                      string
 }
 
 // NewEngine is equivalent to New(parent, nil) (stub assistant).
@@ -117,8 +120,16 @@ func New(parent context.Context, cfg *Config) *Engine {
 			e.maxAssistantTurns = cfg.MaxAssistantTurns
 		}
 		e.suggestCompactOnRecoverableError = cfg.SuggestCompactOnRecoverableError
+		e.templateDir = strings.TrimSpace(cfg.TemplateDir)
 	}
 	return e
+}
+
+func (e *Engine) templateAppendixDir() string {
+	if e.templateDir != "" {
+		return e.templateDir
+	}
+	return features.TemplateMarkdownDir()
 }
 
 // Events receives engine lifecycle events.
@@ -258,6 +269,21 @@ func (e *Engine) runTurnLoop(userText string) {
 	if nFrag > 0 {
 		if !e.trySend(EngineEvent{Kind: EventKindMemdirInject, MemdirFragmentCount: nFrag}) {
 			return
+		}
+	}
+
+	if dir := e.templateAppendixDir(); dir != "" {
+		names := features.TemplateNames()
+		if len(names) > 0 {
+			app, err := query.LoadTemplateMarkdownAppendix(dir, names)
+			if err != nil {
+				loopErr = err
+				e.trySend(EngineEvent{Kind: EventKindError, Err: err})
+				return
+			}
+			if app != "" {
+				resolved += app
+			}
 		}
 	}
 

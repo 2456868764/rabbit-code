@@ -102,6 +102,14 @@ func TestSnipCompactThresholds(t *testing.T) {
 	}
 }
 
+func TestTemplateMarkdownDir(t *testing.T) {
+	t.Setenv(EnvTemplates, "1")
+	t.Setenv(EnvTemplateDir, "/tmp/tpl")
+	if TemplateMarkdownDir() != "/tmp/tpl" {
+		t.Fatal()
+	}
+}
+
 func TestTemplateNames(t *testing.T) {
 	t.Setenv(EnvTemplates, "true")
 	t.Setenv(EnvTemplateNames, " a , b ")

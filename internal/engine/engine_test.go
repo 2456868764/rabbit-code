@@ -777,6 +777,40 @@ func TestEngine_Phase5_breakCacheTemplatesMicrocompactEvents(t *testing.T) {
 	}
 }
 
+func TestEngine_templateMarkdownAppendixFromDir(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.md"), []byte("BODY"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(features.EnvTemplates, "true")
+	t.Setenv(features.EnvTemplateNames, "a")
+	var captured string
+	e := New(context.Background(), &Config{
+		TemplateDir: dir,
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+				captured = string(messagesJSON)
+				return "x", nil
+			}),
+		},
+	})
+	e.Submit("u")
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindDone {
+				if captured == "" || !strings.Contains(captured, "BODY") || !strings.Contains(captured, "## Template a") {
+					t.Fatalf("messages %q", captured)
+				}
+				e.Wait()
+				return
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
 func TestEngine_UserSubmit_carriesPhase5ModeTags(t *testing.T) {
 	t.Setenv(features.EnvUltrathink, "true")
 	t.Setenv(features.EnvUltraplan, "true")
