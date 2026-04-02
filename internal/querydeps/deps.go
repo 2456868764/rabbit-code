@@ -19,6 +19,8 @@ type StreamAssistant interface {
 type Deps struct {
 	Tools     ToolRunner
 	Assistant StreamAssistant
+	// Turn, if set, drives tool rounds in query.LoopDriver.RunTurnLoop; otherwise Assistant is wrapped as text-only.
+	Turn TurnAssistant
 }
 
 // NoopToolRunner returns ErrNoToolRunner from RunTool.
