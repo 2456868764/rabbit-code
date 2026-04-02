@@ -26,6 +26,7 @@ func ApplyTransition(s LoopState, t Transition) LoopState {
 		}
 	case TranStartCompact:
 		out.InCompact = true
+		out.CompactCount++
 	case TranFinishCompact:
 		out.InCompact = false
 	default:

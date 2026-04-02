@@ -7,7 +7,10 @@ type LoopState struct {
 	InCompact    bool
 	// MaxTurns if > 0 caps assistant turns (enforcement in loop later).
 	MaxTurns int
-	// Recovery / stream metadata (P5.1.1 seed; full recovery loop later).
+	// CompactCount increments on TranStartCompact (P5.1.1 / P5.2.1 bookkeeping).
+	CompactCount int
+	// Recovery / stream metadata (P5.1.1).
+	RecoveryPhase    RecoveryPhase
 	RecoveryAttempts int
 	LastStopReason   string
 	HadStreamError   bool

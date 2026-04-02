@@ -22,3 +22,12 @@ func TestRunPhase_Next(t *testing.T) {
 		t.Fatal(p)
 	}
 }
+
+func TestParsePhase(t *testing.T) {
+	if ParsePhase("auto_pending") != RunAutoPending {
+		t.Fatal()
+	}
+	if ParsePhase("") != RunIdle {
+		t.Fatal()
+	}
+}

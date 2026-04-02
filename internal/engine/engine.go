@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"sync"
@@ -12,6 +13,15 @@ import (
 	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/querydeps"
 )
+
+// StopHookFunc runs after each Submit’s RunTurnLoop attempt finishes (success or failure). Hooks run in slice order; legacy StopHook is appended after StopHooks (P5.1.4).
+type StopHookFunc func(ctx context.Context, st query.LoopState, err error)
+
+// RecoverStrategy returns true to run exactly one additional RunTurnLoop after a failure (P5.1.3).
+type RecoverStrategy func(ctx context.Context, st query.LoopState, err error) bool
+
+// CompactExecutor runs after a compact suggest when set (P5.2.1 stub / closure).
+type CompactExecutor func(ctx context.Context, phase compact.RunPhase, transcriptJSON []byte) (summary string, err error)
 
 // Config configures optional streaming backend (nil Assistant keeps stub behavior).
 type Config struct {
@@ -26,8 +36,14 @@ type Config struct {
 	SuggestCompactOnRecoverableError bool
 	// CompactAdvisor, if set, runs after a successful turn loop to surface scheduling hints (P5.2.1 stub).
 	CompactAdvisor func(st query.LoopState, transcriptJSONLen int) (autoCompact, reactiveCompact bool)
-	// StopHook runs after RunTurnLoop finishes (err nil on success). Same engine context (P5.1.4).
-	StopHook func(ctx context.Context, st query.LoopState, err error)
+	// CompactExecutor, if set, runs after each CompactSuggest from CompactAdvisor; emits EventKindCompactResult (P5.2.1).
+	CompactExecutor CompactExecutor
+	// StopHooks run after RunTurnLoop finishes for the Submit (see StopHookFunc).
+	StopHooks []StopHookFunc
+	// StopHook is equivalent to appending one element to StopHooks (backward compatible).
+	StopHook StopHookFunc
+	// RecoverStrategy enables a second RunTurnLoop attempt when it returns true on the first failure.
+	RecoverStrategy RecoverStrategy
 	// OrphanPermissionAdvisor, if set, runs after a successful loop; emit EventKindOrphanPermission when ok (P5.3.3 stub).
 	OrphanPermissionAdvisor func(st query.LoopState) (orphanToolUseID string, ok bool)
 }
@@ -44,7 +60,9 @@ type Engine struct {
 	stubDelay                        time.Duration
 	memdirPaths                      []string
 	compactAdvisor                   func(query.LoopState, int) (bool, bool)
-	stopHook                         func(context.Context, query.LoopState, error)
+	compactExecutor                  CompactExecutor
+	stopHooks                        []StopHookFunc
+	recoverStrategy                  RecoverStrategy
 	orphanPermissionAdvisor          func(query.LoopState) (string, bool)
 	maxAssistantTurns                int
 	suggestCompactOnRecoverableError bool
@@ -86,7 +104,12 @@ func New(parent context.Context, cfg *Config) *Engine {
 		}
 		e.memdirPaths = append([]string(nil), cfg.MemdirPaths...)
 		e.compactAdvisor = cfg.CompactAdvisor
-		e.stopHook = cfg.StopHook
+		e.compactExecutor = cfg.CompactExecutor
+		e.stopHooks = append([]StopHookFunc(nil), cfg.StopHooks...)
+		if cfg.StopHook != nil {
+			e.stopHooks = append(e.stopHooks, cfg.StopHook)
+		}
+		e.recoverStrategy = cfg.RecoverStrategy
 		e.orphanPermissionAdvisor = cfg.OrphanPermissionAdvisor
 		if cfg.MaxAssistantTurns > 0 {
 			e.maxAssistantTurns = cfg.MaxAssistantTurns
@@ -149,17 +172,58 @@ func (e *Engine) applyMemdir(userText string) (resolved string, nFrag int, err e
 	return b.String(), len(frags), nil
 }
 
+func (e *Engine) invokeStopHooks(st *query.LoopState, loopErr error) {
+	for _, h := range e.stopHooks {
+		if h != nil {
+			h(e.ctx, *st, loopErr)
+		}
+	}
+}
+
+func (e *Engine) loopObservers() *query.LoopObservers {
+	return &query.LoopObservers{
+		OnAssistantText: func(text string) {
+			if text != "" {
+				e.trySend(EngineEvent{Kind: EventKindAssistantText, AssistText: text})
+			}
+		},
+		OnToolStart: func(name, id string, input []byte) {
+			e.trySend(EngineEvent{
+				Kind:          EventKindToolCallStart,
+				ToolName:      name,
+				ToolUseID:     id,
+				ToolInputJSON: string(input),
+			})
+		},
+		OnToolDone: func(name, id string, result []byte) {
+			e.trySend(EngineEvent{
+				Kind:           EventKindToolCallDone,
+				ToolName:       name,
+				ToolUseID:      id,
+				ToolResultJSON: string(result),
+			})
+		},
+		OnToolError: func(name, id string, err error) {
+			e.trySend(EngineEvent{
+				Kind:      EventKindToolCallFailed,
+				ToolName:  name,
+				ToolUseID: id,
+				Err:       err,
+			})
+			if oid, ok := querydeps.OrphanToolUseID(err); ok && oid != "" {
+				e.trySend(EngineEvent{
+					Kind:            EventKindOrphanPermission,
+					OrphanToolUseID: oid,
+				})
+			}
+		},
+	}
+}
+
 func (e *Engine) runTurnLoop(userText string) {
 	st := &query.LoopState{}
-	if e.maxAssistantTurns > 0 {
-		st.MaxTurns = e.maxAssistantTurns
-	}
 	var loopErr error
-	defer func() {
-		if e.stopHook != nil {
-			e.stopHook(e.ctx, *st, loopErr)
-		}
-	}()
+	defer func() { e.invokeStopHooks(st, loopErr) }()
 
 	resolved, nFrag, err := e.applyMemdir(userText)
 	if err != nil {
@@ -173,65 +237,101 @@ func (e *Engine) runTurnLoop(userText string) {
 		}
 	}
 
-	d := query.LoopDriver{
-		Deps: querydeps.Deps{
-			Tools:     e.deps.Tools,
-			Assistant: e.deps.Assistant,
-			Turn:      e.deps.Turn,
-		},
-		Model:     e.model,
-		MaxTokens: e.maxTokens,
-		Observe: &query.LoopObservers{
-			OnAssistantText: func(text string) {
-				if text != "" {
-					e.trySend(EngineEvent{Kind: EventKindAssistantText, AssistText: text})
-				}
-			},
-			OnToolStart: func(name, id string, input []byte) {
-				e.trySend(EngineEvent{
-					Kind:          EventKindToolCallStart,
-					ToolName:      name,
-					ToolUseID:     id,
-					ToolInputJSON: string(input),
-				})
-			},
-			OnToolDone: func(name, id string, result []byte) {
-				e.trySend(EngineEvent{
-					Kind:           EventKindToolCallDone,
-					ToolName:       name,
-					ToolUseID:      id,
-					ToolResultJSON: string(result),
-				})
-			},
-		},
+	maxAttempts := 1
+	if e.recoverStrategy != nil {
+		maxAttempts = 2
 	}
 
-	msgs, _, err := d.RunTurnLoop(e.ctx, st, resolved)
-	if err != nil {
-		loopErr = err
-		if errors.Is(err, context.Canceled) || errors.Is(e.ctx.Err(), context.Canceled) {
+	var msgs json.RawMessage
+	succeeded := false
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt == 0 {
+			if e.maxAssistantTurns > 0 {
+				st.MaxTurns = e.maxAssistantTurns
+			}
+		} else {
+			preserve := struct {
+				maxTurns         int
+				compactCount     int
+				recoveryAttempts int
+				recoveryPhase    query.RecoveryPhase
+			}{
+				maxTurns:         st.MaxTurns,
+				compactCount:     st.CompactCount,
+				recoveryAttempts: st.RecoveryAttempts,
+				recoveryPhase:    st.RecoveryPhase,
+			}
+			*st = query.LoopState{
+				MaxTurns:         preserve.maxTurns,
+				CompactCount:     preserve.compactCount,
+				RecoveryAttempts: preserve.recoveryAttempts,
+				RecoveryPhase:    preserve.recoveryPhase,
+			}
+			st.RecoveryPhase = query.RecoveryRetriedOnce
+		}
+
+		d := query.LoopDriver{
+			Deps: querydeps.Deps{
+				Tools:     e.deps.Tools,
+				Assistant: e.deps.Assistant,
+				Turn:      e.deps.Turn,
+			},
+			Model:     e.model,
+			MaxTokens: e.maxTokens,
+			Observe:   e.loopObservers(),
+		}
+
+		var runErr error
+		msgs, _, runErr = d.RunTurnLoop(e.ctx, st, resolved)
+		if runErr == nil {
+			succeeded = true
+			loopErr = nil
+			break
+		}
+		loopErr = runErr
+		if errors.Is(runErr, context.Canceled) || errors.Is(e.ctx.Err(), context.Canceled) {
 			return
 		}
 		st.HadStreamError = true
-		kind, rec := classifyAnthropicError(err)
+		kind, rec := classifyAnthropicError(runErr)
 		st.LastAPIErrorKind = kind
 		if rec {
 			st.RecoveryAttempts++
+			if st.RecoveryPhase == query.RecoveryNone {
+				st.RecoveryPhase = query.RecoveryPendingCompact
+			}
 		}
 		if rec && e.suggestCompactOnRecoverableError {
-			phase := compact.RunIdle.Next(true, false)
+			ph := compact.RunIdle.Next(true, false)
 			e.trySend(EngineEvent{
 				Kind:               EventKindCompactSuggest,
-				CompactPhase:       phase.String(),
+				CompactPhase:       ph.String(),
 				SuggestAutoCompact: true,
 			})
+			if e.compactExecutor != nil {
+				sum, exErr := e.compactExecutor(e.ctx, ph, msgs)
+				e.trySend(EngineEvent{
+					Kind:           EventKindCompactResult,
+					CompactPhase:   ph.String(),
+					CompactSummary: sum,
+					Err:            exErr,
+				})
+			}
+		}
+		willRetry := attempt+1 < maxAttempts && e.recoverStrategy != nil && e.recoverStrategy(e.ctx, *st, runErr)
+		if willRetry {
+			continue
 		}
 		e.trySend(EngineEvent{
 			Kind:               EventKindError,
-			Err:                err,
+			Err:                runErr,
 			APIErrorKind:       kind,
 			RecoverableCompact: rec,
 		})
+		return
+	}
+
+	if !succeeded {
 		return
 	}
 
@@ -254,10 +354,20 @@ func (e *Engine) runTurnLoop(userText string) {
 				SuggestAutoCompact:     auto,
 				SuggestReactiveCompact: react,
 			})
+			if e.compactExecutor != nil {
+				sum, exErr := e.compactExecutor(e.ctx, phase, msgs)
+				e.trySend(EngineEvent{
+					Kind:           EventKindCompactResult,
+					CompactPhase:   phase.String(),
+					CompactSummary: sum,
+					Err:            exErr,
+				})
+				_ = exErr
+			}
 		}
 	}
 
-	e.trySend(EngineEvent{Kind: EventKindDone})
+	e.trySend(EngineEvent{Kind: EventKindDone, LoopTurnCount: st.TurnCount})
 }
 
 func (e *Engine) trySend(ev EngineEvent) bool {

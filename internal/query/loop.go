@@ -64,10 +64,16 @@ func (d *LoopDriver) RunToolStep(ctx context.Context, st *LoopState, name string
 		*st = ApplyTransition(*st, TranScheduleTools)
 	}
 	out, err := d.Deps.Tools.RunTool(ctx, name, input)
+	if err != nil {
+		if st != nil {
+			*st = ApplyTransition(*st, TranToolCallsDone)
+		}
+		return nil, err
+	}
 	if st != nil {
 		*st = ApplyTransition(*st, TranToolCallsDone)
 	}
-	return out, err
+	return out, nil
 }
 
 // RunAssistantChain performs N assistant-only steps (mock multi-turn without tool_calls parsing).
@@ -135,6 +141,9 @@ func (d *LoopDriver) RunTurnLoop(ctx context.Context, st *LoopState, userText st
 			}
 			out, err := d.RunToolStep(ctx, st, u.Name, u.Input)
 			if err != nil {
+				if o := d.Observe; o != nil && o.OnToolError != nil {
+					o.OnToolError(u.Name, u.ID, err)
+				}
 				return msgs, lastAssistantText, err
 			}
 			if o := d.Observe; o != nil && o.OnToolDone != nil {

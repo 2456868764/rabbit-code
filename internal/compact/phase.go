@@ -25,6 +25,22 @@ func (p RunPhase) String() string {
 	}
 }
 
+// ParsePhase maps engine / event strings back to RunPhase (best-effort).
+func ParsePhase(s string) RunPhase {
+	switch s {
+	case "idle", "":
+		return RunIdle
+	case "auto_pending":
+		return RunAutoPending
+	case "reactive_pending":
+		return RunReactivePending
+	case "executing":
+		return RunExecuting
+	default:
+		return RunIdle
+	}
+}
+
 // Next returns the following phase for a successful scheduling edge (stub state machine).
 func (p RunPhase) Next(auto, reactive bool) RunPhase {
 	switch p {

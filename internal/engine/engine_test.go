@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/2456868764/rabbit-code/internal/anthropic"
+	"github.com/2456868764/rabbit-code/internal/compact"
 	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/querydeps"
 )
@@ -239,6 +240,28 @@ func TestEngine_Error_anthropicKindAndRecoverable(t *testing.T) {
 	}
 }
 
+func TestEngine_StopHooks_order(t *testing.T) {
+	var order []int
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "ok", nil
+			}),
+		},
+		StopHooks: []StopHookFunc{
+			func(context.Context, query.LoopState, error) { order = append(order, 1) },
+			func(context.Context, query.LoopState, error) { order = append(order, 2) },
+		},
+		StopHook: func(context.Context, query.LoopState, error) { order = append(order, 3) },
+	})
+	e.Submit("x")
+	drainUntilTerminal(t, e.Events())
+	e.Wait()
+	if len(order) != 3 || order[0] != 1 || order[1] != 2 || order[2] != 3 {
+		t.Fatalf("got %v", order)
+	}
+}
+
 func TestEngine_StopHook_successAndFailure(t *testing.T) {
 	var calls int
 	var lastErr error
@@ -379,6 +402,181 @@ type countingToolRunner struct{ n int }
 func (c *countingToolRunner) RunTool(context.Context, string, []byte) ([]byte, error) {
 	c.n++
 	return []byte(`{}`), nil
+}
+
+func TestEngine_RecoverStrategy_secondAttemptSucceeds(t *testing.T) {
+	var n int
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				n++
+				if n == 1 {
+					return "", errors.New("transient")
+				}
+				return "ok", nil
+			}),
+		},
+		RecoverStrategy: func(context.Context, query.LoopState, error) bool { return true },
+	})
+	e.Submit("x")
+	ch := e.Events()
+	deadline := time.After(2 * time.Second)
+	var sawDone bool
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindDone {
+				sawDone = true
+				if ev.LoopTurnCount != 1 {
+					t.Fatalf("turns %d", ev.LoopTurnCount)
+				}
+				goto recDone
+			}
+			if ev.Kind == EventKindError {
+				t.Fatalf("unexpected error before retry success: %v", ev.Err)
+			}
+		case <-deadline:
+			t.Fatal("timeout")
+		}
+	}
+recDone:
+	e.Wait()
+	if !sawDone || n != 2 {
+		t.Fatalf("done=%v n=%d", sawDone, n)
+	}
+}
+
+func TestEngine_BashStubToolRunner(t *testing.T) {
+	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+		{Text: "run", ToolUses: []querydeps.ToolUseCall{{ID: "t1", Name: "bash", Input: json.RawMessage(`{"cmd":"ls"}`)}}},
+		{Text: "done"},
+	}}
+	e := New(context.Background(), &Config{
+		Deps:  querydeps.Deps{Tools: querydeps.BashStubToolRunner{}, Turn: turns},
+		Model: "m", MaxTokens: 8,
+	})
+	e.Submit("hi")
+	drainUntilTerminal(t, e.Events())
+	e.Wait()
+}
+
+func TestEngine_ToolCallFailed_emitsOrphanFromError(t *testing.T) {
+	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+		{Text: "x", ToolUses: []querydeps.ToolUseCall{{ID: "orph1", Name: "bash", Input: json.RawMessage(`{}`)}}},
+	}}
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Turn: turns,
+			Tools: toolRunnerFunc(func(_ context.Context, _ string, _ []byte) ([]byte, error) {
+				return nil, &querydeps.OrphanPermissionError{ToolUseID: "orph1"}
+			}),
+		},
+		Model: "m", MaxTokens: 8,
+	})
+	e.Submit("z")
+	ch := e.Events()
+	deadline := time.After(2 * time.Second)
+	var sawFail, sawOrphan bool
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindToolCallFailed {
+				sawFail = true
+			}
+			if ev.Kind == EventKindOrphanPermission && ev.OrphanToolUseID == "orph1" {
+				sawOrphan = true
+			}
+			if ev.Kind == EventKindError {
+				if !sawFail || !sawOrphan {
+					t.Fatalf("fail=%v orphan=%v", sawFail, sawOrphan)
+				}
+				e.Wait()
+				return
+			}
+		case <-deadline:
+			t.Fatal("timeout")
+		}
+	}
+}
+
+type toolRunnerFunc func(context.Context, string, []byte) ([]byte, error)
+
+func (f toolRunnerFunc) RunTool(ctx context.Context, name string, in []byte) ([]byte, error) {
+	return f(ctx, name, in)
+}
+
+func TestEngine_CompactExecutor_afterAdvisor(t *testing.T) {
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "y", nil
+			}),
+		},
+		CompactAdvisor: func(_ query.LoopState, _ int) (bool, bool) { return true, false },
+		CompactExecutor: func(_ context.Context, phase compact.RunPhase, transcript []byte) (string, error) {
+			_ = phase
+			if len(transcript) == 0 {
+				return "", errors.New("empty transcript")
+			}
+			return "summary-ok", nil
+		},
+	})
+	e.Submit("u")
+	ch := e.Events()
+	deadline := time.After(2 * time.Second)
+	var sawSuggest, sawResult bool
+	for {
+		select {
+		case ev := <-ch:
+			switch ev.Kind {
+			case EventKindCompactSuggest:
+				sawSuggest = true
+			case EventKindCompactResult:
+				sawResult = true
+				if ev.CompactSummary != "summary-ok" || ev.Err != nil {
+					t.Fatalf("%+v", ev)
+				}
+			case EventKindDone:
+				e.Wait()
+				if !sawSuggest || !sawResult {
+					t.Fatalf("suggest=%v result=%v", sawSuggest, sawResult)
+				}
+				return
+			case EventKindError:
+				t.Fatal(ev.Err)
+			}
+		case <-deadline:
+			t.Fatal("timeout")
+		}
+	}
+}
+
+func TestEngine_Submit_withStreamAssistant_doneTurnCount(t *testing.T) {
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "out", nil
+			}),
+		},
+		Model: "m", MaxTokens: 16,
+	})
+	e.Submit("in")
+	ch := e.Events()
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindDone {
+				if ev.LoopTurnCount != 1 {
+					t.Fatalf("turns %d", ev.LoopTurnCount)
+				}
+				e.Wait()
+				return
+			}
+		case <-deadline:
+			t.Fatal("timeout")
+		}
+	}
 }
 
 func TestEngine_SubmitCancelRace(t *testing.T) {

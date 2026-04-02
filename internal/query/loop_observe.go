@@ -5,4 +5,5 @@ type LoopObservers struct {
 	OnAssistantText func(text string)
 	OnToolStart     func(name, toolUseID string, input []byte)
 	OnToolDone      func(name, toolUseID string, result []byte)
+	OnToolError     func(name, toolUseID string, err error)
 }

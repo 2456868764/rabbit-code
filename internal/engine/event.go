@@ -9,8 +9,10 @@ const (
 	EventKindAssistantText
 	EventKindToolCallStart
 	EventKindToolCallDone
+	EventKindToolCallFailed
 	EventKindOrphanPermission
 	EventKindCompactSuggest
+	EventKindCompactResult
 	EventKindDone
 	EventKindError
 )
@@ -38,4 +40,8 @@ type EngineEvent struct {
 	RecoverableCompact bool
 	// OrphanToolUseID is set for EventKindOrphanPermission (P5.3.3 stub).
 	OrphanToolUseID string
+	// LoopTurnCount is set on EventKindDone (assistant rounds finished in this Submit).
+	LoopTurnCount int
+	// CompactSummary is set on EventKindCompactResult when CompactExecutor runs (P5.2.1).
+	CompactSummary string
 }
