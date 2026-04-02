@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -79,13 +80,23 @@ func BaseURL(p Provider) string {
 	}
 }
 
+// BedrockStreamPath returns the Bedrock Runtime invoke-with-response-stream path for modelID.
+// When modelID is empty, returns the legacy placeholder used by MessagesPath(ProviderBedrock).
+func BedrockStreamPath(modelID string) string {
+	modelID = strings.TrimSpace(modelID)
+	if modelID == "" {
+		return "/model/invoke-with-response-stream"
+	}
+	return fmt.Sprintf("/model/%s/invoke-with-response-stream", url.PathEscape(modelID))
+}
+
 // MessagesPath returns HTTP path for Messages create (1P vs cloud differ; tests use 1P).
 func MessagesPath(p Provider) string {
 	switch p {
 	case ProviderAnthropic:
 		return "/v1/messages"
 	case ProviderBedrock:
-		return "/model/invoke-with-response-stream" // simplified; real Bedrock path model-specific
+		return BedrockStreamPath("") // placeholder without model; use BedrockStreamPath(model) for real calls
 	case ProviderVertex, ProviderFoundry:
 		return "/v1/messages" // Foundry/Vertex often expose Anthropic-compatible subpaths; tests mock host
 	default:
