@@ -31,6 +31,17 @@ func TestStrictForeground529Enabled(t *testing.T) {
 	}
 }
 
+func TestAttributionHeaderPromptEnabled(t *testing.T) {
+	t.Setenv(EnvAttributionHeader, "0")
+	if AttributionHeaderPromptEnabled() {
+		t.Fatal()
+	}
+	t.Setenv(EnvAttributionHeader, "1")
+	if !AttributionHeaderPromptEnabled() {
+		t.Fatal()
+	}
+}
+
 func TestAntiDistillationRequestHeader(t *testing.T) {
 	t.Setenv(EnvAntiDistillation, "1")
 	t.Setenv(EnvAntiDistillationHeader, "X-Custom-AD")

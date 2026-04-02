@@ -37,6 +37,8 @@ const (
 	EnvHTTPUserAgent = "RABBIT_CODE_USER_AGENT"
 	// EnvStrictForeground529 sets DefaultPolicy().StrictForeground529 (withRetry.ts FOREGROUND_529_RETRY_SOURCES gate for HTTP 529).
 	EnvStrictForeground529 = "RABBIT_CODE_STRICT_FOREGROUND_529"
+	// EnvAttributionHeader when set to a falsy value disables the billing attribution system line (CLAUDE_CODE_ATTRIBUTION_HEADER); unset = enabled.
+	EnvAttributionHeader = "RABBIT_CODE_ATTRIBUTION_HEADER"
 )
 
 // UnattendedRetryEnabled mirrors UNATTENDED_RETRY + CLAUDE_CODE_UNATTENDED_RETRY.
@@ -128,4 +130,13 @@ func E2EMockAPI() bool {
 // StrictForeground529Enabled when true, DefaultPolicy uses strict 529 retry whitelist (see anthropic.foreground529RetrySources).
 func StrictForeground529Enabled() bool {
 	return truthy(os.Getenv(EnvStrictForeground529))
+}
+
+// AttributionHeaderPromptEnabled mirrors system.ts isAttributionHeaderEnabled: default true unless RABBIT_CODE_ATTRIBUTION_HEADER is set and falsy.
+func AttributionHeaderPromptEnabled() bool {
+	v, ok := os.LookupEnv(EnvAttributionHeader)
+	if !ok {
+		return true
+	}
+	return truthy(v)
 }
