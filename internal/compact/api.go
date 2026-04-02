@@ -1,5 +1,5 @@
 // Package compact holds API-adjacent compact hooks for Phase 4 (CACHED_MICROCOMPACT, PROMPT_CACHE_BREAK_DETECTION).
-// Full auto/reactive compact state machine is Phase 5; this package only exposes flags and request-shape helpers.
+// Phase 5 adds RunPhase scheduling skeleton (phase.go); full auto/reactive machine still expands here.
 package compact
 
 import (
