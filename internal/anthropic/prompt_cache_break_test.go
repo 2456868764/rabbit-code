@@ -32,9 +32,13 @@ func TestIsPromptCacheBreakStreamJSON(t *testing.T) {
 func TestReadAssistantStream_PromptCacheBreak(t *testing.T) {
 	t.Setenv(features.EnvPromptCacheBreak, "1")
 	raw := "data: {\"type\":\"error\",\"error\":{\"message\":\"cache_break\"}}\n\n"
-	_, _, err := ReadAssistantStream(context.Background(), strings.NewReader(raw))
+	var called bool
+	_, _, err := ReadAssistantStream(context.Background(), strings.NewReader(raw), WithOnPromptCacheBreak(func() { called = true }))
 	if !errors.Is(err, ErrPromptCacheBreakDetected) {
 		t.Fatalf("got %v", err)
+	}
+	if !called {
+		t.Fatal("expected onPromptCacheBreak")
 	}
 }
 

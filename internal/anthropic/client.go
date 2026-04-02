@@ -206,9 +206,10 @@ func (c *Client) PostMessagesStreamReadAssistant(ctx context.Context, body Messa
 }
 
 type readAssistantConfig struct {
-	thinking         *strings.Builder
-	compaction       *strings.Builder
-	toolInputByBlock map[int]*strings.Builder
+	thinking           *strings.Builder
+	compaction         *strings.Builder
+	toolInputByBlock   map[int]*strings.Builder
+	onPromptCacheBreak func()
 }
 
 // ReadAssistantOption configures ReadAssistantStream.
@@ -232,6 +233,13 @@ func WithCompactionAccumulator(acc *strings.Builder) ReadAssistantOption {
 func WithToolInputAccumulators(byIndex map[int]*strings.Builder) ReadAssistantOption {
 	return func(c *readAssistantConfig) {
 		c.toolInputByBlock = byIndex
+	}
+}
+
+// WithOnPromptCacheBreak runs fn when PROMPT_CACHE_BREAK_DETECTION matches an SSE error before returning ErrPromptCacheBreakDetected (AC4-F3 hook).
+func WithOnPromptCacheBreak(fn func()) ReadAssistantOption {
+	return func(c *readAssistantConfig) {
+		c.onPromptCacheBreak = fn
 	}
 }
 
@@ -275,6 +283,9 @@ func ReadAssistantStream(ctx context.Context, body io.Reader, opts ...ReadAssist
 		case "error":
 			var evErr error
 			if IsPromptCacheBreakStreamJSON(ev.JSON) {
+				if cfg.onPromptCacheBreak != nil {
+					cfg.onPromptCacheBreak()
+				}
 				evErr = ErrPromptCacheBreakDetected
 			} else {
 				evErr = fmt.Errorf("stream error event: %s", string(ev.JSON))

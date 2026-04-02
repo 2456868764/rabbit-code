@@ -17,4 +17,7 @@
 // Client.SetOnStreamUsageBootstrap wires OnStreamUsage to cost.ApplyUsageToBootstrap (P4.4.1).
 // Retry: Policy.StrictForeground529 mirrors withRetry.ts FOREGROUND_529_RETRY_SOURCES; RABBIT_CODE_STRICT_FOREGROUND_529 enables it in DefaultPolicy.
 // Policy.InitialConsecutive529Errors mirrors withRetry.ts initialConsecutive529Errors (529 budget pre-seed).
+// Unattended: Policy.Unattended (RABBIT_CODE_UNATTENDED_RETRY) after MaxAttempts on HTTP 429/529 enters withRetry.ts persistent backoff + HEARTBEAT_INTERVAL_MS chunked waits.
+// Attribution: AttributionSystemPromptLine matches system.ts getAttributionHeader (cc_version / cc_entrypoint / optional cch=00000 / cc_workload); inject into system prompt when wiring messages (Phase 5).
+// Prompt cache break: ReadAssistantStream WithOnPromptCacheBreak telemetry hook (AC4-F3).
 package anthropic
