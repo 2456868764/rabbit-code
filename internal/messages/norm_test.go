@@ -28,6 +28,49 @@ func TestNormalizeForAPI_stripsInternal(t *testing.T) {
 	}
 }
 
+func TestNormalizeForAPI_fileRefHTTPSMapsToDocument(t *testing.T) {
+	msgs := []types.Message{{
+		Role: types.RoleUser,
+		Content: []types.ContentPiece{{
+			Type:      types.BlockTypeFileRef,
+			Ref:       "https://example.com/a.pdf",
+			MediaType: "application/pdf",
+		}},
+	}}
+	out := NormalizeForAPI(msgs, DefaultNormalizeAPI())
+	if len(out) != 1 || len(out[0].Content) != 1 {
+		t.Fatalf("got %+v", out)
+	}
+	d := out[0].Content[0]
+	if d.Type != types.BlockTypeDocument {
+		t.Fatalf("type %q", d.Type)
+	}
+	var src struct {
+		Type string `json:"type"`
+		URL  string `json:"url"`
+	}
+	if err := json.Unmarshal(d.Source, &src); err != nil {
+		t.Fatal(err)
+	}
+	if src.Type != "url" || src.URL != "https://example.com/a.pdf" {
+		t.Fatalf("%+v", src)
+	}
+}
+
+func TestNormalizeForAPI_fileRefNonURLStripped(t *testing.T) {
+	msgs := []types.Message{{
+		Role: types.RoleUser,
+		Content: []types.ContentPiece{{
+			Type: types.BlockTypeFileRef,
+			Ref:  "/local/path.pdf",
+		}},
+	}}
+	out := NormalizeForAPI(msgs, DefaultNormalizeAPI())
+	if len(out) != 0 {
+		t.Fatalf("expected drop, got %+v", out)
+	}
+}
+
 func TestNormalizeForAPI_preservesToolChain(t *testing.T) {
 	b := readGolden(t, "transcript_tool_chain.json")
 	tr, err := ParseTranscriptJSON(b)

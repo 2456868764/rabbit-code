@@ -5,7 +5,7 @@ import "encoding/json"
 // ContentPiece is a discriminated JSON object in message content (type field).
 // Optional fields use omitempty; only relevant fields are set per Type.
 //
-// API-oriented types: "text", "tool_use", "tool_result".
+// API-oriented types: "text", "tool_use", "tool_result", "document" (source.*).
 // Internal / feature extensions: "boundary", "tombstone", "history_snip",
 // "connector_text", "compaction_reminder", "file_ref",
 // "kairos_queue", "kairos_channel", "kairos_brief", "uds_inbox", "progress".
@@ -24,6 +24,9 @@ type ContentPiece struct {
 	ToolUseID string          `json:"tool_use_id,omitempty"`
 	Content   json.RawMessage `json:"content,omitempty"`
 	IsError   *bool           `json:"is_error,omitempty"`
+
+	// document (Messages API; e.g. from file_ref URL mapping in messages.NormalizeForAPI)
+	Source json.RawMessage `json:"source,omitempty"`
 
 	// boundary (compact / session markers, P3.2.3)
 	Kind string `json:"kind,omitempty"`
@@ -67,6 +70,7 @@ const (
 	BlockTypeConnectorText       = "connector_text"
 	BlockTypeCompactionReminder  = "compaction_reminder"
 	BlockTypeFileRef             = "file_ref"
+	BlockTypeDocument            = "document"
 	BlockTypeKairosQueue         = "kairos_queue"
 	BlockTypeKairosChannel       = "kairos_channel"
 	BlockTypeKairosBrief         = "kairos_brief"

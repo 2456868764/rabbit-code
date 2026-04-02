@@ -2,6 +2,7 @@ package messages
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/2456868764/rabbit-code/internal/types"
 )
@@ -60,8 +61,15 @@ func normalizeContent(in []types.ContentPiece, opt NormalizeOptions) []types.Con
 		case types.BlockTypeFileRef:
 			if !opt.StripNonAPI {
 				out = append(out, c)
+			} else {
+				ref := strings.TrimSpace(c.Ref)
+				if strings.HasPrefix(ref, "http://") || strings.HasPrefix(ref, "https://") {
+					if src, err := json.Marshal(map[string]string{"type": "url", "url": ref}); err == nil {
+						out = append(out, types.ContentPiece{Type: types.BlockTypeDocument, Source: json.RawMessage(src)})
+					}
+				}
+				// Non-URL file_ref: omit until upload/base64 pipeline exists.
 			}
-			// Stripped for API until Phase 4 maps to document blocks.
 		case types.BlockTypeBoundary, types.BlockTypeTombstone, types.BlockTypeHistorySnip,
 			types.BlockTypeCompactionReminder, types.BlockTypeKairosQueue, types.BlockTypeKairosChannel,
 			types.BlockTypeKairosBrief, types.BlockTypeUDSInbox, types.BlockTypeProgress:
