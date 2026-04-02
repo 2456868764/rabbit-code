@@ -25,6 +25,8 @@ const (
 	EnvTemplates              = "RABBIT_CODE_TEMPLATES"
 	EnvCachedMicrocompact     = "RABBIT_CODE_CACHED_MICROCOMPACT"
 	EnvHistorySnip            = "RABBIT_CODE_HISTORY_SNIP"
+	// EnvBashExec enables querydeps.BashExecToolRunner to run sh -c for bash tool input (Phase 6 bridge; off by default).
+	EnvBashExec = "RABBIT_CODE_BASH_EXEC"
 	// EnvSnipCompact gates snip-style transcript trimming hooks (pairs with query.SnipDropFirstMessages, P5.2.2).
 	EnvSnipCompact = "RABBIT_CODE_SNIP_COMPACT"
 	// EnvSnipCompactMaxBytes / EnvSnipCompactMaxRounds: when SNIP_COMPACT is on, trim prefix each assistant round (independent of HISTORY_SNIP).
@@ -106,6 +108,7 @@ func TemplatesEnabled() bool          { return truthy(os.Getenv(EnvTemplates)) }
 func CachedMicrocompactEnabled() bool { return truthy(os.Getenv(EnvCachedMicrocompact)) }
 func HistorySnipEnabled() bool        { return truthy(os.Getenv(EnvHistorySnip)) }
 func SnipCompactEnabled() bool        { return truthy(os.Getenv(EnvSnipCompact)) }
+func BashExecEnabled() bool           { return truthy(os.Getenv(EnvBashExec)) }
 
 // SnipCompactMaxBytes returns 0 when SNIP_COMPACT is off.
 func SnipCompactMaxBytes() int {
