@@ -18,3 +18,4 @@ docs/*
 !docs/phases/
 docs/phases/*
 !docs/phases/PHASE_ITERATION_RULES.md
+!docs/phases/PHASE05_SPEC_AND_ACCEPTANCE.md
