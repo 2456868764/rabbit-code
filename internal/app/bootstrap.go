@@ -99,6 +99,7 @@ func Bootstrap(ctx context.Context) (*Runtime, error) {
 		})
 	}
 
+	// Phase 4: API key path warmed here; Keychain + OAuth slots still NoopPrefetch unless AC requires them.
 	np := NoopPrefetch{}
 	prefetchStart := time.Now()
 	if err := ParallelPrefetch(ctx, np, np, APIKeyFilePrefetch{GlobalConfigDir: globalDir}); err != nil {

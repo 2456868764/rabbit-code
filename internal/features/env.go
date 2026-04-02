@@ -1,5 +1,16 @@
 // Package features holds runtime feature flags aligned with SOURCE_FEATURE_FLAGS.md.
 // Phase 1 uses environment-variable overrides; later phases may merge with config/telemetry.
+//
+// Phase 4 closure (with internal/anthropic + internal/app): when the agreed acceptance scope is
+// outbound stack (proxy, mTLS, ResolveAPIOutboundTransport), Bedrock/Vertex signing, probes
+// (ProbeServiceAPI / rabbit-code probe), NewClientWithPool / NewAnthropicClient, API key prefetch
+// (APIKeyFilePrefetch), URL file_ref→document normalization, and stream/retry parity, this repo
+// treats Phase 4 as complete. Foundry Azure outbound signing and wiring PostMessagesStream from main
+// are Phase 5+ (see package anthropic doc).
+//
+// Optional Phase 4 tail: if acceptance explicitly requires the same parallel credential warmup as
+// upstream main.tsx (Keychain + OAuth + API key), Bootstrap still passes NoopPrefetch for Keychain
+// and OAuth — implement those Prefetch hooks in internal/app (see ParallelPrefetch).
 package features
 
 import (

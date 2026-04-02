@@ -1,6 +1,13 @@
 // Package anthropic implements the Anthropic Messages HTTP client surface aligned with
 // claude-code-sourcemap/restored-src/src/services/api (streaming, retry, errors, auth, betas, preconnect).
 //
+// Phase 4 scope (this module + app wiring): outbound, signing (Bedrock/Vertex), preconnect, Client
+// factories, usage hook, retry/stream behavior, services/api probe shapes (AC4-7 best-effort paths),
+// and env flags in internal/features/phase4.go. Phase 4 is closed under that definition; Foundry
+// outbound Azure AD signing is excluded. Main-process Messages loop is Phase 5.
+// Parallel Keychain/OAuth prefetch in Bootstrap is an optional Phase 4 tail if product AC requires
+// full main.tsx-style warmup (see package features doc and app.ParallelPrefetch).
+//
 // Backpressure (P4.1.2 / AC4-1c): StreamEvents uses a bounded channel; the SSE reader goroutine
 // blocks on send when the buffer is full, so a slow consumer does not grow unbounded memory.
 //

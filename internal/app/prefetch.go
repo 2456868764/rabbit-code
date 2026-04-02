@@ -21,11 +21,15 @@ type APIKeyPrefetch interface {
 }
 
 // NoopPrefetch implements all three interfaces with no work.
+// Bootstrap uses NoopPrefetch for Keychain and OAuth until optional Phase 4 ACs require real warmup.
 type NoopPrefetch struct{}
 
 func (NoopPrefetch) Prefetch(context.Context) error { return nil }
 
 // ParallelPrefetch runs keychain, oauth, apikey hooks concurrently (main.tsx parallel intent).
+// Today only APIKeyPrefetch is non-noop (APIKeyFilePrefetch). Keychain and OAuth remain Phase 4
+// optional tail: implement Keychain.Prefetch / OAuthPrefetch.Prefetch and pass them from Bootstrap
+// when acceptance requires parity with upstream parallel credential loading.
 func ParallelPrefetch(ctx context.Context, k Keychain, o OAuthPrefetch, a APIKeyPrefetch) error {
 	var wg sync.WaitGroup
 	errs := make([]error, 3)
