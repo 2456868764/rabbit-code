@@ -1,0 +1,39 @@
+package querydeps
+
+import (
+	"context"
+	"errors"
+)
+
+// ToolRunner runs one tool invocation (Phase 6 wires real tools).
+type ToolRunner interface {
+	RunTool(ctx context.Context, name string, inputJSON []byte) (resultJSON []byte, err error)
+}
+
+// StreamAssistant performs one assistant turn from serialized messages JSON (wraps Messages API + stream consumption).
+type StreamAssistant interface {
+	StreamAssistant(ctx context.Context, model string, maxTokens int, messagesJSON []byte) (assistantText string, err error)
+}
+
+// Deps bundles dependencies for query.Loop / engine (all injectable for tests).
+type Deps struct {
+	Tools     ToolRunner
+	Assistant StreamAssistant
+}
+
+// NoopToolRunner returns ErrNoToolRunner from RunTool.
+type NoopToolRunner struct{}
+
+func (NoopToolRunner) RunTool(context.Context, string, []byte) ([]byte, error) {
+	return nil, ErrNoToolRunner
+}
+
+// ErrNoToolRunner means no tool layer is wired yet.
+var ErrNoToolRunner = errors.New("querydeps: no tool runner configured")
+
+// NoopStreamAssistant returns empty assistant text (tests / bootstrap).
+type NoopStreamAssistant struct{}
+
+func (NoopStreamAssistant) StreamAssistant(context.Context, string, int, []byte) (string, error) {
+	return "", nil
+}
