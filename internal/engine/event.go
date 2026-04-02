@@ -15,6 +15,12 @@ const (
 	EventKindCompactResult
 	EventKindDone
 	EventKindError
+	// P5.F.6–F.10 headless signals (TUI / telemetry).
+	EventKindBreakCacheCommand
+	EventKindPromptCacheBreakDetected
+	EventKindTemplatesActive
+	EventKindCachedMicrocompactActive
+	EventKindHistorySnipApplied
 )
 
 // EngineEvent is a single unit on the engine event channel.
@@ -44,4 +50,9 @@ type EngineEvent struct {
 	LoopTurnCount int
 	// CompactSummary is set on EventKindCompactResult when CompactExecutor runs (P5.2.1).
 	CompactSummary string
+	// PhaseDetail carries free-form text for P5.F.* signal kinds (e.g. template names, snip stats).
+	PhaseDetail string
+	// PhaseAuxInt / PhaseAuxInt2 optional integers (e.g. history snip before/after bytes).
+	PhaseAuxInt  int
+	PhaseAuxInt2 int
 }

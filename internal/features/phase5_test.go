@@ -33,3 +33,28 @@ func TestSnipCompactEnabled(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+func TestReactiveCompactMinTranscriptBytes(t *testing.T) {
+	t.Setenv(EnvReactiveCompact, "1")
+	t.Setenv(EnvReactiveCompactMinBytes, "50")
+	if ReactiveCompactMinTranscriptBytes() != 50 {
+		t.Fatal()
+	}
+}
+
+func TestHistorySnipThresholds(t *testing.T) {
+	t.Setenv(EnvHistorySnip, "true")
+	t.Setenv(EnvHistorySnipMaxBytes, "99")
+	if HistorySnipMaxBytes() != 99 {
+		t.Fatal()
+	}
+}
+
+func TestTemplateNames(t *testing.T) {
+	t.Setenv(EnvTemplates, "true")
+	t.Setenv(EnvTemplateNames, " a , b ")
+	n := TemplateNames()
+	if len(n) != 2 || n[0] != "a" || n[1] != "b" {
+		t.Fatalf("%#v", n)
+	}
+}

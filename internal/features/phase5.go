@@ -21,6 +21,13 @@ const (
 	EnvHistorySnip            = "RABBIT_CODE_HISTORY_SNIP"
 	// EnvSnipCompact gates snip-style transcript trimming hooks (pairs with query.SnipDropFirstMessages, P5.2.2).
 	EnvSnipCompact = "RABBIT_CODE_SNIP_COMPACT"
+	// EnvReactiveCompactMinBytes: when REACTIVE_COMPACT is on, suggest reactive compact if len(transcript JSON) >= this (default 8192).
+	EnvReactiveCompactMinBytes = "RABBIT_CODE_REACTIVE_COMPACT_MIN_BYTES"
+	// EnvHistorySnipMaxBytes / EnvHistorySnipMaxRounds gate P5.F.10 transcript prefix drops each assistant round.
+	EnvHistorySnipMaxBytes  = "RABBIT_CODE_HISTORY_SNIP_MAX_BYTES"
+	EnvHistorySnipMaxRounds = "RABBIT_CODE_HISTORY_SNIP_MAX_ROUNDS"
+	// EnvTemplateNames comma-separated names emitted with EventKindTemplatesActive when TEMPLATES is on.
+	EnvTemplateNames = "RABBIT_CODE_TEMPLATE_NAMES"
 )
 
 func TokenBudgetEnabled() bool { return truthy(os.Getenv(EnvTokenBudget)) }
@@ -54,3 +61,74 @@ func SnipCompactEnabled() bool        { return truthy(os.Getenv(EnvSnipCompact))
 
 // PromptCacheBreakDetectionEnabled aliases Phase 4 env (P5.F.9 shares anthropic client gates).
 func PromptCacheBreakDetectionEnabled() bool { return PromptCacheBreakDetection() }
+
+// ReactiveCompactMinTranscriptBytes returns 0 when REACTIVE_COMPACT is off; else min JSON byte length to force reactive suggest.
+func ReactiveCompactMinTranscriptBytes() int {
+	if !ReactiveCompactEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvReactiveCompactMinBytes))
+	if s == "" {
+		return 8192
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 8192
+	}
+	return v
+}
+
+// HistorySnipMaxBytes returns 0 when HISTORY_SNIP is off or unset invalid.
+func HistorySnipMaxBytes() int {
+	if !HistorySnipEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvHistorySnipMaxBytes))
+	if s == "" {
+		return 32768
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 32768
+	}
+	return v
+}
+
+// HistorySnipMaxRounds returns max SnipDropFirstMessages calls per assistant iteration when HISTORY_SNIP is on.
+func HistorySnipMaxRounds() int {
+	if !HistorySnipEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvHistorySnipMaxRounds))
+	if s == "" {
+		return 4
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 4
+	}
+	return v
+}
+
+// TemplateNames returns comma-separated template ids from RABBIT_CODE_TEMPLATE_NAMES when TEMPLATES is enabled.
+func TemplateNames() []string {
+	if !TemplatesEnabled() {
+		return nil
+	}
+	return splitCommaEnv(os.Getenv(EnvTemplateNames))
+}
+
+func splitCommaEnv(s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}

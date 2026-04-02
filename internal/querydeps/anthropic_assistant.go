@@ -13,6 +13,17 @@ type AnthropicAssistant struct {
 	DefaultModel     string
 	DefaultMaxTokens int
 	Policy           anthropic.Policy
+	// ExtraReadOptions are appended after context-derived options (tests / host hooks).
+	ExtraReadOptions []anthropic.ReadAssistantOption
+}
+
+func (a *AnthropicAssistant) readOpts(ctx context.Context) []anthropic.ReadAssistantOption {
+	var opts []anthropic.ReadAssistantOption
+	if cb, ok := OnPromptCacheBreakFromContext(ctx); ok && cb != nil {
+		opts = append(opts, anthropic.WithOnPromptCacheBreak(cb))
+	}
+	opts = append(opts, a.ExtraReadOptions...)
+	return opts
 }
 
 // StreamAssistant calls PostMessagesStreamReadAssistant with messagesJSON as the Messages field.
@@ -41,7 +52,7 @@ func (a *AnthropicAssistant) StreamAssistant(ctx context.Context, model string, 
 		MaxTokens: maxTokens,
 		Messages:  json.RawMessage(messagesJSON),
 	}
-	text, _, err := a.Client.PostMessagesStreamReadAssistant(ctx, body, pol)
+	text, _, err := a.Client.PostMessagesStreamReadAssistant(ctx, body, pol, a.readOpts(ctx)...)
 	return text, err
 }
 
@@ -71,7 +82,7 @@ func (a *AnthropicAssistant) AssistantTurn(ctx context.Context, model string, ma
 		MaxTokens: maxTokens,
 		Messages:  json.RawMessage(messagesJSON),
 	}
-	turn, _, err := a.Client.PostMessagesStreamReadAssistantTurn(ctx, body, pol)
+	turn, _, err := a.Client.PostMessagesStreamReadAssistantTurn(ctx, body, pol, a.readOpts(ctx)...)
 	if err != nil {
 		return TurnResult{}, err
 	}

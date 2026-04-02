@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -218,6 +219,14 @@ func (e *Engine) loopObservers() *query.LoopObservers {
 				})
 			}
 		},
+		OnHistorySnip: func(before, after, rounds int) {
+			e.trySend(EngineEvent{
+				Kind:         EventKindHistorySnipApplied,
+				PhaseDetail:  fmt.Sprintf("rounds=%d", rounds),
+				PhaseAuxInt:  before,
+				PhaseAuxInt2: after,
+			})
+		},
 	}
 }
 
@@ -242,6 +251,30 @@ func (e *Engine) runTurnLoop(userText string) {
 		loopErr = ErrTokenBudgetExceeded
 		e.trySend(EngineEvent{Kind: EventKindError, Err: loopErr})
 		return
+	}
+
+	if features.BreakCacheCommandEnabled() {
+		e.trySend(EngineEvent{Kind: EventKindBreakCacheCommand, PhaseDetail: "submit"})
+	}
+	if features.TemplatesEnabled() {
+		names := features.TemplateNames()
+		e.trySend(EngineEvent{Kind: EventKindTemplatesActive, PhaseDetail: strings.Join(names, ",")})
+	}
+	if features.CachedMicrocompactEnabled() {
+		e.trySend(EngineEvent{Kind: EventKindCachedMicrocompactActive, PhaseDetail: "api_body_flags_deferred"})
+	}
+
+	resolved = query.ApplyPhase5UserTextHints(resolved, query.Phase5UserTextFlags{
+		ContextCollapse: features.ContextCollapseEnabled(),
+		Ultrathink:      features.UltrathinkEnabled(),
+		Ultraplan:       features.UltraplanEnabled(),
+	})
+
+	ctxLoop := e.ctx
+	if features.PromptCacheBreakDetectionEnabled() {
+		ctxLoop = querydeps.ContextWithOnPromptCacheBreak(e.ctx, func() {
+			e.trySend(EngineEvent{Kind: EventKindPromptCacheBreakDetected, PhaseDetail: "sse"})
+		})
 	}
 
 	maxAttempts := 1
@@ -283,13 +316,15 @@ func (e *Engine) runTurnLoop(userText string) {
 				Assistant: e.deps.Assistant,
 				Turn:      e.deps.Turn,
 			},
-			Model:     e.model,
-			MaxTokens: e.maxTokens,
-			Observe:   e.loopObservers(),
+			Model:                e.model,
+			MaxTokens:            e.maxTokens,
+			Observe:              e.loopObservers(),
+			HistorySnipMaxBytes:  features.HistorySnipMaxBytes(),
+			HistorySnipMaxRounds: features.HistorySnipMaxRounds(),
 		}
 
 		var runErr error
-		msgs, _, runErr = d.RunTurnLoop(e.ctx, st, resolved)
+		msgs, _, runErr = d.RunTurnLoop(ctxLoop, st, resolved)
 		if runErr == nil {
 			succeeded = true
 			loopErr = nil
@@ -351,26 +386,30 @@ func (e *Engine) runTurnLoop(userText string) {
 		}
 	}
 
+	auto, react := false, false
 	if e.compactAdvisor != nil {
-		auto, react := e.compactAdvisor(*st, len(msgs))
-		if auto || react {
-			phase := compact.RunIdle.Next(auto, react)
+		auto, react = e.compactAdvisor(*st, len(msgs))
+	}
+	if thr := features.ReactiveCompactMinTranscriptBytes(); thr > 0 && len(msgs) >= thr {
+		react = true
+	}
+	if auto || react {
+		phase := compact.RunIdle.Next(auto, react)
+		e.trySend(EngineEvent{
+			Kind:                   EventKindCompactSuggest,
+			CompactPhase:           phase.String(),
+			SuggestAutoCompact:     auto,
+			SuggestReactiveCompact: react,
+		})
+		if e.compactExecutor != nil {
+			sum, exErr := e.compactExecutor(e.ctx, phase, msgs)
 			e.trySend(EngineEvent{
-				Kind:                   EventKindCompactSuggest,
-				CompactPhase:           phase.String(),
-				SuggestAutoCompact:     auto,
-				SuggestReactiveCompact: react,
+				Kind:           EventKindCompactResult,
+				CompactPhase:   phase.String(),
+				CompactSummary: sum,
+				Err:            exErr,
 			})
-			if e.compactExecutor != nil {
-				sum, exErr := e.compactExecutor(e.ctx, phase, msgs)
-				e.trySend(EngineEvent{
-					Kind:           EventKindCompactResult,
-					CompactPhase:   phase.String(),
-					CompactSummary: sum,
-					Err:            exErr,
-				})
-				_ = exErr
-			}
+			_ = exErr
 		}
 	}
 

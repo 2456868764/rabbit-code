@@ -218,7 +218,7 @@ func (c *Client) PostMessagesStream(ctx context.Context, body MessagesStreamBody
 
 // PostMessagesStreamReadAssistant posts, reads the SSE body to completion, closes the response, then
 // calls OnStreamUsage when set (P4.1.3 / P4.4.1).
-func (c *Client) PostMessagesStreamReadAssistant(ctx context.Context, body MessagesStreamBody, pol Policy) (string, UsageDelta, error) {
+func (c *Client) PostMessagesStreamReadAssistant(ctx context.Context, body MessagesStreamBody, pol Policy, extra ...ReadAssistantOption) (string, UsageDelta, error) {
 	resp, err := c.PostMessagesStream(ctx, body, pol)
 	if err != nil {
 		return "", UsageDelta{}, err
@@ -234,6 +234,7 @@ func (c *Client) PostMessagesStreamReadAssistant(ctx context.Context, body Messa
 	if len(c.ToolInputJSONByBlock) > 0 {
 		ropts = append(ropts, WithToolInputAccumulators(c.ToolInputJSONByBlock))
 	}
+	ropts = append(ropts, extra...)
 	text, u, err := ReadAssistantStream(ctx, resp.Body, ropts...)
 	if err != nil {
 		return text, u, err
@@ -245,7 +246,7 @@ func (c *Client) PostMessagesStreamReadAssistant(ctx context.Context, body Messa
 }
 
 // PostMessagesStreamReadAssistantTurn posts, reads SSE, and returns text + tool_use blocks + stop_reason (Phase 5 query loop).
-func (c *Client) PostMessagesStreamReadAssistantTurn(ctx context.Context, body MessagesStreamBody, pol Policy) (AssistantStreamTurn, UsageDelta, error) {
+func (c *Client) PostMessagesStreamReadAssistantTurn(ctx context.Context, body MessagesStreamBody, pol Policy, extra ...ReadAssistantOption) (AssistantStreamTurn, UsageDelta, error) {
 	resp, err := c.PostMessagesStream(ctx, body, pol)
 	if err != nil {
 		return AssistantStreamTurn{}, UsageDelta{}, err
@@ -261,6 +262,7 @@ func (c *Client) PostMessagesStreamReadAssistantTurn(ctx context.Context, body M
 	if len(c.ToolInputJSONByBlock) > 0 {
 		ropts = append(ropts, WithToolInputAccumulators(c.ToolInputJSONByBlock))
 	}
+	ropts = append(ropts, extra...)
 	turn, u, err := ReadAssistantStreamTurn(ctx, resp.Body, ropts...)
 	if err != nil {
 		return turn, u, err

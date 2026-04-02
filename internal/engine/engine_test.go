@@ -662,6 +662,145 @@ func TestEngine_Submit_withStreamAssistant_doneTurnCount(t *testing.T) {
 	}
 }
 
+func TestEngine_Phase5_breakCacheTemplatesMicrocompactEvents(t *testing.T) {
+	t.Setenv(features.EnvBreakCacheCommand, "true")
+	t.Setenv(features.EnvTemplates, "true")
+	t.Setenv(features.EnvTemplateNames, "a,b")
+	t.Setenv(features.EnvCachedMicrocompact, "true")
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "x", nil
+			}),
+		},
+	})
+	e.Submit("u")
+	ch := e.Events()
+	deadline := time.After(2 * time.Second)
+	var breakSeen, tplSeen, microSeen bool
+	for {
+		select {
+		case ev := <-ch:
+			switch ev.Kind {
+			case EventKindBreakCacheCommand:
+				breakSeen = true
+			case EventKindTemplatesActive:
+				tplSeen = true
+				if ev.PhaseDetail != "a,b" {
+					t.Fatalf("%q", ev.PhaseDetail)
+				}
+			case EventKindCachedMicrocompactActive:
+				microSeen = true
+			case EventKindDone:
+				if !breakSeen || !tplSeen || !microSeen {
+					t.Fatalf("break=%v tpl=%v micro=%v", breakSeen, tplSeen, microSeen)
+				}
+				e.Wait()
+				return
+			}
+		case <-deadline:
+			t.Fatal("timeout")
+		}
+	}
+}
+
+func TestEngine_Phase5_ultrathinkInjectsIntoMessagesJSON(t *testing.T) {
+	t.Setenv(features.EnvUltrathink, "true")
+	var captured string
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+				captured = string(messagesJSON)
+				return "ok", nil
+			}),
+		},
+	})
+	e.Submit("plain")
+	ch := e.Events()
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindDone {
+				if captured == "" || !strings.Contains(captured, "ULTRATHINK") {
+					t.Fatalf("messages %q", captured)
+				}
+				e.Wait()
+				return
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
+func TestEngine_Phase5_reactiveCompactFromEnv(t *testing.T) {
+	t.Setenv(features.EnvReactiveCompact, "true")
+	t.Setenv(features.EnvReactiveCompactMinBytes, "1")
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "r", nil
+			}),
+		},
+		CompactExecutor: compact.ExecuteStub,
+	})
+	e.Submit("u")
+	ch := e.Events()
+	var sawReactive bool
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindCompactSuggest && ev.SuggestReactiveCompact {
+				sawReactive = true
+			}
+			if ev.Kind == EventKindDone {
+				if !sawReactive {
+					t.Fatal("expected reactive compact suggest")
+				}
+				e.Wait()
+				return
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
+func TestEngine_Phase5_historySnipBetweenRounds(t *testing.T) {
+	t.Setenv(features.EnvHistorySnip, "true")
+	t.Setenv(features.EnvHistorySnipMaxBytes, "280")
+	t.Setenv(features.EnvHistorySnipMaxRounds, "2")
+	long := strings.Repeat("z", 350)
+	seq := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+		{Text: long, ToolUses: []querydeps.ToolUseCall{{ID: "1", Name: "bash", Input: json.RawMessage(`{}`)}}},
+		{Text: "end"},
+	}}
+	e := New(context.Background(), &Config{
+		Deps:  querydeps.Deps{Turn: seq, Tools: querydeps.BashStubToolRunner{}},
+		Model: "m", MaxTokens: 8,
+	})
+	e.Submit("hi")
+	ch := e.Events()
+	var sawSnip bool
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindHistorySnipApplied {
+				sawSnip = true
+			}
+			if ev.Kind == EventKindDone {
+				if !sawSnip {
+					t.Fatal("expected history snip event")
+				}
+				e.Wait()
+				return
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
 func TestEngine_SubmitCancelRace(t *testing.T) {
 	for i := 0; i < 40; i++ {
 		e := NewEngine(context.Background())

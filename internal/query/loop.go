@@ -17,6 +17,9 @@ type LoopDriver struct {
 	Model     string
 	MaxTokens int
 	Observe   *LoopObservers
+	// HistorySnipMaxBytes / HistorySnipMaxRounds implement P5.F.10 when both > 0 (engine sets from features).
+	HistorySnipMaxBytes  int
+	HistorySnipMaxRounds int
 }
 
 func (d *LoopDriver) streamer() querydeps.StreamAssistant {
@@ -104,6 +107,16 @@ func (d *LoopDriver) RunTurnLoop(ctx context.Context, st *LoopState, userText st
 	for {
 		if st != nil && st.MaxTurns > 0 && st.TurnCount >= st.MaxTurns {
 			return msgs, lastAssistantText, ErrMaxTurnsExceeded
+		}
+		if d.HistorySnipMaxBytes > 0 && d.HistorySnipMaxRounds > 0 {
+			newMsgs, n, err := TrimTranscriptPrefixWhileOverBudget(msgs, d.HistorySnipMaxBytes, d.HistorySnipMaxRounds)
+			if err != nil {
+				return msgs, lastAssistantText, err
+			}
+			if n > 0 && d.Observe != nil && d.Observe.OnHistorySnip != nil {
+				d.Observe.OnHistorySnip(len(msgs), len(newMsgs), n)
+			}
+			msgs = newMsgs
 		}
 		turn, err := d.turner().AssistantTurn(ctx, model, max, msgs)
 		if err != nil {
