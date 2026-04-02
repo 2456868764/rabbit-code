@@ -1,5 +1,7 @@
 package query
 
+import "strings"
+
 // Phase5UserTextFlags gates optional user-message hints (P5.F.3–F.5).
 type Phase5UserTextFlags struct {
 	ContextCollapse bool
@@ -34,4 +36,22 @@ func ApplyPhase5UserTextHints(text string, f Phase5UserTextFlags) string {
 		out = out + phase5SessionRestoreSuffix
 	}
 	return out
+}
+
+// FormatPhase5HeadlessModeTags lists active Phase 5 input modes for TUI/telemetry (comma-separated, stable order).
+func FormatPhase5HeadlessModeTags(f Phase5UserTextFlags) string {
+	var parts []string
+	if f.ContextCollapse {
+		parts = append(parts, "context_collapse")
+	}
+	if f.Ultrathink {
+		parts = append(parts, "ultrathink")
+	}
+	if f.Ultraplan {
+		parts = append(parts, "ultraplan")
+	}
+	if f.SessionRestore {
+		parts = append(parts, "session_restore")
+	}
+	return strings.Join(parts, ",")
 }

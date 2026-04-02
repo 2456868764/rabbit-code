@@ -21,3 +21,12 @@ func TestApplyPhase5UserTextHints(t *testing.T) {
 		t.Fatalf("%q", out3)
 	}
 }
+
+func TestFormatPhase5HeadlessModeTags_order(t *testing.T) {
+	got := FormatPhase5HeadlessModeTags(Phase5UserTextFlags{
+		Ultraplan: true, Ultrathink: true, ContextCollapse: true,
+	})
+	if got != "context_collapse,ultrathink,ultraplan" {
+		t.Fatalf("%q", got)
+	}
+}

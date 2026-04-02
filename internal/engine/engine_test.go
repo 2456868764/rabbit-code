@@ -777,6 +777,34 @@ func TestEngine_Phase5_breakCacheTemplatesMicrocompactEvents(t *testing.T) {
 	}
 }
 
+func TestEngine_UserSubmit_carriesPhase5ModeTags(t *testing.T) {
+	t.Setenv(features.EnvUltrathink, "true")
+	t.Setenv(features.EnvUltraplan, "true")
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "x", nil
+			}),
+		},
+	})
+	e.Submit("hi")
+	ev := <-e.Events()
+	if ev.Kind != EventKindUserSubmit || ev.PhaseDetail != "ultrathink,ultraplan" {
+		t.Fatalf("%+v", ev)
+	}
+	for {
+		select {
+		case ev2 := <-e.Events():
+			if ev2.Kind == EventKindDone {
+				e.Wait()
+				return
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
 func TestEngine_Phase5_ultrathinkInjectsIntoMessagesJSON(t *testing.T) {
 	t.Setenv(features.EnvUltrathink, "true")
 	var captured string

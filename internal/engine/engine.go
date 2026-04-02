@@ -135,7 +135,13 @@ func (e *Engine) Submit(userText string) {
 	e.wg.Add(1)
 	go func() {
 		defer e.wg.Done()
-		if !e.trySend(EngineEvent{Kind: EventKindUserSubmit, UserText: userText}) {
+		modeTags := query.FormatPhase5HeadlessModeTags(query.Phase5UserTextFlags{
+			ContextCollapse: features.ContextCollapseEnabled(),
+			Ultrathink:      features.UltrathinkEnabled(),
+			Ultraplan:       features.UltraplanEnabled(),
+			SessionRestore:  features.SessionRestoreEnabled(),
+		})
+		if !e.trySend(EngineEvent{Kind: EventKindUserSubmit, UserText: userText, PhaseDetail: modeTags}) {
 			return
 		}
 		if e.useQueryLoop() {
