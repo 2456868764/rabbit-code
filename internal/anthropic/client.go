@@ -35,9 +35,9 @@ type Client struct {
 	// ToolInputJSONByBlock maps content_block index → accumulator for input_json_delta partial_json (parallel tool calls use distinct indices).
 	ToolInputJSONByBlock map[int]*strings.Builder
 
-	transportMu   sync.Mutex
-	cachedBaseRT  http.RoundTripper
-	cachedWrapRT  http.RoundTripper
+	transportMu  sync.Mutex
+	cachedBaseRT http.RoundTripper
+	cachedWrapRT http.RoundTripper
 }
 
 // NewClient returns a client with sane defaults.
@@ -81,13 +81,13 @@ func (c *Client) messagesURL(body MessagesStreamBody) string {
 
 // vertexStreamJSONBody matches @anthropic-ai/vertex-sdk: model moves to path, body gets anthropic_version.
 type vertexStreamJSONBody struct {
-	MaxTokens          int             `json:"max_tokens"`
-	Stream             bool            `json:"stream"`
-	Messages           json.RawMessage `json:"messages"`
-	OutputConfig       *OutputConfig   `json:"output_config,omitempty"`
-	AnthropicBeta      []string        `json:"anthropic_beta,omitempty"`
-	AnthropicVersion   string          `json:"anthropic_version"`
-	AntiDistillation   []string        `json:"anti_distillation,omitempty"`
+	MaxTokens        int             `json:"max_tokens"`
+	Stream           bool            `json:"stream"`
+	Messages         json.RawMessage `json:"messages"`
+	OutputConfig     *OutputConfig   `json:"output_config,omitempty"`
+	AnthropicBeta    []string        `json:"anthropic_beta,omitempty"`
+	AnthropicVersion string          `json:"anthropic_version"`
+	AntiDistillation []string        `json:"anti_distillation,omitempty"`
 }
 
 func (c *Client) mergeStreamingBody(body MessagesStreamBody) MessagesStreamBody {
@@ -105,13 +105,13 @@ func (c *Client) marshalMessagesStreamJSON(body MessagesStreamBody) ([]byte, err
 	body.Stream = true
 	if c.Provider == ProviderVertex && envVertexProjectID() != "" {
 		vb := vertexStreamJSONBody{
-			MaxTokens:          body.MaxTokens,
-			Stream:             true,
-			Messages:           body.Messages,
-			OutputConfig:       body.OutputConfig,
-			AnthropicBeta:      append([]string(nil), body.AnthropicBeta...),
-			AnthropicVersion:   VertexDefaultAnthropicVersion,
-			AntiDistillation:   append([]string(nil), body.AntiDistillation...),
+			MaxTokens:        body.MaxTokens,
+			Stream:           true,
+			Messages:         body.Messages,
+			OutputConfig:     body.OutputConfig,
+			AnthropicBeta:    append([]string(nil), body.AnthropicBeta...),
+			AnthropicVersion: VertexDefaultAnthropicVersion,
+			AntiDistillation: append([]string(nil), body.AntiDistillation...),
 		}
 		return json.Marshal(vb)
 	}

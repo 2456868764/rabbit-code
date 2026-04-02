@@ -30,20 +30,20 @@ type RateLimit struct {
 
 // ExtraUsage mirrors usage.ts ExtraUsage.
 type ExtraUsage struct {
-	IsEnabled     bool     `json:"is_enabled"`
-	MonthlyLimit  *float64 `json:"monthly_limit"`
-	UsedCredits   *float64 `json:"used_credits"`
-	Utilization   *float64 `json:"utilization"`
+	IsEnabled    bool     `json:"is_enabled"`
+	MonthlyLimit *float64 `json:"monthly_limit"`
+	UsedCredits  *float64 `json:"used_credits"`
+	Utilization  *float64 `json:"utilization"`
 }
 
 // Utilization mirrors fetchUtilization() return (usage.ts).
 type Utilization struct {
-	FiveHour           *RateLimit  `json:"five_hour"`
-	SevenDay           *RateLimit  `json:"seven_day"`
-	SevenDayOAuthApps  *RateLimit  `json:"seven_day_oauth_apps"`
-	SevenDayOpus       *RateLimit  `json:"seven_day_opus"`
-	SevenDaySonnet     *RateLimit  `json:"seven_day_sonnet"`
-	ExtraUsage         *ExtraUsage `json:"extra_usage"`
+	FiveHour          *RateLimit  `json:"five_hour"`
+	SevenDay          *RateLimit  `json:"seven_day"`
+	SevenDayOAuthApps *RateLimit  `json:"seven_day_oauth_apps"`
+	SevenDayOpus      *RateLimit  `json:"seven_day_opus"`
+	SevenDaySonnet    *RateLimit  `json:"seven_day_sonnet"`
+	ExtraUsage        *ExtraUsage `json:"extra_usage"`
 }
 
 // FetchUtilization performs GET {oauthBase}/api/oauth/usage with Bearer auth (services/api/usage.ts).
@@ -73,7 +73,7 @@ func FetchUtilization(ctx context.Context, rt http.RoundTripper, oauthBase, bear
 	req = req.WithContext(cctx)
 	// Align transient retries with Messages (429/529/5xx) via DoRequest (usage.ts + withRetry parity).
 	pol := Policy{
-		MaxAttempts:   4,
+		MaxAttempts: 4,
 		Retry529429: true,
 		Unattended:  features.UnattendedRetryEnabled(),
 		FastRetry:   features.FastRetryEnabled(),

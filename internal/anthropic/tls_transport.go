@@ -10,7 +10,7 @@ import (
 )
 
 // HTTPTransportAPIOutbound returns a proxy-aware *http.Transport, optionally loading a TLS client
-// certificate from CLAUDE_CODE_CLIENT_CERT + CLAUDE_CODE_CLIENT_KEY (client.ts mTLS paths; P4.3.3).
+// certificate from RABBIT_CODE_CLIENT_CERT + RABBIT_CODE_CLIENT_KEY (client.ts mTLS paths; P4.3.3).
 // If only one of the two paths is set, returns an error.
 func HTTPTransportAPIOutbound() (*http.Transport, error) {
 	return httpTransportAPIOutbound(nil)
@@ -24,13 +24,13 @@ func HTTPTransportAPIOutboundWithRoots(pool *x509.CertPool) (*http.Transport, er
 
 func httpTransportAPIOutbound(rootCAs *x509.CertPool) (*http.Transport, error) {
 	t := HTTPTransportWithProxyFromEnvAndRoots(rootCAs)
-	certPath := strings.TrimSpace(os.Getenv("CLAUDE_CODE_CLIENT_CERT"))
-	keyPath := strings.TrimSpace(os.Getenv("CLAUDE_CODE_CLIENT_KEY"))
+	certPath := strings.TrimSpace(os.Getenv("RABBIT_CODE_CLIENT_CERT"))
+	keyPath := strings.TrimSpace(os.Getenv("RABBIT_CODE_CLIENT_KEY"))
 	if certPath == "" && keyPath == "" {
 		return t, nil
 	}
 	if certPath == "" || keyPath == "" {
-		return nil, fmt.Errorf("anthropic: CLAUDE_CODE_CLIENT_CERT and CLAUDE_CODE_CLIENT_KEY must both be set for mTLS")
+		return nil, fmt.Errorf("anthropic: RABBIT_CODE_CLIENT_CERT and RABBIT_CODE_CLIENT_KEY must both be set for mTLS")
 	}
 	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {
@@ -44,4 +44,3 @@ func httpTransportAPIOutbound(rootCAs *x509.CertPool) (*http.Transport, error) {
 	t.TLSClientConfig.Certificates = []tls.Certificate{cert}
 	return t, nil
 }
-

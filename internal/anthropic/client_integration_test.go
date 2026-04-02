@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/2456868764/rabbit-code/internal/cost"
 	"github.com/2456868764/rabbit-code/internal/bootstrap"
+	"github.com/2456868764/rabbit-code/internal/cost"
 )
 
 func TestPostMessagesStream_MockServer(t *testing.T) {

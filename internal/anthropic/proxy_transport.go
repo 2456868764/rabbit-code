@@ -22,7 +22,7 @@ func HTTPTransportWithProxyFromEnv() *http.Transport {
 }
 
 // HTTPTransportWithProxyFromEnvAndRoots is HTTPTransportWithProxyFromEnv with optional TLS RootCAs (e.g. app.Bootstrap pool + RABBIT_CODE_EXTRA_CA_BUNDLE).
-// It does not read CLAUDE_CODE_CLIENT_CERT / KEY — use HTTPTransportAPIOutbound for mTLS.
+// It does not read client cert env vars — use HTTPTransportAPIOutbound for mTLS (RABBIT_CODE_CLIENT_CERT / KEY).
 func HTTPTransportWithProxyFromEnvAndRoots(pool *x509.CertPool) *http.Transport {
 	t := HTTPTransportWithProxyFromEnv()
 	if pool == nil {

@@ -45,21 +45,21 @@ func TestShouldSkipPreconnect_Foundry(t *testing.T) {
 }
 
 func TestShouldSkipPreconnect_UnixSocket(t *testing.T) {
-	t.Setenv("ANTHROPIC_UNIX_SOCKET", "/tmp/x.sock")
+	t.Setenv("RABBIT_CODE_UNIX_SOCKET", "/tmp/x.sock")
 	if !ShouldSkipPreconnect() {
 		t.Fatal("expected skip for unix socket")
 	}
 }
 
 func TestShouldSkipPreconnect_ClientMTLS(t *testing.T) {
-	t.Setenv("CLAUDE_CODE_CLIENT_CERT", "/path/cert.pem")
+	t.Setenv("RABBIT_CODE_CLIENT_CERT", "/path/cert.pem")
 	if !ShouldSkipPreconnect() {
 		t.Fatal("expected skip for client cert")
 	}
 }
 
 func TestShouldSkipPreconnect_ClientKey(t *testing.T) {
-	t.Setenv("CLAUDE_CODE_CLIENT_KEY", "/path/key.pem")
+	t.Setenv("RABBIT_CODE_CLIENT_KEY", "/path/key.pem")
 	if !ShouldSkipPreconnect() {
 		t.Fatal("expected skip for client key")
 	}
@@ -72,9 +72,9 @@ func TestPreconnectHEAD_Happy(t *testing.T) {
 	t.Setenv("https_proxy", "")
 	t.Setenv("ALL_PROXY", "")
 	t.Setenv("all_proxy", "")
-	t.Setenv("ANTHROPIC_UNIX_SOCKET", "")
-	t.Setenv("CLAUDE_CODE_CLIENT_CERT", "")
-	t.Setenv("CLAUDE_CODE_CLIENT_KEY", "")
+	t.Setenv("RABBIT_CODE_UNIX_SOCKET", "")
+	t.Setenv("RABBIT_CODE_CLIENT_CERT", "")
+	t.Setenv("RABBIT_CODE_CLIENT_KEY", "")
 	t.Setenv(features.EnvUseBedrock, "")
 	t.Setenv(features.EnvUseVertex, "")
 	t.Setenv(features.EnvUseFoundry, "")

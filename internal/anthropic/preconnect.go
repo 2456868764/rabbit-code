@@ -15,11 +15,10 @@ func ShouldSkipPreconnect() bool {
 	if features.UseBedrock() || features.UseVertex() || features.UseFoundry() {
 		return true
 	}
-	if strings.TrimSpace(os.Getenv("ANTHROPIC_UNIX_SOCKET")) != "" {
+	if strings.TrimSpace(os.Getenv("RABBIT_CODE_UNIX_SOCKET")) != "" {
 		return true
 	}
-	if strings.TrimSpace(os.Getenv("CLAUDE_CODE_CLIENT_CERT")) != "" ||
-		strings.TrimSpace(os.Getenv("CLAUDE_CODE_CLIENT_KEY")) != "" {
+	if mTLSEnvPathsSet("RABBIT_CODE_CLIENT_CERT", "RABBIT_CODE_CLIENT_KEY") {
 		return true
 	}
 	for _, k := range []string{
@@ -31,6 +30,11 @@ func ShouldSkipPreconnect() bool {
 		}
 	}
 	return false
+}
+
+func mTLSEnvPathsSet(certEnv, keyEnv string) bool {
+	return strings.TrimSpace(os.Getenv(certEnv)) != "" ||
+		strings.TrimSpace(os.Getenv(keyEnv)) != ""
 }
 
 // PreconnectHEAD issues a fire-and-forget HEAD to baseURL (apiPreconnect.ts). Errors are ignored.

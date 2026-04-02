@@ -16,7 +16,7 @@ import (
 const (
 	BaseDelayMS = 500
 	// FastBaseDelayMS is the exponential backoff floor when Policy.FastRetry is true (withRetry.ts fast mode).
-	FastBaseDelayMS = 100
+	FastBaseDelayMS    = 100
 	DefaultMaxAttempts = 10
 	// Max529Retries is how many times we may retry after receiving HTTP 529 (withRetry.ts MAX_529_RETRIES).
 	Max529Retries = 3
@@ -43,20 +43,20 @@ const (
 
 	// --- constants aligned with src/constants/querySource + withRetry.ts FOREGROUND_529_RETRY_SOURCES ---
 
-	QuerySourceReplMainThread                        QuerySource = "repl_main_thread"
-	QuerySourceReplMainThreadOutputStyleCustom       QuerySource = "repl_main_thread:outputStyle:custom"
-	QuerySourceReplMainThreadOutputStyleExplanatory  QuerySource = "repl_main_thread:outputStyle:Explanatory"
-	QuerySourceReplMainThreadOutputStyleLearning     QuerySource = "repl_main_thread:outputStyle:Learning"
-	QuerySourceSDK                                   QuerySource = "sdk"
-	QuerySourceAgentCustom                           QuerySource = "agent:custom"
-	QuerySourceAgentDefault                          QuerySource = "agent:default"
-	QuerySourceAgentBuiltin                          QuerySource = "agent:builtin"
-	QuerySourceHookAgent                             QuerySource = "hook_agent"
-	QuerySourceHookPrompt                            QuerySource = "hook_prompt"
-	QuerySourceVerificationAgent                     QuerySource = "verification_agent"
-	QuerySourceSideQuestion                          QuerySource = "side_question"
-	QuerySourceAutoMode                              QuerySource = "auto_mode"
-	QuerySourceBashClassifier                        QuerySource = "bash_classifier"
+	QuerySourceReplMainThread                       QuerySource = "repl_main_thread"
+	QuerySourceReplMainThreadOutputStyleCustom      QuerySource = "repl_main_thread:outputStyle:custom"
+	QuerySourceReplMainThreadOutputStyleExplanatory QuerySource = "repl_main_thread:outputStyle:Explanatory"
+	QuerySourceReplMainThreadOutputStyleLearning    QuerySource = "repl_main_thread:outputStyle:Learning"
+	QuerySourceSDK                                  QuerySource = "sdk"
+	QuerySourceAgentCustom                          QuerySource = "agent:custom"
+	QuerySourceAgentDefault                         QuerySource = "agent:default"
+	QuerySourceAgentBuiltin                         QuerySource = "agent:builtin"
+	QuerySourceHookAgent                            QuerySource = "hook_agent"
+	QuerySourceHookPrompt                           QuerySource = "hook_prompt"
+	QuerySourceVerificationAgent                    QuerySource = "verification_agent"
+	QuerySourceSideQuestion                         QuerySource = "side_question"
+	QuerySourceAutoMode                             QuerySource = "auto_mode"
+	QuerySourceBashClassifier                       QuerySource = "bash_classifier"
 )
 
 // foreground529RetrySources mirrors withRetry.ts FOREGROUND_529_RETRY_SOURCES (BASH_CLASSIFIER branch always included in Go).
@@ -65,17 +65,17 @@ var foreground529RetrySources = map[QuerySource]struct{}{
 	QuerySourceReplMainThreadOutputStyleCustom:      {},
 	QuerySourceReplMainThreadOutputStyleExplanatory: {},
 	QuerySourceReplMainThreadOutputStyleLearning:    {},
-	QuerySourceSDK:                                  {},
-	QuerySourceAgentCustom:                          {},
-	QuerySourceAgentDefault:                         {},
-	QuerySourceAgentBuiltin:                         {},
-	QuerySourceCompaction:                           {},
-	QuerySourceHookAgent:                            {},
-	QuerySourceHookPrompt:                           {},
-	QuerySourceVerificationAgent:                    {},
-	QuerySourceSideQuestion:                         {},
-	QuerySourceAutoMode:                             {},
-	QuerySourceBashClassifier:                       {},
+	QuerySourceSDK:               {},
+	QuerySourceAgentCustom:       {},
+	QuerySourceAgentDefault:      {},
+	QuerySourceAgentBuiltin:      {},
+	QuerySourceCompaction:        {},
+	QuerySourceHookAgent:         {},
+	QuerySourceHookPrompt:        {},
+	QuerySourceVerificationAgent: {},
+	QuerySourceSideQuestion:      {},
+	QuerySourceAutoMode:          {},
+	QuerySourceBashClassifier:    {},
 }
 
 func allows529Retry(pol Policy) bool {
@@ -111,7 +111,7 @@ type Policy struct {
 // DefaultPolicy returns default retry behavior for foreground streams.
 func DefaultPolicy() Policy {
 	return Policy{
-		MaxAttempts:           DefaultMaxAttempts,
+		MaxAttempts:         DefaultMaxAttempts,
 		Retry529429:         true,
 		Unattended:          features.UnattendedRetryEnabled(),
 		FastRetry:           features.FastRetryEnabled(),

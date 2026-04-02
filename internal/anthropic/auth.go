@@ -11,11 +11,11 @@ import (
 // Optional Refresh implements withOAuth401Retry: on HTTP 401 with Bearer auth, Refresh runs once
 // and the request is retried. Retrying a body-bearing request requires req.GetBody (PostMessagesStream sets it).
 type AuthTransport struct {
-	Base    http.RoundTripper
-	APIKey  string
-	Bearer  string
+	Base      http.RoundTripper
+	APIKey    string
+	Bearer    string
 	GetBearer func() string
-	Refresh func(ctx context.Context) error
+	Refresh   func(ctx context.Context) error
 }
 
 func (t *AuthTransport) bearer() string {

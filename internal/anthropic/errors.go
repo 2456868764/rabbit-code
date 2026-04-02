@@ -15,13 +15,13 @@ import (
 type Kind string
 
 const (
-	KindUnknown          Kind = "unknown"
-	KindPromptTooLong    Kind = "prompt_too_long"
-	KindMaxOutputTokens  Kind = "max_output_tokens"
-	KindRateLimit        Kind = "rate_limit"
-	KindOverloaded       Kind = "overloaded" // 529
-	KindConnection       Kind = "connection"
-	KindUnauthorized     Kind = "unauthorized"
+	KindUnknown         Kind = "unknown"
+	KindPromptTooLong   Kind = "prompt_too_long"
+	KindMaxOutputTokens Kind = "max_output_tokens"
+	KindRateLimit       Kind = "rate_limit"
+	KindOverloaded      Kind = "overloaded" // 529
+	KindConnection      Kind = "connection"
+	KindUnauthorized    Kind = "unauthorized"
 )
 
 // APIError is a typed error with optional HTTP status and structured kind.

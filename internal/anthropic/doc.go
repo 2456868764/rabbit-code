@@ -9,8 +9,9 @@
 //
 // Proxy (P4.3.3): HTTPTransportWithProxyFromEnv (and HTTPTransportWithProxyFromEnvAndRoots for Bootstrap TLS pool)
 // as the base RoundTripper for NewTransportChain / NewClient.
-// mTLS: HTTPTransportAPIOutbound / HTTPTransportAPIOutboundWithRoots load CLAUDE_CODE_CLIENT_CERT + CLAUDE_CODE_CLIENT_KEY when both are set.
-// Cloud: SigningTransport + CloudRequestSigner hook for Bedrock/Vertex/Foundry signing (Stub* signers until AC4-6 real signing).
+// mTLS: HTTPTransportAPIOutbound / HTTPTransportAPIOutboundWithRoots load RABBIT_CODE_CLIENT_CERT + RABBIT_CODE_CLIENT_KEY when both are set.
+// Preconnect skip: RABBIT_CODE_UNIX_SOCKET or RABBIT_CODE_CLIENT_CERT / RABBIT_CODE_CLIENT_KEY (ShouldSkipPreconnect).
+// Cloud: SigningTransport + CloudRequestSigner — BedrockSigV4Signer (bedrock-runtime SigV4), VertexTokenSigner (GCP ADC Bearer), StubFoundrySigner; NewSigningTransportForProvider / NewAPIOutboundTransport (proxy+mTLS base + signing by DetectProvider). RABBIT_CODE_SKIP_BEDROCK_AUTH / RABBIT_CODE_SKIP_VERTEX_AUTH no-op signers for mocks.
 // Vertex: ANTHROPIC_VERTEX_PROJECT_ID + CLOUD_ML_REGION (or ANTHROPIC_VERTEX_BASE_URL) enable streamRawPredict path and vertex JSON body (see vertex-sdk).
 // Foundry: ANTHROPIC_FOUNDRY_RESOURCE builds https://{res}.services.ai.azure.com/anthropic (foundry-sdk).
 // ReadAssistantStream: optional WithThinkingAccumulator / WithCompactionAccumulator / WithToolInputAccumulators (Client fields).

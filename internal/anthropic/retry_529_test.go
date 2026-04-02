@@ -68,7 +68,7 @@ func TestDoRequest_QuerySourceNo529(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
 	_, err := DoRequest(context.Background(), http.DefaultTransport, req, Policy{
-		MaxAttempts:   20,
+		MaxAttempts: 20,
 		Retry529429: true,
 		QuerySource: QuerySourceNo529,
 	})
@@ -90,7 +90,7 @@ func TestDoRequest_StrictForeground529_unknownSource(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
 	_, err := DoRequest(context.Background(), http.DefaultTransport, req, Policy{
-		MaxAttempts:           20,
+		MaxAttempts:         20,
 		Retry529429:         true,
 		QuerySource:         QuerySource("title_suggestion"),
 		StrictForeground529: true,
@@ -113,7 +113,7 @@ func TestDoRequest_StrictForeground529_sdkStillRetries529(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
 	_, err := DoRequest(context.Background(), http.DefaultTransport, req, Policy{
-		MaxAttempts:           20,
+		MaxAttempts:         20,
 		Retry529429:         true,
 		QuerySource:         QuerySourceSDK,
 		StrictForeground529: true,
@@ -137,7 +137,7 @@ func TestDoRequest_InitialConsecutive529Errors(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
 	_, err := DoRequest(context.Background(), http.DefaultTransport, req, Policy{
 		MaxAttempts:                 20,
-		Retry529429:               true,
+		Retry529429:                 true,
 		InitialConsecutive529Errors: 2,
 	})
 	if err == nil {
@@ -172,7 +172,7 @@ func TestDoRequest_StrictForeground529_emptySourceRetries529(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
 	_, err := DoRequest(context.Background(), http.DefaultTransport, req, Policy{
-		MaxAttempts:           20,
+		MaxAttempts:         20,
 		Retry529429:         true,
 		QuerySource:         QuerySourceDefault,
 		StrictForeground529: true,

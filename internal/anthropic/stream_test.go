@@ -87,8 +87,8 @@ func TestReadAssistantStream_WithToolInputAccumulators(t *testing.T) {
 		"type":  "content_block_delta",
 		"index": 0,
 		"delta": map[string]string{
-			"type":          "input_json_delta",
-			"partial_json":  `{"n":`,
+			"type":         "input_json_delta",
+			"partial_json": `{"n":`,
 		},
 	})
 	if err != nil {
