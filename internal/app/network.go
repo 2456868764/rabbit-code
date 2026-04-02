@@ -15,7 +15,7 @@ const (
 	envExtraCA    = "RABBIT_CODE_EXTRA_CA_BUNDLE"
 )
 
-// ProxyConfig carries proxy strings for a future HTTP transport (Phase 4).
+// ProxyConfig carries proxy strings read at bootstrap (stdlib proxy envs are applied by anthropic HTTP transports).
 type ProxyConfig struct {
 	HTTPProxy  string
 	HTTPSProxy string
@@ -81,7 +81,8 @@ func AppendPEMFiles(pool *x509.CertPool, paths []string) error {
 	return nil
 }
 
-// TLSClientConfig returns a minimal tls.Config for Phase 4 reuse (no client certs yet).
+// TLSClientConfig returns RootCAs and MinVersion. mTLS client certs for API calls are loaded on the
+// anthropic outbound stack (RABBIT_CODE_CLIENT_CERT + RABBIT_CODE_CLIENT_KEY), not here.
 func TLSClientConfig(pool *x509.CertPool) *tls.Config {
 	if pool == nil {
 		return &tls.Config{MinVersion: tls.VersionTLS12}

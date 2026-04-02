@@ -108,6 +108,12 @@ var Builders = map[string]Builder{
 
 func trim(s string) string { return strings.TrimRight(s, "/") }
 
+// HasTSModule reports whether tsFile is a registered services/api builder (e.g. emptyUsage.ts).
+func HasTSModule(tsFile string) bool {
+	_, ok := Builders[tsFile]
+	return ok
+}
+
 // BuildRequest returns a probe request for the named TS file.
 func BuildRequest(tsFile, anthropicBase, oauthBase string) (*http.Request, error) {
 	b, ok := Builders[tsFile]

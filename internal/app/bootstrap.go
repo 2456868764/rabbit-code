@@ -7,11 +7,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"time"
 
-	"github.com/2456868764/rabbit-code/internal/anthropic"
 	"github.com/2456868764/rabbit-code/internal/bootstrap"
 	"github.com/2456868764/rabbit-code/internal/features"
 )
@@ -70,14 +68,8 @@ func Bootstrap(ctx context.Context) (*Runtime, error) {
 		return nil, fmt.Errorf("cert pool: %w", err)
 	}
 
-	// Phase 4 / AC4-6: same outbound stack as Messages (proxy + optional mTLS + Bedrock SigV4 / Vertex Bearer when applicable).
-	preconnectRT, err := anthropic.NewAPIOutboundTransport(ctx, pool)
-	if err != nil {
-		log.Debug("preconnect: API outbound transport unavailable, falling back to proxy+roots only", "err", err)
-		preconnectRT = anthropic.HTTPTransportWithProxyFromEnvAndRoots(pool)
-	}
-	preconnectClient := &http.Client{Transport: preconnectRT}
-	_ = anthropic.PreconnectHEAD(ctx, preconnectClient, anthropic.BaseURL(anthropic.DetectProvider()))
+	// Phase 4 / AC4-6: same outbound resolution as Messages (ResolveAPIOutboundTransport).
+	runAPIPreconnect(ctx, pool, log)
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -109,7 +101,7 @@ func Bootstrap(ctx context.Context) (*Runtime, error) {
 
 	np := NoopPrefetch{}
 	prefetchStart := time.Now()
-	if err := ParallelPrefetch(ctx, np, np, np); err != nil {
+	if err := ParallelPrefetch(ctx, np, np, APIKeyFilePrefetch{GlobalConfigDir: globalDir}); err != nil {
 		reg.Run()
 		return nil, err
 	}

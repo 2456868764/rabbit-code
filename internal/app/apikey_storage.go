@@ -17,16 +17,22 @@ func apiKeyFilePath(globalDir string) string {
 
 // HasAPIKeyConfigured returns true if any supported env var or the saved api_key file is non-empty.
 func HasAPIKeyConfigured(globalDir string) bool {
+	return ReadAPIKey(globalDir) != ""
+}
+
+// ReadAPIKey returns the API key from the first non-empty env (ANTHROPIC_API_KEY, RABBIT_CODE_API_KEY),
+// else from globalDir/api_key. Empty string if unset.
+func ReadAPIKey(globalDir string) string {
 	for _, name := range apiKeyEnvNames {
-		if strings.TrimSpace(os.Getenv(name)) != "" {
-			return true
+		if v := strings.TrimSpace(os.Getenv(name)); v != "" {
+			return v
 		}
 	}
 	b, err := os.ReadFile(apiKeyFilePath(globalDir))
 	if err != nil {
-		return false
+		return ""
 	}
-	return strings.TrimSpace(string(b)) != ""
+	return strings.TrimSpace(string(b))
 }
 
 // WriteAPIKeyFile stores the key for later phases (mode 0600). Trims surrounding whitespace.

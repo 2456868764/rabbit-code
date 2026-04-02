@@ -13,9 +13,7 @@ func UserHome() (string, error) {
 	return os.UserHomeDir()
 }
 
-// GlobalConfigDir returns the OS-appropriate user config directory for rabbit-code.
-// Windows: os.UserConfigDir()/rabbit-code (%AppData% on typical setups).
-// Unix: XDG_CONFIG_HOME/rabbit-code or ~/.config/rabbit-code.
+// GlobalConfigDir returns XDG_CONFIG_HOME/rabbit-code or ~/.config/rabbit-code.
 func GlobalConfigDir() (string, error) {
 	if runtime.GOOS == "windows" {
 		cfg, err := os.UserConfigDir()
