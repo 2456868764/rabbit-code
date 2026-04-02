@@ -4,6 +4,24 @@ import (
 	"strings"
 )
 
+// DedupeBetasPreserveOrder removes empty and duplicate beta names, keeping first occurrence (utils/betas.ts getMergedBetas merge).
+func DedupeBetasPreserveOrder(names []string) []string {
+	seen := make(map[string]struct{}, len(names))
+	var out []string
+	for _, n := range names {
+		n = strings.TrimSpace(n)
+		if n == "" {
+			continue
+		}
+		if _, ok := seen[n]; ok {
+			continue
+		}
+		seen[n] = struct{}{}
+		out = append(out, n)
+	}
+	return out
+}
+
 // SplitBetasForBedrock returns betas that belong in HTTP anthropic-beta vs Bedrock extraBodyParams
 // (constants/betas.ts BEDROCK_EXTRA_PARAMS_HEADERS).
 func SplitBetasForBedrock(names []string) (header []string, extraBody []string) {
@@ -24,6 +42,7 @@ func SplitBetasForBedrock(names []string) (header []string, extraBody []string) 
 // MergeBetasForProvider builds the anthropic-beta header value for HTTP.
 // For Bedrock, betas in BedrockExtraParamsBetas are omitted here (caller merges them into JSON body).
 func MergeBetasForProvider(p Provider, names []string) string {
+	names = DedupeBetasPreserveOrder(names)
 	if p == ProviderBedrock {
 		h, _ := SplitBetasForBedrock(names)
 		return MergeBetaHeader(h)

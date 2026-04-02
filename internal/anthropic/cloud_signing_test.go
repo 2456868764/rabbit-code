@@ -70,3 +70,11 @@ func TestStubVertexSigner(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func TestStubFoundrySigner(t *testing.T) {
+	var s StubFoundrySigner
+	err := s.Sign(context.Background(), httptest.NewRequest(http.MethodPost, "/", nil))
+	if !errors.Is(err, ErrCloudSigningNotImplemented) {
+		t.Fatalf("got %v", err)
+	}
+}

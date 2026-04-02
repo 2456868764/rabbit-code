@@ -23,6 +23,18 @@ func TestIsPromptCacheBreakStreamJSON(t *testing.T) {
 	if !IsPromptCacheBreakStreamJSON([]byte(`{"detail":"prompt_cache expired for this session"}`)) {
 		t.Fatal("expected prompt_cache+expired heuristic")
 	}
+	if !IsPromptCacheBreakStreamJSON([]byte(`{"error":{"message":"prompt_cache_miss on block"}}`)) {
+		t.Fatal("expected prompt_cache_miss heuristic")
+	}
+	if !IsPromptCacheBreakStreamJSON([]byte(`{"message":"invalid_cache reference"}`)) {
+		t.Fatal("expected invalid_cache heuristic")
+	}
+	if !IsPromptCacheBreakStreamJSON([]byte(`{"type":"error","error":{"message":"cached_prompt invalid"}}`)) {
+		t.Fatal("expected cached_prompt+invalid heuristic")
+	}
+	if !IsPromptCacheBreakStreamJSON([]byte(`cache_key invalid for prompt`)) {
+		t.Fatal("expected cache_key+invalid heuristic")
+	}
 	t.Setenv(features.EnvPromptCacheBreak, "")
 	if IsPromptCacheBreakStreamJSON([]byte(`{"type":"error","message":"cache_break"}`)) {
 		t.Fatal("expected false when feature off")

@@ -48,3 +48,10 @@ type StubVertexSigner struct{}
 func (StubVertexSigner) Sign(context.Context, *http.Request) error {
 	return ErrCloudSigningNotImplemented
 }
+
+// StubFoundrySigner returns ErrCloudSigningNotImplemented from Sign (Azure Foundry / managed identity hook; AC4-6).
+type StubFoundrySigner struct{}
+
+func (StubFoundrySigner) Sign(context.Context, *http.Request) error {
+	return ErrCloudSigningNotImplemented
+}

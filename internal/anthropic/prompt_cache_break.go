@@ -32,5 +32,17 @@ func IsPromptCacheBreakStreamJSON(jsonLine []byte) bool {
 	if bytes.Contains(b, []byte("prompt_cache")) && bytes.Contains(b, []byte("expired")) {
 		return true
 	}
+	if bytes.Contains(b, []byte("prompt_cache_miss")) {
+		return true
+	}
+	if bytes.Contains(b, []byte("invalid_cache")) {
+		return true
+	}
+	if bytes.Contains(b, []byte("cached_prompt")) && bytes.Contains(b, []byte("invalid")) {
+		return true
+	}
+	if bytes.Contains(b, []byte("cache_key")) && bytes.Contains(b, []byte("invalid")) {
+		return true
+	}
 	return false
 }

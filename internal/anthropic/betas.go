@@ -19,6 +19,8 @@ const (
 	BetaSummarizeConnectorText   = "summarize-connector-text-2026-03-13"
 	BetaAFKMode                  = "afk-mode-2026-01-31"
 	BetaAdvisor                  = "advisor-tool-2026-03-01"
+	// BetaCLIInternal is constants/betas.ts CLI_INTERNAL_BETA_HEADER when USER_TYPE=ant (ant-only in product; string frozen for parity).
+	BetaCLIInternal = "cli-internal-2026-02-09"
 	// BetaOAuth is constants/oauth.ts OAUTH_BETA_HEADER (merged into anthropic-beta on OAuth-backed clients).
 	BetaOAuth = "oauth-2025-04-20"
 )

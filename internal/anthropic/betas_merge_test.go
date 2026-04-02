@@ -11,6 +11,31 @@ func TestBetaOAuth_matchesOAuthTS(t *testing.T) {
 	}
 }
 
+func TestBetaCLIInternal_matchesConstantsBetasTS(t *testing.T) {
+	if BetaCLIInternal != "cli-internal-2026-02-09" {
+		t.Fatal(BetaCLIInternal)
+	}
+}
+
+func TestDedupeBetasPreserveOrder(t *testing.T) {
+	got := DedupeBetasPreserveOrder([]string{
+		BetaWebSearch, BetaWebSearch, " " + BetaTaskBudgets, BetaWebSearch,
+	})
+	if len(got) != 2 || got[0] != BetaWebSearch || got[1] != BetaTaskBudgets {
+		t.Fatalf("%v", got)
+	}
+}
+
+func TestMergeBetasForProvider_dedupesInput(t *testing.T) {
+	s := MergeBetasForProvider(ProviderAnthropic, []string{
+		BetaClaudeCode20250219, BetaClaudeCode20250219, BetaWebSearch,
+	})
+	want := BetaClaudeCode20250219 + "," + BetaWebSearch
+	if s != want {
+		t.Fatalf("got %q want %q", s, want)
+	}
+}
+
 func TestBedrockExtraParamsBetas_matchesConstantsBetasTS(t *testing.T) {
 	want := []string{BetaInterleavedThinking, BetaContext1M, BetaToolSearch3P}
 	if len(BedrockExtraParamsBetas) != len(want) {
