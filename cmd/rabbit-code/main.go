@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/2456868764/rabbit-code/internal/app"
+	"github.com/2456868764/rabbit-code/internal/anthropic/services"
 	"github.com/2456868764/rabbit-code/internal/version"
 )
 
@@ -20,6 +21,16 @@ func main() {
 		case "config":
 			if err := handleConfigSubcommand(); err != nil {
 				fmt.Fprintf(os.Stderr, "rabbit-code: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		case "probe":
+			tsFile := services.EmptyUsage
+			if len(os.Args) > 2 {
+				tsFile = os.Args[2]
+			}
+			if err := app.RunProbe(context.Background(), os.Stdout, tsFile); err != nil {
+				fmt.Fprintf(os.Stderr, "rabbit-code: probe: %v\n", err)
 				os.Exit(1)
 			}
 			return
@@ -55,9 +66,10 @@ func main() {
 			fmt.Fprintf(os.Stderr, "rabbit-code: config: %v\n", err)
 			os.Exit(1)
 		}
+		app.RunAPIPreconnect(ctx, rt)
 	}
 
-	fmt.Fprintf(os.Stderr, "rabbit-code — Phase 1 bootstrap OK. Commands: version | config dump | set | wizard | sync | %s=1\n", app.ExitAfterInitEnv)
+	fmt.Fprintf(os.Stderr, "rabbit-code — Phase 1 bootstrap OK. Commands: version | config dump | probe | set | wizard | sync | %s=1\n", app.ExitAfterInitEnv)
 	os.Exit(0)
 }
 
