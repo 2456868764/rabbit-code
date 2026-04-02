@@ -11,4 +11,6 @@ type LoopState struct {
 	RecoveryAttempts int
 	LastStopReason   string
 	HadStreamError   bool
+	// LastAPIErrorKind is the anthropic.APIError kind string after a failed assistant call (P5.1.3).
+	LastAPIErrorKind string
 }

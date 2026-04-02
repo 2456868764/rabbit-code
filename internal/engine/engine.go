@@ -22,20 +22,26 @@ type Config struct {
 	MemdirPaths []string      // optional: prepend session fragments to each Submit user text (P5.4.1)
 	// CompactAdvisor, if set, runs after a successful turn loop to surface scheduling hints (P5.2.1 stub).
 	CompactAdvisor func(st query.LoopState, transcriptJSONLen int) (autoCompact, reactiveCompact bool)
+	// StopHook runs after RunTurnLoop finishes (err nil on success). Same engine context (P5.1.4).
+	StopHook func(ctx context.Context, st query.LoopState, err error)
+	// OrphanPermissionAdvisor, if set, runs after a successful loop; emit EventKindOrphanPermission when ok (P5.3.3 stub).
+	OrphanPermissionAdvisor func(st query.LoopState) (orphanToolUseID string, ok bool)
 }
 
 // Engine coordinates cancellable query turns (stub or real StreamAssistant / RunTurnLoop).
 type Engine struct {
-	ctx            context.Context
-	cancel         context.CancelFunc
-	ch             chan EngineEvent
-	wg             sync.WaitGroup
-	deps           querydeps.Deps
-	model          string
-	maxTokens      int
-	stubDelay      time.Duration
-	memdirPaths    []string
-	compactAdvisor func(query.LoopState, int) (bool, bool)
+	ctx                     context.Context
+	cancel                  context.CancelFunc
+	ch                      chan EngineEvent
+	wg                      sync.WaitGroup
+	deps                    querydeps.Deps
+	model                   string
+	maxTokens               int
+	stubDelay               time.Duration
+	memdirPaths             []string
+	compactAdvisor          func(query.LoopState, int) (bool, bool)
+	stopHook                func(context.Context, query.LoopState, error)
+	orphanPermissionAdvisor func(query.LoopState) (string, bool)
 }
 
 // NewEngine is equivalent to New(parent, nil) (stub assistant).
@@ -74,6 +80,8 @@ func New(parent context.Context, cfg *Config) *Engine {
 		}
 		e.memdirPaths = append([]string(nil), cfg.MemdirPaths...)
 		e.compactAdvisor = cfg.CompactAdvisor
+		e.stopHook = cfg.StopHook
+		e.orphanPermissionAdvisor = cfg.OrphanPermissionAdvisor
 	}
 	return e
 }
@@ -132,8 +140,17 @@ func (e *Engine) applyMemdir(userText string) (resolved string, nFrag int, err e
 }
 
 func (e *Engine) runTurnLoop(userText string) {
+	st := &query.LoopState{}
+	var loopErr error
+	defer func() {
+		if e.stopHook != nil {
+			e.stopHook(e.ctx, *st, loopErr)
+		}
+	}()
+
 	resolved, nFrag, err := e.applyMemdir(userText)
 	if err != nil {
+		loopErr = err
 		e.trySend(EngineEvent{Kind: EventKindError, Err: err})
 		return
 	}
@@ -143,7 +160,6 @@ func (e *Engine) runTurnLoop(userText string) {
 		}
 	}
 
-	st := &query.LoopState{}
 	d := query.LoopDriver{
 		Deps: querydeps.Deps{
 			Tools:     e.deps.Tools,
@@ -179,12 +195,32 @@ func (e *Engine) runTurnLoop(userText string) {
 
 	msgs, _, err := d.RunTurnLoop(e.ctx, st, resolved)
 	if err != nil {
+		loopErr = err
 		if errors.Is(err, context.Canceled) || errors.Is(e.ctx.Err(), context.Canceled) {
 			return
 		}
 		st.HadStreamError = true
-		e.trySend(EngineEvent{Kind: EventKindError, Err: err})
+		kind, rec := classifyAnthropicError(err)
+		st.LastAPIErrorKind = kind
+		if rec {
+			st.RecoveryAttempts++
+		}
+		e.trySend(EngineEvent{
+			Kind:               EventKindError,
+			Err:                err,
+			APIErrorKind:       kind,
+			RecoverableCompact: rec,
+		})
 		return
+	}
+
+	if e.orphanPermissionAdvisor != nil {
+		if id, ok := e.orphanPermissionAdvisor(*st); ok && id != "" {
+			e.trySend(EngineEvent{
+				Kind:            EventKindOrphanPermission,
+				OrphanToolUseID: id,
+			})
+		}
 	}
 
 	if e.compactAdvisor != nil {

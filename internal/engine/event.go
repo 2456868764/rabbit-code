@@ -9,6 +9,7 @@ const (
 	EventKindAssistantText
 	EventKindToolCallStart
 	EventKindToolCallDone
+	EventKindOrphanPermission
 	EventKindCompactSuggest
 	EventKindDone
 	EventKindError
@@ -30,4 +31,11 @@ type EngineEvent struct {
 	CompactPhase           string
 	SuggestAutoCompact     bool
 	SuggestReactiveCompact bool
+
+	// APIErrorKind is set for EventKindError when the failure unwraps to anthropic.APIError (P5.1.3).
+	APIErrorKind string
+	// RecoverableCompact hints prompt_too_long / max_output_tokens style recovery (compact / trim); TUI may react.
+	RecoverableCompact bool
+	// OrphanToolUseID is set for EventKindOrphanPermission (P5.3.3 stub).
+	OrphanToolUseID string
 }

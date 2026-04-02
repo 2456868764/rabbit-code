@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/2456868764/rabbit-code/internal/anthropic"
 	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/querydeps"
 )
@@ -207,6 +209,115 @@ func TestEngine_CompactSuggest_afterLoop(t *testing.T) {
 	e.Wait()
 	if !sawCompact {
 		t.Fatal("expected compact suggest")
+	}
+}
+
+func TestEngine_Error_anthropicKindAndRecoverable(t *testing.T) {
+	apiErr := &anthropic.APIError{Kind: anthropic.KindPromptTooLong, Status: 400, Msg: "ptl"}
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "", fmt.Errorf("wrap: %w", apiErr)
+			}),
+		},
+	})
+	e.Submit("x")
+	var sawErr *EngineEvent
+	for {
+		ev := <-e.Events()
+		if ev.Kind == EventKindError {
+			sawErr = &ev
+			break
+		}
+	}
+	e.Wait()
+	if sawErr == nil {
+		t.Fatal("no error event")
+	}
+	if sawErr.APIErrorKind != string(anthropic.KindPromptTooLong) || !sawErr.RecoverableCompact {
+		t.Fatalf("%+v", sawErr)
+	}
+}
+
+func TestEngine_StopHook_successAndFailure(t *testing.T) {
+	var calls int
+	var lastErr error
+	hook := func(_ context.Context, _ query.LoopState, err error) {
+		calls++
+		lastErr = err
+	}
+
+	e1 := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "ok", nil
+			}),
+		},
+		StopHook: hook,
+	})
+	e1.Submit("a")
+	drainUntilTerminal(t, e1.Events())
+	e1.Wait()
+	if calls != 1 || lastErr != nil {
+		t.Fatalf("calls=%d err=%v", calls, lastErr)
+	}
+
+	e2 := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "", errors.New("fail")
+			}),
+		},
+		StopHook: hook,
+	})
+	e2.Submit("b")
+	drainUntilTerminal(t, e2.Events())
+	e2.Wait()
+	if calls != 2 || lastErr == nil {
+		t.Fatalf("calls=%d err=%v", calls, lastErr)
+	}
+}
+
+func TestEngine_OrphanPermission_advisor(t *testing.T) {
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "y", nil
+			}),
+		},
+		OrphanPermissionAdvisor: func(_ query.LoopState) (string, bool) {
+			return "toolu_orphan_1", true
+		},
+	})
+	e.Submit("z")
+	var saw bool
+	for {
+		ev := <-e.Events()
+		if ev.Kind == EventKindOrphanPermission && ev.OrphanToolUseID == "toolu_orphan_1" {
+			saw = true
+		}
+		if ev.Kind == EventKindDone {
+			break
+		}
+	}
+	e.Wait()
+	if !saw {
+		t.Fatal("expected orphan permission event")
+	}
+}
+
+func drainUntilTerminal(t *testing.T, ch <-chan EngineEvent) {
+	t.Helper()
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindDone || ev.Kind == EventKindError {
+				return
+			}
+		case <-deadline:
+			t.Fatal("timeout waiting for terminal event")
+		}
 	}
 }
 
