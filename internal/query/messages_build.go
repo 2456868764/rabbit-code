@@ -1,7 +1,6 @@
 package query
 
 import (
-	"bytes"
 	"encoding/json"
 )
 
@@ -16,13 +15,6 @@ func AppendAssistantTextMessage(messagesJSON json.RawMessage, assistantText stri
 }
 
 func appendTextRoleMessage(messagesJSON json.RawMessage, role, text string) (json.RawMessage, error) {
-	var list []json.RawMessage
-	raw := bytes.TrimSpace(messagesJSON)
-	if len(raw) > 0 && string(raw) != "null" {
-		if err := json.Unmarshal(raw, &list); err != nil {
-			return nil, err
-		}
-	}
 	piece, err := json.Marshal(map[string]any{
 		"role": role,
 		"content": []map[string]string{
@@ -32,8 +24,7 @@ func appendTextRoleMessage(messagesJSON json.RawMessage, role, text string) (jso
 	if err != nil {
 		return nil, err
 	}
-	list = append(list, json.RawMessage(piece))
-	return json.Marshal(list)
+	return appendRawMessageToList(messagesJSON, piece)
 }
 
 // InitialUserMessagesJSON builds [{"role":"user","content":[{"type":"text","text":...}]}].

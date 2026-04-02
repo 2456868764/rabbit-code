@@ -3,9 +3,13 @@ package query
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/2456868764/rabbit-code/internal/querydeps"
 )
+
+// ErrMaxTurnsExceeded is returned when LoopState.MaxTurns > 0 and the cap is hit before another assistant call.
+var ErrMaxTurnsExceeded = errors.New("query: max assistant turns exceeded")
 
 // LoopDriver runs assistant and tool steps against querydeps.Deps (query.ts loop seed).
 type LoopDriver struct {
@@ -21,15 +25,27 @@ func (d *LoopDriver) streamer() querydeps.StreamAssistant {
 	return querydeps.NoopStreamAssistant{}
 }
 
-// RunAssistantStep calls StreamAssistant and appends the assistant text message to the transcript JSON.
-func (d *LoopDriver) RunAssistantStep(ctx context.Context, messagesJSON json.RawMessage) (assistantText string, out json.RawMessage, err error) {
-	model, max := d.Model, d.MaxTokens
+func (d *LoopDriver) modelAndMax() (model string, maxTokens int) {
+	model, maxTokens = d.Model, d.MaxTokens
 	if model == "" {
 		model = "claude-3-5-haiku-20241022"
 	}
-	if max <= 0 {
-		max = 1024
+	if maxTokens <= 0 {
+		maxTokens = 1024
 	}
+	return model, maxTokens
+}
+
+func (d *LoopDriver) turner() querydeps.TurnAssistant {
+	if d.Deps.Turn != nil {
+		return d.Deps.Turn
+	}
+	return querydeps.StreamAsTurnAssistant(d.Deps.Assistant)
+}
+
+// RunAssistantStep calls StreamAssistant and appends the assistant text message to the transcript JSON.
+func (d *LoopDriver) RunAssistantStep(ctx context.Context, messagesJSON json.RawMessage) (assistantText string, out json.RawMessage, err error) {
+	model, max := d.modelAndMax()
 	text, err := d.streamer().StreamAssistant(ctx, model, max, messagesJSON)
 	if err != nil {
 		return "", nil, err
@@ -68,4 +84,53 @@ func (d *LoopDriver) RunAssistantChain(ctx context.Context, userText string, ste
 		msgs = next
 	}
 	return msgs, texts, nil
+}
+
+// RunTurnLoop runs assistant turns until the model returns no tool uses, ctx is done, or MaxTurns is exceeded.
+// When st is non-nil, TranReceiveAssistant is applied after each assistant message; RunToolStep applies tool transitions.
+func (d *LoopDriver) RunTurnLoop(ctx context.Context, st *LoopState, userText string) (msgs json.RawMessage, lastAssistantText string, err error) {
+	msgs, err = InitialUserMessagesJSON(userText)
+	if err != nil {
+		return nil, "", err
+	}
+	model, max := d.modelAndMax()
+	for {
+		if st != nil && st.MaxTurns > 0 && st.TurnCount >= st.MaxTurns {
+			return msgs, lastAssistantText, ErrMaxTurnsExceeded
+		}
+		turn, err := d.turner().AssistantTurn(ctx, model, max, msgs)
+		if err != nil {
+			return msgs, lastAssistantText, err
+		}
+		if len(turn.ToolUses) == 0 && turn.Text == "" {
+			break
+		}
+		msgs, err = AppendAssistantTurnMessage(msgs, turn.Text, turn.ToolUses)
+		if err != nil {
+			return msgs, lastAssistantText, err
+		}
+		if st != nil {
+			*st = ApplyTransition(*st, TranReceiveAssistant)
+		}
+		lastAssistantText = turn.Text
+		if len(turn.ToolUses) == 0 {
+			break
+		}
+		if d.Deps.Tools == nil {
+			return msgs, lastAssistantText, querydeps.ErrNoToolRunner
+		}
+		results := make([]ToolResultBlock, 0, len(turn.ToolUses))
+		for _, u := range turn.ToolUses {
+			out, err := d.RunToolStep(ctx, st, u.Name, u.Input)
+			if err != nil {
+				return msgs, lastAssistantText, err
+			}
+			results = append(results, ToolResultBlock{ToolUseID: u.ID, Content: string(out)})
+		}
+		msgs, err = AppendUserToolResultsMessage(msgs, results)
+		if err != nil {
+			return msgs, lastAssistantText, err
+		}
+	}
+	return msgs, lastAssistantText, nil
 }
