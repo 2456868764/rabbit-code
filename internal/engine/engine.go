@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/2456868764/rabbit-code/internal/compact"
+	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/memdir"
 	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/querydeps"
@@ -235,6 +236,12 @@ func (e *Engine) runTurnLoop(userText string) {
 		if !e.trySend(EngineEvent{Kind: EventKindMemdirInject, MemdirFragmentCount: nFrag}) {
 			return
 		}
+	}
+
+	if maxB := features.TokenBudgetMaxInputBytes(); maxB > 0 && len(resolved) > maxB {
+		loopErr = ErrTokenBudgetExceeded
+		e.trySend(EngineEvent{Kind: EventKindError, Err: loopErr})
+		return
 	}
 
 	maxAttempts := 1

@@ -13,6 +13,7 @@ import (
 
 	"github.com/2456868764/rabbit-code/internal/anthropic"
 	"github.com/2456868764/rabbit-code/internal/compact"
+	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/querydeps"
 )
@@ -25,6 +26,39 @@ func drainChFor(d time.Duration, ch <-chan EngineEvent) {
 			return
 		case <-ch:
 		}
+	}
+}
+
+func TestEngine_TokenBudget_blocksOversizeResolvedText(t *testing.T) {
+	t.Setenv(features.EnvTokenBudget, "true")
+	t.Setenv(features.EnvTokenBudgetMaxInputBytes, "10")
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "ok", nil
+			}),
+		},
+	})
+	e.Submit("12345678901")
+	var saw error
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindError {
+				saw = ev.Err
+				goto budgetDone
+			}
+			if ev.Kind == EventKindAssistantText {
+				t.Fatal("assistant should not run")
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+budgetDone:
+	e.Wait()
+	if !errors.Is(saw, ErrTokenBudgetExceeded) {
+		t.Fatalf("got %v", saw)
 	}
 }
 
