@@ -14,7 +14,7 @@ Go module: [`github.com/2456868764/rabbit-code`](https://github.com/2456868764/r
 
 ## Phase 开发流程（强制）
 
-各 Phase 开工前须全量对齐 **`claude-code-sourcemap`**（功能清单、验收标准、**§4 路径对照**、**§6 迭代记录**）；迭代中须 **先列执行计划 → 逐项实现 → 测试通过 → `git commit`**，直至该 Phase 按 SPEC 收口。详见根目录 **[`PHASE_ITERATION_RULES.md`](./PHASE_ITERATION_RULES.md)**。
+各 Phase 开工前须全量对齐 **`claude-code-sourcemap`**（功能清单、验收标准、**§4 路径对照**、**§6 迭代记录**）；迭代中须 **先列执行计划 → 逐项实现 → 测试通过 → `git commit`**，直至该 Phase 按 SPEC 收口。详见 **[`docs/phases/PHASE_ITERATION_RULES.md`](./docs/phases/PHASE_ITERATION_RULES.md)**。
 
 ---
 
