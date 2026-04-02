@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/2456868764/rabbit-code/internal/compact"
@@ -71,6 +72,7 @@ type Engine struct {
 	maxAssistantTurns                int
 	suggestCompactOnRecoverableError bool
 	templateDir                      string
+	cacheBreakSeen                   int32 // atomic: prompt-cache break callback ran this Submit
 }
 
 // NewEngine is equivalent to New(parent, nil) (stub assistant).
@@ -321,10 +323,14 @@ func (e *Engine) runTurnLoop(userText string) {
 		SessionRestore:  features.SessionRestoreEnabled(),
 	})
 
+	atomic.StoreInt32(&e.cacheBreakSeen, 0)
 	ctxLoop := e.ctx
-	if features.PromptCacheBreakDetectionEnabled() {
+	if features.PromptCacheBreakDetectionEnabled() || features.PromptCacheBreakSuggestCompactEnabled() {
 		ctxLoop = querydeps.ContextWithOnPromptCacheBreak(e.ctx, func() {
-			e.trySend(EngineEvent{Kind: EventKindPromptCacheBreakDetected, PhaseDetail: "sse"})
+			atomic.StoreInt32(&e.cacheBreakSeen, 1)
+			if features.PromptCacheBreakDetectionEnabled() {
+				e.trySend(EngineEvent{Kind: EventKindPromptCacheBreakDetected, PhaseDetail: "sse"})
+			}
 		})
 	}
 
@@ -428,6 +434,24 @@ func (e *Engine) runTurnLoop(userText string) {
 
 	if !succeeded {
 		return
+	}
+
+	if features.PromptCacheBreakSuggestCompactEnabled() && atomic.SwapInt32(&e.cacheBreakSeen, 0) != 0 {
+		ph := compact.RunIdle.Next(false, true)
+		e.trySend(EngineEvent{
+			Kind:                   EventKindCompactSuggest,
+			CompactPhase:           ph.String(),
+			SuggestReactiveCompact: true,
+		})
+		if e.compactExecutor != nil {
+			sum, exErr := e.compactExecutor(e.ctx, ph, msgs)
+			e.trySend(EngineEvent{
+				Kind:           EventKindCompactResult,
+				CompactPhase:   ph.String(),
+				CompactSummary: sum,
+				Err:            exErr,
+			})
+		}
 	}
 
 	if e.orphanPermissionAdvisor != nil {

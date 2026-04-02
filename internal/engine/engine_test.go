@@ -1005,6 +1005,48 @@ func TestEngine_SnipCompactBetweenRounds(t *testing.T) {
 	}
 }
 
+type cacheBreakFireTurn struct{}
+
+func (cacheBreakFireTurn) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (querydeps.TurnResult, error) {
+	_ = model
+	_ = maxTokens
+	_ = msgs
+	if cb, ok := querydeps.OnPromptCacheBreakFromContext(ctx); ok && cb != nil {
+		cb()
+	}
+	return querydeps.TurnResult{Text: "ok"}, nil
+}
+
+func TestEngine_promptCacheBreakSuggestCompact(t *testing.T) {
+	t.Setenv(features.EnvPromptCacheBreak, "")
+	t.Setenv(features.EnvPromptCacheBreakSuggestCompact, "true")
+	var sawSuggest bool
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Turn: cacheBreakFireTurn{},
+		},
+		CompactExecutor: compact.ExecuteStub,
+	})
+	e.Submit("hi")
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindCompactSuggest && ev.SuggestReactiveCompact {
+				sawSuggest = true
+			}
+			if ev.Kind == EventKindDone {
+				if !sawSuggest {
+					t.Fatal("expected reactive compact after cache break hook")
+				}
+				e.Wait()
+				return
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
 func TestEngine_SubmitCancelRace(t *testing.T) {
 	for i := 0; i < 40; i++ {
 		e := NewEngine(context.Background())

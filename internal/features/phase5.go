@@ -41,6 +41,8 @@ const (
 	EnvTemplateNames = "RABBIT_CODE_TEMPLATE_NAMES"
 	// EnvTemplateDir: when TEMPLATES is on, load <name>.md from this directory and append to resolved user text.
 	EnvTemplateDir = "RABBIT_CODE_TEMPLATE_DIR"
+	// EnvPromptCacheBreakSuggestCompact: after a successful turn, if a cache-break hook fired, emit reactive compact suggest (P5.F.9).
+	EnvPromptCacheBreakSuggestCompact = "RABBIT_CODE_PROMPT_CACHE_BREAK_SUGGEST_COMPACT"
 )
 
 func TokenBudgetEnabled() bool { return truthy(os.Getenv(EnvTokenBudget)) }
@@ -139,6 +141,9 @@ func SnipCompactMaxRounds() int {
 
 // PromptCacheBreakDetectionEnabled aliases Phase 4 env (P5.F.9 shares anthropic client gates).
 func PromptCacheBreakDetectionEnabled() bool { return PromptCacheBreakDetection() }
+
+// PromptCacheBreakSuggestCompactEnabled gates post-loop reactive compact when a cache-break callback ran this Submit.
+func PromptCacheBreakSuggestCompactEnabled() bool { return truthy(os.Getenv(EnvPromptCacheBreakSuggestCompact)) }
 
 // ReactiveCompactMinTranscriptBytes returns 0 when REACTIVE_COMPACT is off; else min JSON byte length to force reactive suggest.
 func ReactiveCompactMinTranscriptBytes() int {

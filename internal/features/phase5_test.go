@@ -49,6 +49,13 @@ func TestTokenBudgetMaxAttachmentBytes_whenEnabled(t *testing.T) {
 	}
 }
 
+func TestPromptCacheBreakSuggestCompactEnabled(t *testing.T) {
+	t.Setenv(EnvPromptCacheBreakSuggestCompact, "1")
+	if !PromptCacheBreakSuggestCompactEnabled() {
+		t.Fatal()
+	}
+}
+
 func TestSessionRestoreEnabled(t *testing.T) {
 	t.Setenv(EnvSessionRestore, "true")
 	if !SessionRestoreEnabled() {
