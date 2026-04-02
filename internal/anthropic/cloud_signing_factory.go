@@ -17,6 +17,16 @@ func NewAPIOutboundTransport(ctx context.Context, pool *x509.CertPool) (http.Rou
 	return NewSigningTransportForProvider(ctx, base, DetectProvider())
 }
 
+// ResolveAPIOutboundTransport tries NewAPIOutboundTransport; on error returns HTTPTransportWithProxyFromEnvAndRoots(pool)
+// and the original error so callers can log (Bootstrap). Messages client factories use the same resolution.
+func ResolveAPIOutboundTransport(ctx context.Context, pool *x509.CertPool) (rt http.RoundTripper, err error) {
+	t, e := NewAPIOutboundTransport(ctx, pool)
+	if e == nil {
+		return t, nil
+	}
+	return HTTPTransportWithProxyFromEnvAndRoots(pool), e
+}
+
 // NewSigningTransportForProvider wraps base with SigV4 (Bedrock) or GCP Bearer (Vertex) when applicable.
 // For ProviderAnthropic and ProviderFoundry, returns base unchanged (Foundry Azure signing not implemented yet).
 func NewSigningTransportForProvider(ctx context.Context, base http.RoundTripper, p Provider) (http.RoundTripper, error) {

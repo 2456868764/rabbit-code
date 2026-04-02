@@ -7,13 +7,15 @@
 // Bedrock: betas in BEDROCK_EXTRA_PARAMS_HEADERS are JSON-encoded as "anthropic_beta" on the request
 // body when using Client.SetBetaNames (HTTP anthropic-beta gets the remainder).
 //
+// App wiring: app.NewAnthropicClient uses NewClientWithPool + ReadAPIKey + SetOnStreamUsageBootstrap (same outbound as Bootstrap preconnect).
+// CLI: rabbit-code probe [services/api ts name] uses app.RunProbe (P4.6.1); main repeats RunAPIPreconnect after merged config when trust is on.
 // Proxy (P4.3.3): HTTPTransportWithProxyFromEnv (and HTTPTransportWithProxyFromEnvAndRoots for Bootstrap TLS pool)
 // as the base RoundTripper for NewTransportChain / NewClient.
 // mTLS: HTTPTransportAPIOutbound / HTTPTransportAPIOutboundWithRoots load RABBIT_CODE_CLIENT_CERT + RABBIT_CODE_CLIENT_KEY when both are set.
 // Preconnect skip: RABBIT_CODE_UNIX_SOCKET or RABBIT_CODE_CLIENT_CERT / RABBIT_CODE_CLIENT_KEY (ShouldSkipPreconnect).
-// Cloud: SigningTransport + CloudRequestSigner — BedrockSigV4Signer (bedrock-runtime SigV4), VertexTokenSigner (GCP ADC Bearer), StubFoundrySigner; NewSigningTransportForProvider / NewAPIOutboundTransport (proxy+mTLS base + signing by DetectProvider). RABBIT_CODE_SKIP_BEDROCK_AUTH / RABBIT_CODE_SKIP_VERTEX_AUTH no-op signers for mocks.
+// Cloud: SigningTransport + CloudRequestSigner — BedrockSigV4Signer (bedrock-runtime SigV4), VertexTokenSigner (GCP ADC Bearer), StubFoundrySigner; NewSigningTransportForProvider / NewAPIOutboundTransport; ResolveAPIOutboundTransport falls back to proxy+roots on error (Bootstrap + NewClientWithPool / NewClientWithPoolOAuth). RABBIT_CODE_SKIP_BEDROCK_AUTH / RABBIT_CODE_SKIP_VERTEX_AUTH no-op signers for mocks.
 // Vertex: ANTHROPIC_VERTEX_PROJECT_ID + CLOUD_ML_REGION (or ANTHROPIC_VERTEX_BASE_URL) enable streamRawPredict path and vertex JSON body (see vertex-sdk).
-// Foundry: ANTHROPIC_FOUNDRY_RESOURCE builds https://{res}.services.ai.azure.com/anthropic (foundry-sdk).
+// Foundry: ANTHROPIC_FOUNDRY_RESOURCE builds https://{res}.services.ai.azure.com/anthropic (foundry-sdk). Azure AD signing for outbound requests is not in Phase 4 (RABBIT_CODE_SKIP_FOUNDRY_AUTH reserved for future mocks).
 // ReadAssistantStream: optional WithThinkingAccumulator / WithCompactionAccumulator / WithToolInputAccumulators (Client fields).
 // Client.SetOnStreamUsageBootstrap wires OnStreamUsage to cost.ApplyUsageToBootstrap (P4.4.1).
 // Retry: Policy.StrictForeground529 mirrors withRetry.ts FOREGROUND_529_RETRY_SOURCES; RABBIT_CODE_STRICT_FOREGROUND_529 enables it in DefaultPolicy.
