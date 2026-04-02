@@ -34,6 +34,12 @@ IDE **bridge**, **direct connect / server** modes, **remote** and **upstream pro
 - **UI stack:** [Bubble Tea v2](https://github.com/charmbracelet/bubbletea) (`charm.land/bubbletea/v2`, e.g. **v2.0.2**) for the Elm-style loop, [Bubbles v2](https://github.com/charmbracelet/bubbles) (`charm.land/bubbles/v2`) for reusable widgets (text inputs, lists, viewports, spinners, …), and [Lip Gloss v2](https://github.com/charmbracelet/lipgloss) (`charm.land/lipgloss/v2`, e.g. **v2.0.2**) for layout and theming.
 - **Quality bar:** Non-UI packages target high line coverage on critical paths; TUI code favors **model reduction tests** and **stable string snapshots** of rendered views so refactors do not silently break layouts or key handling.
 
+### Headless engine (`internal/engine`, Phase 5)
+
+**`engine.Engine`** drives **`query.RunTurnLoop`** when **`Config.Deps`** supplies **`Assistant`** and/or **`Turn`** (`querydeps`). Subscribe via **`Events()`** to **`EngineEvent`**: user submit, assistant text, tool start/done, optional memdir inject, orphan-permission hint, compact suggestions, **`Done`**, or **`Error`** (with **`APIErrorKind`** / **`RecoverableCompact`** when the error unwraps to **`anthropic.APIError`**).
+
+**`Config`** highlights: **`Deps`**, **`Model`** / **`MaxTokens`**, **`MemdirPaths`**, **`MaxAssistantTurns`** (→ **`query.LoopState.MaxTurns`**), **`SuggestCompactOnRecoverableError`**, **`CompactAdvisor`**, **`StopHook`**, **`OrphanPermissionAdvisor`**. Use **`make test-phase5`** for the Phase 5 package set.
+
 ---
 
 ## Quick start
