@@ -2,7 +2,7 @@
 BIN := bin/rabbit-code
 MODULE := ./...
 
-.PHONY: build test test-race test-phase4 lint e2e e2e-tui clean assets-mascot
+.PHONY: build test test-race test-phase4 test-phase5 lint e2e e2e-tui clean assets-mascot
 
 # Write assets/rabbit-code-mascot.png using the same resolution order as CLI (assets/rabbit.png when cwd is module root).
 assets-mascot:
@@ -17,6 +17,9 @@ test:
 
 test-phase4:
 	go test ./internal/anthropic/... ./internal/cost/... ./internal/compact/... ./internal/features/... ./internal/app/... ./internal/messages/... -race -count=1
+
+test-phase5:
+	go test ./internal/query/... ./internal/querydeps/... ./internal/compact/... ./internal/engine/... ./internal/memdir/... -race -count=1
 
 test-race:
 	go test $(MODULE) -race -count=1
