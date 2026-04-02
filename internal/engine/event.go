@@ -5,7 +5,11 @@ type EventKind int
 
 const (
 	EventKindUserSubmit EventKind = iota
+	EventKindMemdirInject
 	EventKindAssistantText
+	EventKindToolCallStart
+	EventKindToolCallDone
+	EventKindCompactSuggest
 	EventKindDone
 	EventKindError
 )
@@ -16,4 +20,14 @@ type EngineEvent struct {
 	UserText   string
 	AssistText string
 	Err        error `json:"-"`
+
+	ToolName            string
+	ToolUseID           string
+	ToolInputJSON       string
+	ToolResultJSON      string
+	MemdirFragmentCount int
+
+	CompactPhase           string
+	SuggestAutoCompact     bool
+	SuggestReactiveCompact bool
 }
