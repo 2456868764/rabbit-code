@@ -12,4 +12,5 @@
 // mTLS: HTTPTransportAPIOutbound / HTTPTransportAPIOutboundWithRoots load CLAUDE_CODE_CLIENT_CERT + CLAUDE_CODE_CLIENT_KEY when both are set.
 // ReadAssistantStream: optional WithThinkingAccumulator / WithCompactionAccumulator / WithToolInputAccumulators (Client fields).
 // Retry: Policy.StrictForeground529 mirrors withRetry.ts FOREGROUND_529_RETRY_SOURCES; RABBIT_CODE_STRICT_FOREGROUND_529 enables it in DefaultPolicy.
+// Policy.InitialConsecutive529Errors mirrors withRetry.ts initialConsecutive529Errors (529 budget pre-seed).
 package anthropic

@@ -98,6 +98,8 @@ type Policy struct {
 	QuerySource QuerySource
 	// StrictForeground529 when true applies withRetry.ts FOREGROUND_529_RETRY_SOURCES: only Default ("") and listed QuerySource values retry 529; others fail fast on 529 like No529.
 	StrictForeground529 bool
+	// InitialConsecutive529Errors pre-seeds the 529 retry budget consumed elsewhere (withRetry.ts initialConsecutive529Errors; e.g. streaming 529 before a non-streaming fallback).
+	InitialConsecutive529Errors int
 }
 
 // DefaultPolicy returns default retry behavior for foreground streams.
@@ -148,7 +150,10 @@ func DoRequest(ctx context.Context, rt http.RoundTripper, req *http.Request, pol
 		n = 1
 	}
 	var lastStatus int
-	left529 := Max529Retries
+	left529 := Max529Retries - pol.InitialConsecutive529Errors
+	if left529 < 0 {
+		left529 = 0
+	}
 	for attempt := 0; attempt < n; attempt++ {
 		if attempt > 0 {
 			select {

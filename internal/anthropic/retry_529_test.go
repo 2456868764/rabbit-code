@@ -126,6 +126,29 @@ func TestDoRequest_StrictForeground529_sdkStillRetries529(t *testing.T) {
 	}
 }
 
+func TestDoRequest_InitialConsecutive529Errors(t *testing.T) {
+	var n atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n.Add(1)
+		w.WriteHeader(529)
+	}))
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+	_, err := DoRequest(context.Background(), http.DefaultTransport, req, Policy{
+		MaxAttempts:                 20,
+		Retry529429:               true,
+		InitialConsecutive529Errors: 2,
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	// Max529Retries=3, initial=2 → one 529 slot left → 2 total responses.
+	if n.Load() != 2 {
+		t.Fatalf("round trips=%d want 2", n.Load())
+	}
+}
+
 func TestDefaultPolicy_StrictForeground529FromEnv(t *testing.T) {
 	t.Setenv(features.EnvStrictForeground529, "1")
 	p := DefaultPolicy()
