@@ -5,6 +5,24 @@ import (
 	"testing"
 )
 
+func TestBetaOAuth_matchesOAuthTS(t *testing.T) {
+	if BetaOAuth != "oauth-2025-04-20" {
+		t.Fatal(BetaOAuth)
+	}
+}
+
+func TestBedrockExtraParamsBetas_matchesConstantsBetasTS(t *testing.T) {
+	want := []string{BetaInterleavedThinking, BetaContext1M, BetaToolSearch3P}
+	if len(BedrockExtraParamsBetas) != len(want) {
+		t.Fatalf("got %d want %d", len(BedrockExtraParamsBetas), len(want))
+	}
+	for _, w := range want {
+		if _, ok := BedrockExtraParamsBetas[w]; !ok {
+			t.Fatalf("missing %q", w)
+		}
+	}
+}
+
 func TestSplitBetasForBedrock(t *testing.T) {
 	h, e := SplitBetasForBedrock([]string{
 		BetaClaudeCode20250219,

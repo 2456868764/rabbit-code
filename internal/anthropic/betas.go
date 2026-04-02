@@ -19,6 +19,8 @@ const (
 	BetaSummarizeConnectorText   = "summarize-connector-text-2026-03-13"
 	BetaAFKMode                  = "afk-mode-2026-01-31"
 	BetaAdvisor                  = "advisor-tool-2026-03-01"
+	// BetaOAuth is constants/oauth.ts OAUTH_BETA_HEADER (merged into anthropic-beta on OAuth-backed clients).
+	BetaOAuth = "oauth-2025-04-20"
 )
 
 // MergeBetaHeader joins non-empty beta names for the anthropic-beta HTTP header (utils/betas.ts getMergedBetas).
