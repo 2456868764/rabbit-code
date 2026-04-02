@@ -42,6 +42,29 @@ func TestAttributionHeaderPromptEnabled(t *testing.T) {
 	}
 }
 
+func TestAntiDistillationFakeToolsInBody(t *testing.T) {
+	t.Setenv(EnvAntiDistillation, "")
+	t.Setenv(EnvAntiDistillationFakeTools, "1")
+	if AntiDistillationFakeToolsInBody() {
+		t.Fatal("CC off")
+	}
+	t.Setenv(EnvAntiDistillation, "1")
+	if !AntiDistillationFakeToolsInBody() {
+		t.Fatal("both on")
+	}
+}
+
+func TestDisableKeepAliveOnECONNRESETEnabled(t *testing.T) {
+	t.Setenv(EnvDisableKeepAliveOnECONNRESET, "1")
+	if !DisableKeepAliveOnECONNRESETEnabled() {
+		t.Fatal()
+	}
+	t.Setenv(EnvDisableKeepAliveOnECONNRESET, "")
+	if DisableKeepAliveOnECONNRESETEnabled() {
+		t.Fatal()
+	}
+}
+
 func TestAntiDistillationRequestHeader(t *testing.T) {
 	t.Setenv(EnvAntiDistillation, "1")
 	t.Setenv(EnvAntiDistillationHeader, "X-Custom-AD")

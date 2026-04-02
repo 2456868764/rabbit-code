@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/2456868764/rabbit-code/internal/features"
 )
@@ -33,6 +34,10 @@ type Client struct {
 	CompactionAccumulator *strings.Builder
 	// ToolInputJSONByBlock maps content_block index → accumulator for input_json_delta partial_json (parallel tool calls use distinct indices).
 	ToolInputJSONByBlock map[int]*strings.Builder
+
+	transportMu   sync.Mutex
+	cachedBaseRT  http.RoundTripper
+	cachedWrapRT  http.RoundTripper
 }
 
 // NewClient returns a client with sane defaults.
@@ -76,31 +81,67 @@ func (c *Client) messagesURL(body MessagesStreamBody) string {
 
 // vertexStreamJSONBody matches @anthropic-ai/vertex-sdk: model moves to path, body gets anthropic_version.
 type vertexStreamJSONBody struct {
-	MaxTokens        int             `json:"max_tokens"`
-	Stream           bool            `json:"stream"`
-	Messages         json.RawMessage `json:"messages"`
-	OutputConfig     *OutputConfig   `json:"output_config,omitempty"`
-	AnthropicBeta    []string        `json:"anthropic_beta,omitempty"`
-	AnthropicVersion string          `json:"anthropic_version"`
+	MaxTokens          int             `json:"max_tokens"`
+	Stream             bool            `json:"stream"`
+	Messages           json.RawMessage `json:"messages"`
+	OutputConfig       *OutputConfig   `json:"output_config,omitempty"`
+	AnthropicBeta      []string        `json:"anthropic_beta,omitempty"`
+	AnthropicVersion   string          `json:"anthropic_version"`
+	AntiDistillation   []string        `json:"anti_distillation,omitempty"`
 }
 
-func (c *Client) marshalMessagesStreamJSON(body MessagesStreamBody) ([]byte, error) {
+func (c *Client) mergeStreamingBody(body MessagesStreamBody) MessagesStreamBody {
 	if c.Provider == ProviderBedrock && len(c.bedrockBodyBetas) > 0 && len(body.AnthropicBeta) == 0 {
 		body.AnthropicBeta = append([]string(nil), c.bedrockBodyBetas...)
 	}
+	if features.AntiDistillationFakeToolsInBody() {
+		body.AntiDistillation = []string{"fake_tools"}
+	}
+	return body
+}
+
+func (c *Client) marshalMessagesStreamJSON(body MessagesStreamBody) ([]byte, error) {
+	body = c.mergeStreamingBody(body)
 	body.Stream = true
 	if c.Provider == ProviderVertex && envVertexProjectID() != "" {
 		vb := vertexStreamJSONBody{
-			MaxTokens:        body.MaxTokens,
-			Stream:           true,
-			Messages:         body.Messages,
-			OutputConfig:     body.OutputConfig,
-			AnthropicBeta:    append([]string(nil), body.AnthropicBeta...),
-			AnthropicVersion: VertexDefaultAnthropicVersion,
+			MaxTokens:          body.MaxTokens,
+			Stream:             true,
+			Messages:           body.Messages,
+			OutputConfig:       body.OutputConfig,
+			AnthropicBeta:      append([]string(nil), body.AnthropicBeta...),
+			AnthropicVersion:   VertexDefaultAnthropicVersion,
+			AntiDistillation:   append([]string(nil), body.AntiDistillation...),
 		}
 		return json.Marshal(vb)
 	}
 	return json.Marshal(body)
+}
+
+func (c *Client) effectiveTransport() http.RoundTripper {
+	tr := c.HTTPClient.Transport
+	if tr == nil {
+		tr = http.DefaultTransport
+	}
+	if !features.DisableKeepAliveOnECONNRESETEnabled() {
+		return tr
+	}
+	// Avoid toggling DisableKeepAlives on the process-wide default transport.
+	if tr == http.DefaultTransport {
+		return tr
+	}
+	c.transportMu.Lock()
+	defer c.transportMu.Unlock()
+	if c.cachedWrapRT != nil && c.cachedBaseRT == tr {
+		return c.cachedWrapRT
+	}
+	c.cachedBaseRT = tr
+	if t, ok := tr.(*http.Transport); ok {
+		c.cachedWrapRT = newKeepAliveResetTransport(t)
+	} else {
+		c.cachedWrapRT = tr
+	}
+	return c.cachedWrapRT
 }
 
 // MessagesStreamBody is the JSON body for POST .../messages with stream:true (subset).
@@ -113,6 +154,8 @@ type MessagesStreamBody struct {
 	OutputConfig *OutputConfig `json:"output_config,omitempty"`
 	// AnthropicBeta is sent as JSON "anthropic_beta" (Bedrock: betas in BEDROCK_EXTRA_PARAMS_HEADERS; 1P often uses header only).
 	AnthropicBeta []string `json:"anthropic_beta,omitempty"`
+	// AntiDistillation is merged when RABBIT_CODE_ANTI_DISTILLATION_CC + RABBIT_CODE_ANTI_DISTILLATION_FAKE_TOOLS (claude.ts getExtraBodyParams).
+	AntiDistillation []string `json:"anti_distillation,omitempty"`
 }
 
 // PostMessagesStream starts a streaming request. Caller must close resp.Body.
@@ -170,11 +213,7 @@ func (c *Client) PostMessagesStream(ctx context.Context, body MessagesStreamBody
 	for k, v := range c.ExtraHeaders {
 		req.Header[k] = append([]string(nil), v...)
 	}
-	tr := c.HTTPClient.Transport
-	if tr == nil {
-		tr = http.DefaultTransport
-	}
-	return DoRequest(ctx, tr, req, pol)
+	return DoRequest(ctx, c.effectiveTransport(), req, pol)
 }
 
 // PostMessagesStreamReadAssistant posts, reads the SSE body to completion, closes the response, then

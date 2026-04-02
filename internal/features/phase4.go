@@ -22,6 +22,8 @@ const (
 	EnvAntiDistillationHeader = "RABBIT_CODE_ANTI_DISTILLATION_HEADER"
 	// EnvAntiDistillationValue sets the header value (default 1).
 	EnvAntiDistillationValue = "RABBIT_CODE_ANTI_DISTILLATION_VALUE"
+	// EnvAntiDistillationFakeTools when truthy with ANTI_DISTILLATION_CC adds JSON anti_distillation: ["fake_tools"] (claude.ts getExtraBodyParams).
+	EnvAntiDistillationFakeTools = "RABBIT_CODE_ANTI_DISTILLATION_FAKE_TOOLS"
 	// EnvOAuthBetaAppend is a comma-separated list of extra anthropic-beta names for OAuth sessions (constants/oauth.ts OAUTH_BETA_HEADER patterns).
 	EnvOAuthBetaAppend = "RABBIT_CODE_OAUTH_BETA_APPEND"
 	EnvNativeAttestation     = "RABBIT_CODE_NATIVE_CLIENT_ATTESTATION"
@@ -39,6 +41,8 @@ const (
 	EnvStrictForeground529 = "RABBIT_CODE_STRICT_FOREGROUND_529"
 	// EnvAttributionHeader when set to a falsy value disables the billing attribution system line (CLAUDE_CODE_ATTRIBUTION_HEADER); unset = enabled.
 	EnvAttributionHeader = "RABBIT_CODE_ATTRIBUTION_HEADER"
+	// EnvDisableKeepAliveOnECONNRESET when truthy wraps *http.Transport to set DisableKeepAlives after ECONNRESET/EPIPE (proxy.ts disableKeepAlive + withRetry.ts stale socket path).
+	EnvDisableKeepAliveOnECONNRESET = "RABBIT_CODE_DISABLE_KEEPALIVE_ON_ECONNRESET"
 )
 
 // UnattendedRetryEnabled mirrors UNATTENDED_RETRY + CLAUDE_CODE_UNATTENDED_RETRY.
@@ -65,6 +69,11 @@ func SkipFoundryAuth() bool { return truthy(os.Getenv(EnvSkipFoundryAuth)) }
 
 func AntiDistillationCC() bool {
 	return truthy(os.Getenv(EnvAntiDistillation))
+}
+
+// AntiDistillationFakeToolsInBody mirrors getExtraBodyParams anti_distillation: opt-in body field when CC is on.
+func AntiDistillationFakeToolsInBody() bool {
+	return AntiDistillationCC() && truthy(os.Getenv(EnvAntiDistillationFakeTools))
 }
 
 // AntiDistillationRequestHeader returns the header name/value to send when ANTI_DISTILLATION_CC is enabled.
@@ -130,6 +139,11 @@ func E2EMockAPI() bool {
 // StrictForeground529Enabled when true, DefaultPolicy uses strict 529 retry whitelist (see anthropic.foreground529RetrySources).
 func StrictForeground529Enabled() bool {
 	return truthy(os.Getenv(EnvStrictForeground529))
+}
+
+// DisableKeepAliveOnECONNRESETEnabled gates Client transport wrapping (see anthropic.keepAliveResetTransport).
+func DisableKeepAliveOnECONNRESETEnabled() bool {
+	return truthy(os.Getenv(EnvDisableKeepAliveOnECONNRESET))
 }
 
 // AttributionHeaderPromptEnabled mirrors system.ts isAttributionHeaderEnabled: default true unless RABBIT_CODE_ATTRIBUTION_HEADER is set and falsy.

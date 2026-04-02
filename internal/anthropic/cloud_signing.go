@@ -41,3 +41,10 @@ type StubBedrockSigner struct{}
 func (StubBedrockSigner) Sign(context.Context, *http.Request) error {
 	return ErrCloudSigningNotImplemented
 }
+
+// StubVertexSigner returns ErrCloudSigningNotImplemented from Sign (Vertex / GCP access token hook; AC4-6).
+type StubVertexSigner struct{}
+
+func (StubVertexSigner) Sign(context.Context, *http.Request) error {
+	return ErrCloudSigningNotImplemented
+}
