@@ -9,6 +9,7 @@ import (
 
 	"github.com/2456868764/rabbit-code/internal/app"
 	"github.com/2456868764/rabbit-code/internal/anthropic/services"
+	"github.com/2456868764/rabbit-code/internal/phase5cli"
 	"github.com/2456868764/rabbit-code/internal/version"
 )
 
@@ -31,6 +32,16 @@ func main() {
 			}
 			if err := app.RunProbe(context.Background(), os.Stdout, tsFile); err != nil {
 				fmt.Fprintf(os.Stderr, "rabbit-code: probe: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		case "context":
+			if len(os.Args) < 3 || os.Args[2] != "break-cache" {
+				fmt.Fprintf(os.Stderr, "usage: rabbit-code context break-cache\n")
+				os.Exit(1)
+			}
+			if err := phase5cli.WriteBreakCacheCommandJSON(os.Stdout); err != nil {
+				fmt.Fprintf(os.Stderr, "rabbit-code: context: %v\n", err)
 				os.Exit(1)
 			}
 			return
