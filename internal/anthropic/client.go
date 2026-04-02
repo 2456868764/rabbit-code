@@ -244,6 +244,33 @@ func (c *Client) PostMessagesStreamReadAssistant(ctx context.Context, body Messa
 	return text, u, nil
 }
 
+// PostMessagesStreamReadAssistantTurn posts, reads SSE, and returns text + tool_use blocks + stop_reason (Phase 5 query loop).
+func (c *Client) PostMessagesStreamReadAssistantTurn(ctx context.Context, body MessagesStreamBody, pol Policy) (AssistantStreamTurn, UsageDelta, error) {
+	resp, err := c.PostMessagesStream(ctx, body, pol)
+	if err != nil {
+		return AssistantStreamTurn{}, UsageDelta{}, err
+	}
+	defer resp.Body.Close()
+	var ropts []ReadAssistantOption
+	if c.ThinkingAccumulator != nil {
+		ropts = append(ropts, WithThinkingAccumulator(c.ThinkingAccumulator))
+	}
+	if c.CompactionAccumulator != nil {
+		ropts = append(ropts, WithCompactionAccumulator(c.CompactionAccumulator))
+	}
+	if len(c.ToolInputJSONByBlock) > 0 {
+		ropts = append(ropts, WithToolInputAccumulators(c.ToolInputJSONByBlock))
+	}
+	turn, u, err := ReadAssistantStreamTurn(ctx, resp.Body, ropts...)
+	if err != nil {
+		return turn, u, err
+	}
+	if c.OnStreamUsage != nil {
+		c.OnStreamUsage(u)
+	}
+	return turn, u, nil
+}
+
 type readAssistantConfig struct {
 	thinking           *strings.Builder
 	compaction         *strings.Builder
