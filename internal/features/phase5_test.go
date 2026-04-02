@@ -63,6 +63,13 @@ func TestSessionRestoreEnabled(t *testing.T) {
 	}
 }
 
+func TestBashExecEnabled(t *testing.T) {
+	t.Setenv(EnvBashExec, "true")
+	if !BashExecEnabled() {
+		t.Fatal()
+	}
+}
+
 func TestSnipCompactEnabled(t *testing.T) {
 	t.Setenv(EnvSnipCompact, "true")
 	if !SnipCompactEnabled() {
