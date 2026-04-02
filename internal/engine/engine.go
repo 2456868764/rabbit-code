@@ -37,7 +37,7 @@ type Config struct {
 	// SuggestCompactOnRecoverableError emits EventKindCompactSuggest (auto) before EventKindError when the failure is RecoverableCompact (P5.1.3 hint).
 	SuggestCompactOnRecoverableError bool
 	// CompactAdvisor, if set, runs after a successful turn loop to surface scheduling hints (P5.2.1 stub).
-	CompactAdvisor func(st query.LoopState, transcriptJSONLen int) (autoCompact, reactiveCompact bool)
+	CompactAdvisor func(st query.LoopState, transcriptJSON []byte) (autoCompact, reactiveCompact bool)
 	// CompactExecutor, if set, runs after each CompactSuggest from CompactAdvisor; emits EventKindCompactResult (P5.2.1).
 	CompactExecutor CompactExecutor
 	// StopHooks run after RunTurnLoop finishes for the Submit (see StopHookFunc).
@@ -61,7 +61,7 @@ type Engine struct {
 	maxTokens                        int
 	stubDelay                        time.Duration
 	memdirPaths                      []string
-	compactAdvisor                   func(query.LoopState, int) (bool, bool)
+	compactAdvisor                   func(query.LoopState, []byte) (bool, bool)
 	compactExecutor                  CompactExecutor
 	stopHooks                        []StopHookFunc
 	recoverStrategy                  RecoverStrategy
@@ -408,9 +408,9 @@ func (e *Engine) runTurnLoop(userText string) {
 
 	auto, react := false, false
 	if e.compactAdvisor != nil {
-		auto, react = e.compactAdvisor(*st, len(msgs))
+		auto, react = e.compactAdvisor(*st, msgs)
 	}
-	if thr := features.ReactiveCompactMinTranscriptBytes(); thr > 0 && len(msgs) >= thr {
+	if query.ReactiveCompactByTranscript(msgs, features.ReactiveCompactMinTranscriptBytes(), features.ReactiveCompactMinEstimatedTokens()) {
 		react = true
 	}
 	if auto || react {

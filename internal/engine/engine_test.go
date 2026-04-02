@@ -38,8 +38,8 @@ func TestEngine_CompactE2E_longTranscriptTriggersExecutor(t *testing.T) {
 			}),
 		},
 		Model: "m", MaxTokens: 64,
-		CompactAdvisor: func(_ query.LoopState, transcriptLen int) (bool, bool) {
-			return transcriptLen > 1200, false
+		CompactAdvisor: func(_ query.LoopState, transcriptJSON []byte) (bool, bool) {
+			return len(transcriptJSON) > 1200, false
 		},
 		CompactExecutor: func(_ context.Context, phase compact.RunPhase, _ []byte) (string, error) {
 			_ = phase
@@ -345,7 +345,7 @@ func TestEngine_CompactSuggest_afterLoop(t *testing.T) {
 				return "x", nil
 			}),
 		},
-		CompactAdvisor: func(_ query.LoopState, _ int) (bool, bool) {
+		CompactAdvisor: func(_ query.LoopState, _ []byte) (bool, bool) {
 			return true, false
 		},
 	})
@@ -668,7 +668,7 @@ func TestEngine_CompactExecutor_afterAdvisor(t *testing.T) {
 				return "y", nil
 			}),
 		},
-		CompactAdvisor: func(_ query.LoopState, _ int) (bool, bool) { return true, false },
+		CompactAdvisor: func(_ query.LoopState, _ []byte) (bool, bool) { return true, false },
 		CompactExecutor: func(_ context.Context, phase compact.RunPhase, transcript []byte) (string, error) {
 			_ = phase
 			if len(transcript) == 0 {
@@ -796,6 +796,40 @@ func TestEngine_Phase5_ultrathinkInjectsIntoMessagesJSON(t *testing.T) {
 			if ev.Kind == EventKindDone {
 				if captured == "" || !strings.Contains(captured, "ULTRATHINK") {
 					t.Fatalf("messages %q", captured)
+				}
+				e.Wait()
+				return
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
+func TestEngine_Phase5_reactiveCompactFromEnv_minTokens(t *testing.T) {
+	t.Setenv(features.EnvReactiveCompact, "true")
+	t.Setenv(features.EnvReactiveCompactMinBytes, "999999")
+	t.Setenv(features.EnvReactiveCompactMinTokens, "1")
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "r", nil
+			}),
+		},
+		CompactExecutor: compact.ExecuteStub,
+	})
+	e.Submit("u")
+	ch := e.Events()
+	var sawReactive bool
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindCompactSuggest && ev.SuggestReactiveCompact {
+				sawReactive = true
+			}
+			if ev.Kind == EventKindDone {
+				if !sawReactive {
+					t.Fatal("expected reactive compact suggest (token threshold)")
 				}
 				e.Wait()
 				return

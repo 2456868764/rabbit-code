@@ -64,6 +64,17 @@ func TestReactiveCompactMinTranscriptBytes(t *testing.T) {
 	}
 }
 
+func TestReactiveCompactMinEstimatedTokens(t *testing.T) {
+	t.Setenv(EnvReactiveCompact, "1")
+	if ReactiveCompactMinEstimatedTokens() != 0 {
+		t.Fatal()
+	}
+	t.Setenv(EnvReactiveCompactMinTokens, "100")
+	if ReactiveCompactMinEstimatedTokens() != 100 {
+		t.Fatal()
+	}
+}
+
 func TestHistorySnipThresholds(t *testing.T) {
 	t.Setenv(EnvHistorySnip, "true")
 	t.Setenv(EnvHistorySnipMaxBytes, "99")

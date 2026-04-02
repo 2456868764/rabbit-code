@@ -30,6 +30,8 @@ const (
 	EnvSnipCompactMaxRounds = "RABBIT_CODE_SNIP_COMPACT_MAX_ROUNDS"
 	// EnvReactiveCompactMinBytes: when REACTIVE_COMPACT is on, suggest reactive compact if len(transcript JSON) >= this (default 8192).
 	EnvReactiveCompactMinBytes = "RABBIT_CODE_REACTIVE_COMPACT_MIN_BYTES"
+	// EnvReactiveCompactMinTokens: optional heuristic token threshold (query.EstimateTranscriptJSONTokens). 0 = unset.
+	EnvReactiveCompactMinTokens = "RABBIT_CODE_REACTIVE_COMPACT_MIN_TOKENS"
 	// EnvHistorySnipMaxBytes / EnvHistorySnipMaxRounds gate P5.F.10 transcript prefix drops each assistant round.
 	EnvHistorySnipMaxBytes  = "RABBIT_CODE_HISTORY_SNIP_MAX_BYTES"
 	EnvHistorySnipMaxRounds = "RABBIT_CODE_HISTORY_SNIP_MAX_ROUNDS"
@@ -145,6 +147,22 @@ func ReactiveCompactMinTranscriptBytes() int {
 	v, err := strconv.Atoi(s)
 	if err != nil || v <= 0 {
 		return 8192
+	}
+	return v
+}
+
+// ReactiveCompactMinEstimatedTokens returns 0 when REACTIVE_COMPACT is off or env unset.
+func ReactiveCompactMinEstimatedTokens() int {
+	if !ReactiveCompactEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvReactiveCompactMinTokens))
+	if s == "" {
+		return 0
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 0
 	}
 	return v
 }
