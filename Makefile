@@ -16,7 +16,7 @@ test:
 	go test $(MODULE) -count=1
 
 test-phase4:
-	go test ./internal/anthropic/... ./internal/cost/... ./internal/compact/... ./internal/features/... -race -count=1
+	go test ./internal/anthropic/... ./internal/cost/... ./internal/compact/... ./internal/features/... ./internal/app/... -race -count=1
 
 test-race:
 	go test $(MODULE) -race -count=1

@@ -70,9 +70,13 @@ func Bootstrap(ctx context.Context) (*Runtime, error) {
 		return nil, fmt.Errorf("cert pool: %w", err)
 	}
 
-	preconnectClient := &http.Client{
-		Transport: anthropic.HTTPTransportWithProxyFromEnvAndRoots(pool),
+	// Phase 4 / AC4-6: same outbound stack as Messages (proxy + optional mTLS + Bedrock SigV4 / Vertex Bearer when applicable).
+	preconnectRT, err := anthropic.NewAPIOutboundTransport(ctx, pool)
+	if err != nil {
+		log.Debug("preconnect: API outbound transport unavailable, falling back to proxy+roots only", "err", err)
+		preconnectRT = anthropic.HTTPTransportWithProxyFromEnvAndRoots(pool)
 	}
+	preconnectClient := &http.Client{Transport: preconnectRT}
 	_ = anthropic.PreconnectHEAD(ctx, preconnectClient, anthropic.BaseURL(anthropic.DetectProvider()))
 
 	cwd, err := os.Getwd()
