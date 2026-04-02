@@ -154,16 +154,16 @@ func (e *Engine) Submit(userText string) {
 	}()
 }
 
-func (e *Engine) applyMemdir(userText string) (resolved string, nFrag int, err error) {
+func (e *Engine) applyMemdir(userText string) (resolved string, nFrag int, injectRawBytes int, err error) {
 	if len(e.memdirPaths) == 0 {
-		return userText, 0, nil
+		return userText, 0, 0, nil
 	}
-	frags, err := memdir.SessionFragmentsFromPaths(e.memdirPaths)
+	frags, injectRawBytes, err := memdir.SessionFragmentsFromPaths(e.memdirPaths)
 	if err != nil {
-		return "", 0, err
+		return "", 0, 0, err
 	}
 	if len(frags) == 0 {
-		return userText, 0, nil
+		return userText, 0, injectRawBytes, nil
 	}
 	var b strings.Builder
 	for _, f := range frags {
@@ -171,7 +171,7 @@ func (e *Engine) applyMemdir(userText string) (resolved string, nFrag int, err e
 		b.WriteString("\n\n")
 	}
 	b.WriteString(userText)
-	return b.String(), len(frags), nil
+	return b.String(), len(frags), injectRawBytes, nil
 }
 
 func (e *Engine) invokeStopHooks(st *query.LoopState, loopErr error) {
@@ -243,7 +243,7 @@ func (e *Engine) runTurnLoop(userText string) {
 	var loopErr error
 	defer func() { e.invokeStopHooks(st, loopErr) }()
 
-	resolved, nFrag, err := e.applyMemdir(userText)
+	resolved, nFrag, injectRaw, err := e.applyMemdir(userText)
 	if err != nil {
 		loopErr = err
 		e.trySend(EngineEvent{Kind: EventKindError, Err: err})
@@ -255,7 +255,17 @@ func (e *Engine) runTurnLoop(userText string) {
 		}
 	}
 
+	if maxA := features.TokenBudgetMaxAttachmentBytes(); maxA > 0 && injectRaw > maxA {
+		loopErr = ErrTokenBudgetExceeded
+		e.trySend(EngineEvent{Kind: EventKindError, Err: loopErr})
+		return
+	}
 	if maxB := features.TokenBudgetMaxInputBytes(); maxB > 0 && len(resolved) > maxB {
+		loopErr = ErrTokenBudgetExceeded
+		e.trySend(EngineEvent{Kind: EventKindError, Err: loopErr})
+		return
+	}
+	if maxT := features.TokenBudgetMaxInputTokens(); maxT > 0 && query.EstimateUTF8BytesAsTokens(resolved) > maxT {
 		loopErr = ErrTokenBudgetExceeded
 		e.trySend(EngineEvent{Kind: EventKindError, Err: loopErr})
 		return

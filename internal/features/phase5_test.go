@@ -27,6 +27,28 @@ func TestTokenBudgetMaxInputBytes_whenEnabled(t *testing.T) {
 	}
 }
 
+func TestTokenBudgetMaxInputTokens_whenEnabled(t *testing.T) {
+	t.Setenv(EnvTokenBudget, "1")
+	if TokenBudgetMaxInputTokens() != 0 {
+		t.Fatalf("unset want 0 got %d", TokenBudgetMaxInputTokens())
+	}
+	t.Setenv(EnvTokenBudgetMaxInputTokens, "500")
+	if TokenBudgetMaxInputTokens() != 500 {
+		t.Fatalf("got %d", TokenBudgetMaxInputTokens())
+	}
+}
+
+func TestTokenBudgetMaxAttachmentBytes_whenEnabled(t *testing.T) {
+	t.Setenv(EnvTokenBudget, "1")
+	if TokenBudgetMaxAttachmentBytes() != 0 {
+		t.Fatal()
+	}
+	t.Setenv(EnvTokenBudgetMaxAttachmentBytes, "99")
+	if TokenBudgetMaxAttachmentBytes() != 99 {
+		t.Fatal()
+	}
+}
+
 func TestSnipCompactEnabled(t *testing.T) {
 	t.Setenv(EnvSnipCompact, "true")
 	if !SnipCompactEnabled() {

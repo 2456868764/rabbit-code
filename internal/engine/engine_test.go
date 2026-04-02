@@ -111,6 +111,79 @@ budgetDone:
 	}
 }
 
+func TestEngine_TokenBudget_blocksByTokenEstimate(t *testing.T) {
+	t.Setenv(features.EnvTokenBudget, "true")
+	t.Setenv(features.EnvTokenBudgetMaxInputBytes, "999999")
+	t.Setenv(features.EnvTokenBudgetMaxInputTokens, "1")
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "ok", nil
+			}),
+		},
+	})
+	e.Submit("abcde")
+	var saw error
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindError {
+				saw = ev.Err
+				goto tokDone
+			}
+			if ev.Kind == EventKindAssistantText {
+				t.Fatal("assistant should not run")
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+tokDone:
+	e.Wait()
+	if !errors.Is(saw, ErrTokenBudgetExceeded) {
+		t.Fatalf("got %v", saw)
+	}
+}
+
+func TestEngine_TokenBudget_blocksOversizeMemdirInject(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "big.txt")
+	if err := os.WriteFile(p, []byte("12345678901"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(features.EnvTokenBudget, "true")
+	t.Setenv(features.EnvTokenBudgetMaxAttachmentBytes, "5")
+	e := New(context.Background(), &Config{
+		MemdirPaths: []string{p},
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "ok", nil
+			}),
+		},
+	})
+	e.Submit("x")
+	var saw error
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindError {
+				saw = ev.Err
+				goto attDone
+			}
+			if ev.Kind == EventKindAssistantText {
+				t.Fatal("assistant should not run")
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+attDone:
+	e.Wait()
+	if !errors.Is(saw, ErrTokenBudgetExceeded) {
+		t.Fatalf("got %v", saw)
+	}
+}
+
 func TestEngine_Submit_withStreamAssistant(t *testing.T) {
 	e := New(context.Background(), &Config{
 		Deps: querydeps.Deps{

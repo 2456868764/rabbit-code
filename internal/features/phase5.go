@@ -11,6 +11,10 @@ import (
 const (
 	EnvTokenBudget            = "RABBIT_CODE_TOKEN_BUDGET"
 	EnvTokenBudgetMaxInputBytes = "RABBIT_CODE_TOKEN_BUDGET_MAX_INPUT_BYTES"
+	// EnvTokenBudgetMaxInputTokens: when TOKEN_BUDGET is on, optional cap on heuristic tokens (see query.EstimateUTF8BytesAsTokens). 0 = unset (no token cap).
+	EnvTokenBudgetMaxInputTokens = "RABBIT_CODE_TOKEN_BUDGET_MAX_INPUT_TOKENS"
+	// EnvTokenBudgetMaxAttachmentBytes: when TOKEN_BUDGET is on, optional cap on raw bytes loaded from MemdirPaths (session inject).
+	EnvTokenBudgetMaxAttachmentBytes = "RABBIT_CODE_TOKEN_BUDGET_MAX_ATTACHMENT_BYTES"
 	EnvReactiveCompact        = "RABBIT_CODE_REACTIVE_COMPACT"
 	EnvContextCollapse        = "RABBIT_CODE_CONTEXT_COLLAPSE"
 	EnvUltrathink             = "RABBIT_CODE_ULTRATHINK"
@@ -48,6 +52,38 @@ func TokenBudgetMaxInputBytes() int {
 	v, err := strconv.Atoi(s)
 	if err != nil || v <= 0 {
 		return 4_000_000
+	}
+	return v
+}
+
+// TokenBudgetMaxInputTokens returns 0 when TOKEN_BUDGET is off or env unset (no heuristic token cap).
+func TokenBudgetMaxInputTokens() int {
+	if !TokenBudgetEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvTokenBudgetMaxInputTokens))
+	if s == "" {
+		return 0
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 0
+	}
+	return v
+}
+
+// TokenBudgetMaxAttachmentBytes returns 0 when TOKEN_BUDGET is off or env unset (no inject-size cap).
+func TokenBudgetMaxAttachmentBytes() int {
+	if !TokenBudgetEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvTokenBudgetMaxAttachmentBytes))
+	if s == "" {
+		return 0
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 0
 	}
 	return v
 }

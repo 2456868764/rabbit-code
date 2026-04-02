@@ -5,22 +5,22 @@ import (
 	"os"
 )
 
-// SessionFragmentsFromPaths reads each path as UTF-8 text and returns non-empty trimmed lines as fragments.
-// Empty files are skipped. Used for memdir-style session injection (Phase 5 stub).
-func SessionFragmentsFromPaths(paths []string) ([]string, error) {
-	var out []string
+// SessionFragmentsFromPaths reads each path as UTF-8 text and returns non-empty trimmed fragments.
+// Empty files are skipped. totalRawBytes is the sum of on-disk file sizes (before trim) for attachment-style budgets.
+func SessionFragmentsFromPaths(paths []string) (fragments []string, totalRawBytes int, err error) {
 	for _, p := range paths {
 		if p == "" {
 			continue
 		}
 		b, err := os.ReadFile(p)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
+		totalRawBytes += len(b)
 		s := string(bytes.TrimSpace(b))
 		if s != "" {
-			out = append(out, s)
+			fragments = append(fragments, s)
 		}
 	}
-	return out, nil
+	return fragments, totalRawBytes, nil
 }
