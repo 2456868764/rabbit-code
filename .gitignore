@@ -13,4 +13,5 @@
 !.env.example
 coverage.out
 coverage.html
+# Local / draft specs only — do not commit docs/ (never git add -f docs).
 docs/
