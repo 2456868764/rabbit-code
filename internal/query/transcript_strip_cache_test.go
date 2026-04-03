@@ -50,3 +50,21 @@ func TestStripCacheControlFromMessagesJSON_noopWhenAbsent(t *testing.T) {
 		t.Fatalf("semantic differ: %s vs %s", out, raw)
 	}
 }
+
+func TestStripCacheControlFromMessagesJSON_emptyErrors(t *testing.T) {
+	_, _, err := StripCacheControlFromMessagesJSON(nil)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	_, _, err = StripCacheControlFromMessagesJSON(json.RawMessage(`   `))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestStripCacheControlFromMessagesJSON_invalidJSON(t *testing.T) {
+	_, _, err := StripCacheControlFromMessagesJSON(json.RawMessage(`not json`))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
