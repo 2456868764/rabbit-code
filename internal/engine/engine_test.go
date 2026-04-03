@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -1461,6 +1462,66 @@ func TestEngine_promptCacheBreakAutoCompact_recovery(t *testing.T) {
 				t.Fatalf("error: %v", ev.Err)
 			}
 		case <-time.After(3 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
+type failTwicePromptCacheBreakThenOK struct {
+	n int
+	t *testing.T
+}
+
+func (f *failTwicePromptCacheBreakThenOK) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (querydeps.TurnResult, error) {
+	f.n++
+	if f.n <= 2 {
+		return querydeps.TurnResult{}, anthropic.ErrPromptCacheBreakDetected
+	}
+	if !bytes.Contains(msgs, []byte("seed2")) {
+		f.t.Fatalf("AssistantTurn call %d: want transcript from second compact, got %s", f.n, msgs)
+	}
+	return querydeps.TurnResult{Text: "h1-two-compacts"}, nil
+}
+
+func TestEngine_promptCacheBreak_twoCompactRetry_events(t *testing.T) {
+	t.Setenv(features.EnvPromptCacheBreak, "1")
+	t.Setenv(features.EnvPromptCacheBreakTrimResend, "0")
+	t.Setenv(features.EnvPromptCacheBreakAutoCompact, "1")
+	var compactCalls, compactRetryEvents int
+	turn := &failTwicePromptCacheBreakThenOK{t: t}
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{Turn: turn},
+		CompactExecutor: func(ctx context.Context, phase compact.RunPhase, transcriptJSON []byte) (string, []byte, error) {
+			_ = ctx
+			_ = phase
+			compactCalls++
+			if compactCalls == 1 {
+				return "c1", []byte(`[{"role":"user","content":[{"type":"text","text":"seed1"}]}]`), nil
+			}
+			return "c2", []byte(`[{"role":"user","content":[{"type":"text","text":"seed2"}]}]`), nil
+		},
+	})
+	e.Submit("hi")
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindPromptCacheBreakRecovery && ev.PhaseDetail == "compact_retry" {
+				compactRetryEvents++
+			}
+			if ev.Kind == EventKindDone {
+				if compactRetryEvents != 2 {
+					t.Fatalf("compact_retry events: want 2, got %d", compactRetryEvents)
+				}
+				if compactCalls != 2 {
+					t.Fatalf("CompactExecutor calls: want 2, got %d", compactCalls)
+				}
+				e.Wait()
+				return
+			}
+			if ev.Kind == EventKindError {
+				t.Fatalf("error: %v", ev.Err)
+			}
+		case <-time.After(4 * time.Second):
 			t.Fatal("timeout")
 		}
 	}
