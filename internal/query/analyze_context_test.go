@@ -1,6 +1,10 @@
 package query
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/2456868764/rabbit-code/internal/features"
+)
 
 func TestReactiveCompactByTranscript_bytesOnly(t *testing.T) {
 	if ReactiveCompactByTranscript([]byte("hi"), 1, 0) != true {
@@ -18,6 +22,13 @@ func TestReactiveCompactByTranscript_tokensOnly(t *testing.T) {
 	}
 	if ReactiveCompactByTranscript([]byte("abcde"), 0, 2) != true {
 		t.Fatal()
+	}
+}
+
+func TestReactiveCompactByTranscript_disabledWhenDisableCompact(t *testing.T) {
+	t.Setenv(features.EnvDisableCompact, "1")
+	if ReactiveCompactByTranscript([]byte("long"), 1, 0) {
+		t.Fatal("expected false when RABBIT_CODE_DISABLE_COMPACT")
 	}
 }
 

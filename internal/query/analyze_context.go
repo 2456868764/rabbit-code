@@ -1,8 +1,13 @@
 package query
 
+import "github.com/2456868764/rabbit-code/internal/features"
+
 // ReactiveCompactByTranscript mirrors a minimal analyzeContext-style gate: reactive compact is suggested
 // when transcript JSON exceeds a byte threshold and/or a heuristic token threshold (continuation item 5).
 func ReactiveCompactByTranscript(transcriptJSON []byte, minBytes, minTokens int) bool {
+	if features.DisableCompact() {
+		return false
+	}
 	if minBytes > 0 && len(transcriptJSON) >= minBytes {
 		return true
 	}

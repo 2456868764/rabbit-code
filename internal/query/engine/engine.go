@@ -14,7 +14,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/memdir"
 	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/query/querydeps"
-	"github.com/2456868764/rabbit-code/internal/services/api"
+	anthropic "github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
@@ -143,7 +143,8 @@ type Engine struct {
 	postCompactCleanup               PostCompactCleanup
 	microcompactEditBuffer           *compact.MicrocompactEditBuffer
 	cacheBreakSeen                   int32 // atomic: prompt-cache break callback ran this Submit
-	// autoCompactConsecutiveFailures counts failed auto compact executor runs across Submits (H3 / autoCompact.ts).
+	// autoCompactConsecutiveFailures counts failed proactive auto compact executor runs across Submits (H3 / autoCompact.ts);
+	// mirrored onto st.AutoCompactTracking.ConsecutiveFailures when st != nil.
 	autoCompactConsecutiveFailures int
 }
 
@@ -556,7 +557,7 @@ func (e *Engine) runTurnLoop(userText string) {
 					SuggestAutoCompact: true,
 				})
 				resPh := compact.ResultPhaseAfterCompactExecutor(execPh, nil)
-				e.noteAutoCompactExecutorOutcome(true, nil)
+				e.noteAutoCompactExecutorOutcome(st, true, nil)
 				e.trySend(EngineEvent{
 					Kind:           EventKindCompactResult,
 					CompactPhase:   resPh.String(),
@@ -583,7 +584,7 @@ func (e *Engine) runTurnLoop(userText string) {
 			execPh := compact.ExecutorPhaseAfterSchedule(phase)
 			sum, _, exErr := e.compactExecutor(e.ctx, execPh, msgs)
 			resPh := compact.ResultPhaseAfterCompactExecutor(execPh, exErr)
-			e.noteAutoCompactExecutorOutcome(auto, exErr)
+			e.noteAutoCompactExecutorOutcome(st, auto, exErr)
 			e.trySend(EngineEvent{
 				Kind:           EventKindCompactResult,
 				CompactPhase:   resPh.String(),
@@ -627,15 +628,16 @@ func (e *Engine) autoCompactCircuitTripped() bool {
 }
 
 // noteAutoCompactExecutorOutcome updates the session-level circuit when the compact suggest included proactive auto.
-func (e *Engine) noteAutoCompactExecutorOutcome(autoInSuggest bool, err error) {
+func (e *Engine) noteAutoCompactExecutorOutcome(st *query.LoopState, autoInSuggest bool, err error) {
 	if !autoInSuggest {
 		return
 	}
 	if err != nil {
 		e.autoCompactConsecutiveFailures++
-		return
+	} else {
+		e.autoCompactConsecutiveFailures = 0
 	}
-	e.autoCompactConsecutiveFailures = 0
+	query.MirrorAutocompactConsecutiveFailures(st, e.autoCompactConsecutiveFailures)
 }
 
 func (e *Engine) trySend(ev EngineEvent) bool {
