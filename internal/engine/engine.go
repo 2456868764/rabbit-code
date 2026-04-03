@@ -23,7 +23,8 @@ type StopHookFunc func(ctx context.Context, st query.LoopState, err error)
 type RecoverStrategy func(ctx context.Context, st query.LoopState, err error) bool
 
 // CompactExecutor runs after a compact suggest when set (P5.2.1 stub / closure).
-type CompactExecutor func(ctx context.Context, phase compact.RunPhase, transcriptJSON []byte) (summary string, err error)
+// When nextTranscriptJSON is non-empty, RecoverStrategy retry seeds RunTurnLoopFromMessages with it (H6 reactive compact path).
+type CompactExecutor func(ctx context.Context, phase compact.RunPhase, transcriptJSON []byte) (summary string, nextTranscriptJSON []byte, err error)
 
 // ContextCollapseDrain trims transcript on recoverable prompt_too_long when CONTEXT_COLLAPSE is on; committed feeds LoopContinue (H6).
 type ContextCollapseDrain func(ctx context.Context, st *query.LoopState, transcriptJSON json.RawMessage) (trimmed json.RawMessage, committed int, ok bool)
@@ -401,7 +402,7 @@ func (e *Engine) runTurnLoop(userText string) {
 			SuggestReactiveCompact: true,
 		})
 		if e.compactExecutor != nil {
-			sum, exErr := e.compactExecutor(e.ctx, ph, msgs)
+			sum, _, exErr := e.compactExecutor(e.ctx, ph, msgs)
 			e.trySend(EngineEvent{
 				Kind:           EventKindCompactResult,
 				CompactPhase:   ph.String(),
@@ -439,7 +440,7 @@ func (e *Engine) runTurnLoop(userText string) {
 			SuggestReactiveCompact: react,
 		})
 		if e.compactExecutor != nil {
-			sum, exErr := e.compactExecutor(e.ctx, phase, msgs)
+			sum, _, exErr := e.compactExecutor(e.ctx, phase, msgs)
 			e.trySend(EngineEvent{
 				Kind:           EventKindCompactResult,
 				CompactPhase:   phase.String(),

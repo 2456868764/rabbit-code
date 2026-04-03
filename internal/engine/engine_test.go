@@ -41,9 +41,9 @@ func TestEngine_CompactE2E_longTranscriptTriggersExecutor(t *testing.T) {
 		CompactAdvisor: func(_ query.LoopState, transcriptJSON []byte) (bool, bool) {
 			return len(transcriptJSON) > 1200, false
 		},
-		CompactExecutor: func(_ context.Context, phase compact.RunPhase, _ []byte) (string, error) {
+		CompactExecutor: func(_ context.Context, phase compact.RunPhase, _ []byte) (string, []byte, error) {
 			_ = phase
-			return "e2e-compact-summary", nil
+			return "e2e-compact-summary", nil, nil
 		},
 	})
 	e.Submit("hi")
@@ -809,6 +809,83 @@ func TestEngine_ContextCollapseDrain_recoverRetryUsesDrainedSeed(t *testing.T) {
 	}
 }
 
+func TestEngine_RecoverStrategy_compactNextTranscriptSeedsRetry(t *testing.T) {
+	apiErr := &anthropic.APIError{Kind: anthropic.KindPromptTooLong, Status: 400, Msg: "ptl"}
+	nextMsgs, err := query.InitialUserMessagesJSON("COMPACT_RETRY_MARKER")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	var secondBody string
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+				n++
+				if n == 1 {
+					return "", fmt.Errorf("w: %w", apiErr)
+				}
+				secondBody = string(messagesJSON)
+				return "ok", nil
+			}),
+		},
+		SuggestCompactOnRecoverableError: true,
+		RecoverStrategy:                  func(context.Context, query.LoopState, error) bool { return true },
+		CompactExecutor: func(_ context.Context, _ compact.RunPhase, _ []byte) (string, []byte, error) {
+			return "compact-ok", nextMsgs, nil
+		},
+	})
+	e.Submit("first-user-should-not-retry")
+	drainUntilTerminal(t, e.Events())
+	e.Wait()
+	if n != 2 {
+		t.Fatalf("want 2 assistant calls, got %d", n)
+	}
+	if !strings.Contains(secondBody, "COMPACT_RETRY_MARKER") || strings.Contains(secondBody, "first-user-should-not-retry") {
+		t.Fatalf("retry should use executor next transcript; got %q", secondBody)
+	}
+}
+
+func TestEngine_drainThenCompact_compactNextWinsOnRetrySeed(t *testing.T) {
+	t.Setenv(features.EnvContextCollapse, "true")
+	apiErr := &anthropic.APIError{Kind: anthropic.KindPromptTooLong, Status: 400, Msg: "ptl"}
+	drained, err := query.InitialUserMessagesJSON("DRAIN_ONLY")
+	if err != nil {
+		t.Fatal(err)
+	}
+	compactOut, err := query.InitialUserMessagesJSON("COMPACT_WINS_SEED")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	var secondBody string
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+				n++
+				if n == 1 {
+					return "", fmt.Errorf("w: %w", apiErr)
+				}
+				secondBody = string(messagesJSON)
+				return "ok", nil
+			}),
+		},
+		SuggestCompactOnRecoverableError: true,
+		RecoverStrategy:                  func(context.Context, query.LoopState, error) bool { return true },
+		ContextCollapseDrain: func(_ context.Context, _ *query.LoopState, _ json.RawMessage) (json.RawMessage, int, bool) {
+			return drained, 1, true
+		},
+		CompactExecutor: func(_ context.Context, _ compact.RunPhase, _ []byte) (string, []byte, error) {
+			return "s", compactOut, nil
+		},
+	})
+	e.Submit("original")
+	drainUntilTerminal(t, e.Events())
+	e.Wait()
+	if !strings.Contains(secondBody, "COMPACT_WINS_SEED") || strings.Contains(secondBody, "DRAIN_ONLY") {
+		t.Fatalf("compact next transcript should win over drain-only seed; got %q", secondBody)
+	}
+}
+
 func TestEngine_ConfigAgentIDNonInteractive_inLoopState(t *testing.T) {
 	var captured query.LoopState
 	e := New(context.Background(), &Config{
@@ -905,12 +982,12 @@ func TestEngine_CompactExecutor_afterAdvisor(t *testing.T) {
 			}),
 		},
 		CompactAdvisor: func(_ query.LoopState, _ []byte) (bool, bool) { return true, false },
-		CompactExecutor: func(_ context.Context, phase compact.RunPhase, transcript []byte) (string, error) {
+		CompactExecutor: func(_ context.Context, phase compact.RunPhase, transcript []byte) (string, []byte, error) {
 			_ = phase
 			if len(transcript) == 0 {
-				return "", errors.New("empty transcript")
+				return "", nil, errors.New("empty transcript")
 			}
-			return "summary-ok", nil
+			return "summary-ok", nil, nil
 		},
 	})
 	e.Submit("u")

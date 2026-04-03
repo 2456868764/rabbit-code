@@ -18,6 +18,6 @@ func FormatStubCompactSummary(phase RunPhase, transcript []byte) string {
 }
 
 // ExecuteStubWithMeta is like ExecuteStub but embeds phase and transcript metrics in the summary.
-func ExecuteStubWithMeta(_ context.Context, phase RunPhase, transcriptJSON []byte) (summary string, err error) {
-	return FormatStubCompactSummary(phase, transcriptJSON), nil
+func ExecuteStubWithMeta(_ context.Context, phase RunPhase, transcriptJSON []byte) (summary string, nextTranscriptJSON []byte, err error) {
+	return FormatStubCompactSummary(phase, transcriptJSON), nil, nil
 }

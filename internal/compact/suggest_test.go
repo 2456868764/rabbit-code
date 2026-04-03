@@ -13,7 +13,10 @@ func TestReactiveSuggestFromTranscript(t *testing.T) {
 }
 
 func TestExecuteStubWithMeta(t *testing.T) {
-	s, err := ExecuteStubWithMeta(context.Background(), RunIdle, []byte(`{"a":1}`))
+	s, next, err := ExecuteStubWithMeta(context.Background(), RunIdle, []byte(`{"a":1}`))
+	if len(next) != 0 {
+		t.Fatalf("unexpected next transcript: %q", next)
+	}
 	if err != nil || !strings.Contains(s, "estTok=") || !strings.Contains(s, "bytes=") {
 		t.Fatalf("%q %v", s, err)
 	}

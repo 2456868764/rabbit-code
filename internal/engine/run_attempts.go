@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -47,6 +48,7 @@ func (e *Engine) executeRunTurnLoopAttempts(ctxLoop context.Context, st *query.L
 		}
 
 		drainedForRetry := false
+		var compactRetrySeed []byte
 		var runErr error
 		if len(retrySeedMsgs) > 0 {
 			msgs, _, runErr = d.RunTurnLoopFromMessages(ctxLoop, st, retrySeedMsgs)
@@ -92,7 +94,7 @@ func (e *Engine) executeRunTurnLoopAttempts(ctxLoop context.Context, st *query.L
 				SuggestAutoCompact: true,
 			})
 			if e.compactExecutor != nil {
-				sum, exErr := e.compactExecutor(e.ctx, ph, msgs)
+				sum, next, exErr := e.compactExecutor(e.ctx, ph, msgs)
 				e.trySend(EngineEvent{
 					Kind:           EventKindCompactResult,
 					CompactPhase:   ph.String(),
@@ -101,6 +103,11 @@ func (e *Engine) executeRunTurnLoopAttempts(ctxLoop context.Context, st *query.L
 				})
 				if exErr == nil {
 					query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonReactiveCompactRetry})
+					if len(bytes.TrimSpace(next)) > 0 {
+						compactRetrySeed = append([]byte(nil), next...)
+						msgs = json.RawMessage(append([]byte(nil), next...))
+						st.SetMessagesJSON(msgs)
+					}
 				}
 			}
 		}
@@ -115,7 +122,9 @@ func (e *Engine) executeRunTurnLoopAttempts(ctxLoop context.Context, st *query.L
 			} else {
 				query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonSubmitRecoverRetry})
 			}
-			if drainedForRetry {
+			if len(compactRetrySeed) > 0 {
+				retrySeedMsgs = json.RawMessage(append([]byte(nil), compactRetrySeed...))
+			} else if drainedForRetry {
 				retrySeedMsgs = json.RawMessage(append([]byte(nil), msgs...))
 			}
 			continue
