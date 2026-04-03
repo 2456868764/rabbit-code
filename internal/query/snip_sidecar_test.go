@@ -79,3 +79,48 @@ func TestReplaySnipRemovalsAuto_noEmbeddedErrors(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func TestTranscriptMessageCount(t *testing.T) {
+	msgs, err := buildThreeMessageTranscript(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, err := TranscriptMessageCount(msgs)
+	if err != nil || n != 3 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+}
+
+func TestAnnotateTranscriptWithUUIDs(t *testing.T) {
+	msgs, err := buildThreeMessageTranscript(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := AnnotateTranscriptWithUUIDs(msgs, []string{"a", "b", "c"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := BuildUUIDToIndexFromMessagesJSON(out, "")
+	if err != nil || m["a"] != 0 || m["c"] != 2 {
+		t.Fatalf("%+v err=%v", m, err)
+	}
+	_, err = AnnotateTranscriptWithUUIDs(msgs, []string{"x"}, "")
+	if err == nil {
+		t.Fatal("want len mismatch error")
+	}
+}
+
+func TestStripMessageFieldsFromTranscriptJSON(t *testing.T) {
+	raw := []byte(`[{"role":"user","rabbit_message_uuid":"u","extra":"x","content":[]}]`)
+	out, err := StripMessageFieldsFromTranscriptJSON(raw, []string{RabbitMessageUUIDKey, "extra"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var arr []map[string]json.RawMessage
+	if err := json.Unmarshal(out, &arr); err != nil {
+		t.Fatal(err)
+	}
+	if len(arr[0]) != 2 {
+		t.Fatalf("keys left: %d", len(arr[0]))
+	}
+}

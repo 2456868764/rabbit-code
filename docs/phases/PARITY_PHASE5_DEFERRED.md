@@ -33,7 +33,7 @@ See **PHASE05_SPEC_AND_ACCEPTANCE.md** §2 **P5.F.*** and **`internal/features/r
 | Job classifier, `stopHooks` from disk | 2 / 5 / 10 | Iter 12: template **`.md`** from dir only |
 | F.8 upstream-named cache-editing beta + full `microCompact.ts` / cache field parity | 4 / 6 | Placeholder beta only in headless path |
 | F.9 Auto-trim transcript + resend after break | 5 / 6 | Iter 12: compact **suggest** only |
-| **P5.2.2** snip metadata / persistence (UUID map, session round-trip) | 5 / 8 | Headless：**H7.6–H7.9**（含转录内 **`rabbit_message_uuid`** + **`ReplaySnipRemovalsAuto`**）；**JSONL Map + parentUuid 重链** 仍 Phase 8 |
+| **P5.2.2** snip metadata / persistence (UUID map, session round-trip) | 5 / 8 | Headless：**H7.6–H7.11**（重放、侧车 UUID、**`AnnotateTranscriptWithUUIDs`** / 多字段 strip）；**JSONL Map + parentUuid 重链** 仍 Phase 8 |
 | TS **`ToolUseContext`** full object (`AppState`, MCP, full abort lifecycle, `handleStopHooks` tool runner) | 6 / 10 | H6 headless: **`ToolUseContextMirror`** + **`StopHooksAfterSuccessfulTurn`** + defer **`StopHooks`** |
 
 **Full-parity order (headless first, then TUI/REPL)**: see **PHASE05_CONTINUATION.md** §「全量还原推荐顺序」— **H6（headless State/continue 已收口）→ H1 → H2/H3/H4 → H5/H7/H8 → H9**, then **T1→T2→T3** with **T4/T5** interleaved as documented there.
