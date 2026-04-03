@@ -19,6 +19,9 @@ func TestProactiveAutoCompactAllowedForQuerySource(t *testing.T) {
 	if ProactiveAutoCompactAllowedForQuerySource(QuerySourceCompact) {
 		t.Fatal("compact should block")
 	}
+	if ProactiveAutoCompactAllowedForQuerySource(QuerySourceExtractMemories) {
+		t.Fatal("extract_memories should block")
+	}
 	t.Run("marble_origami blocked when context collapse on", func(t *testing.T) {
 		t.Setenv(features.EnvContextCollapse, "1")
 		if ProactiveAutoCompactAllowedForQuerySource(QuerySourceMarbleOrigami) {

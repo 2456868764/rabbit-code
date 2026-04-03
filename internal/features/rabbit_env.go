@@ -214,6 +214,25 @@ const (
 	EnvClaudeRemote            = "CLAUDE_CODE_REMOTE"
 	EnvRemoteMemoryDir         = "RABBIT_CODE_REMOTE_MEMORY_DIR"
 	EnvClaudeRemoteMemoryDir   = "CLAUDE_CODE_REMOTE_MEMORY_DIR"
+	// EnvTeamMem enables team memory (TEAMMEM build + GrowthBook tengu_herring_clock in TS). Headless: default off unless truthy.
+	EnvTeamMem = "RABBIT_CODE_TEAMMEM"
+	// EnvMemorySearchPastContext enables "## Searching past context" in memory prompts (memdir.ts buildSearchingPastContextSection).
+	EnvMemorySearchPastContext = "RABBIT_CODE_MEMORY_SEARCH_PAST_CONTEXT"
+	// EnvExtractMemories enables forked background memory extraction after successful Submit (stopHooks.ts + extractMemories.ts).
+	EnvExtractMemories = "RABBIT_CODE_EXTRACT_MEMORIES"
+	// EnvExtractMemoriesNonInteractive allows extract when the session is non-interactive (paths.ts tengu_slate_thimble analogue).
+	EnvExtractMemoriesNonInteractive = "RABBIT_CODE_EXTRACT_MEMORIES_NON_INTERACTIVE"
+	// EnvExtractMemoriesInterval runs extraction at most every N eligible stop-hook invocations (default 1). TS: tengu_bramble_lintel.
+	EnvExtractMemoriesInterval = "RABBIT_CODE_EXTRACT_MEMORIES_INTERVAL"
+	// EnvExtractMemoriesSkipIndex when truthy passes skipIndex to extract prompts (TS: tengu_moth_copse).
+	EnvExtractMemoriesSkipIndex = "RABBIT_CODE_EXTRACT_MEMORIES_SKIP_INDEX"
+	// EnvMemorySystemPrompt when unset, memory system prompt injection is on when auto memory resolves (H8). Set to "0" to disable.
+	EnvMemorySystemPrompt = "RABBIT_CODE_MEMORY_SYSTEM_PROMPT"
+	// EnvKairosDailyLogMemory + EnvKairosActive enable assistant daily-log memory mode (memdir.ts KAIROS branch).
+	EnvKairosDailyLogMemory = "RABBIT_CODE_KAIROS_DAILY_LOG_MEMORY"
+	EnvKairosActive         = "RABBIT_CODE_KAIROS_ACTIVE"
+	// EnvCoworkMemoryExtraGuidelines appends lines to memory builders (CLAUDE_COWORK_MEMORY_EXTRA_GUIDELINES analogue).
+	EnvCoworkMemoryExtraGuidelines = "RABBIT_CODE_COWORK_MEMORY_EXTRA_GUIDELINES"
 )
 
 // MemdirRelevanceMode returns memdir.RelevanceMode values: "heuristic" or "llm".
@@ -306,6 +325,102 @@ func AutoMemoryEnabledFromMerged(merged map[string]interface{}) bool {
 		}
 	}
 	return true
+}
+
+// TeamMemoryEnabled mirrors teamMemPaths.isTeamMemoryEnabled with AutoMemoryEnabled() and RABBIT_CODE_TEAMMEM (TS: tengu_herring_clock, default false).
+func TeamMemoryEnabled() bool {
+	return TeamMemoryEnabledFromMerged(nil)
+}
+
+// TeamMemoryEnabledFromMerged requires auto memory; then merged["teamMemoryEnabled"] if present, else truthy RABBIT_CODE_TEAMMEM.
+func TeamMemoryEnabledFromMerged(merged map[string]interface{}) bool {
+	if !AutoMemoryEnabledFromMerged(merged) {
+		return false
+	}
+	if merged != nil {
+		if raw, ok := merged["teamMemoryEnabled"]; ok {
+			if b, parsed := parseJSONBoolSetting(raw); parsed {
+				return b
+			}
+		}
+	}
+	return truthy(os.Getenv(EnvTeamMem))
+}
+
+// MemorySearchPastContextEnabled gates optional transcript grep guidance in memory system prompts.
+func MemorySearchPastContextEnabled() bool {
+	return truthy(os.Getenv(EnvMemorySearchPastContext))
+}
+
+// ExtractMemoriesEnvEnabled is true when RABBIT_CODE_EXTRACT_MEMORIES is truthy (build flag analogue EXTRACT_MEMORIES).
+func ExtractMemoriesEnvEnabled() bool {
+	return truthy(os.Getenv(EnvExtractMemories))
+}
+
+// ExtractMemoriesAllowed mirrors isExtractModeActive (paths.ts): env on, and interactive or RABBIT_CODE_EXTRACT_MEMORIES_NON_INTERACTIVE.
+func ExtractMemoriesAllowed(nonInteractive bool) bool {
+	if !ExtractMemoriesEnvEnabled() {
+		return false
+	}
+	if !nonInteractive {
+		return true
+	}
+	return truthy(os.Getenv(EnvExtractMemoriesNonInteractive))
+}
+
+// ExtractMemoriesInterval returns N≥1 from RABBIT_CODE_EXTRACT_MEMORIES_INTERVAL (default 1).
+func ExtractMemoriesInterval() int {
+	s := strings.TrimSpace(os.Getenv(EnvExtractMemoriesInterval))
+	if s == "" {
+		return 1
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v < 1 {
+		return 1
+	}
+	return v
+}
+
+// ExtractMemoriesSkipIndex mirrors tengu_moth_copse when RABBIT_CODE_EXTRACT_MEMORIES_SKIP_INDEX is truthy.
+func ExtractMemoriesSkipIndex() bool {
+	return truthy(os.Getenv(EnvExtractMemoriesSkipIndex))
+}
+
+// MemorySystemPromptInjectionEnabled is false when RABBIT_CODE_MEMORY_SYSTEM_PROMPT is set and falsy; default true.
+func MemorySystemPromptInjectionEnabled() bool {
+	v, ok := os.LookupEnv(EnvMemorySystemPrompt)
+	if !ok {
+		return true
+	}
+	return truthy(v)
+}
+
+// MemoryPromptSkipIndex mirrors tengu_moth_copse for loadMemoryPrompt / combined builders (shared with extract skip index env).
+func MemoryPromptSkipIndex() bool {
+	return ExtractMemoriesSkipIndex()
+}
+
+// KairosDailyLogMemoryEnabled is true when both KAIROS daily-log and active env are truthy.
+func KairosDailyLogMemoryEnabled() bool {
+	return truthy(os.Getenv(EnvKairosDailyLogMemory)) && truthy(os.Getenv(EnvKairosActive))
+}
+
+// CoworkMemoryExtraGuidelineLines returns non-empty lines from RABBIT_CODE_COWORK_MEMORY_EXTRA_GUIDELINES or CLAUDE_COWORK_MEMORY_EXTRA_GUIDELINES.
+func CoworkMemoryExtraGuidelineLines() []string {
+	s := strings.TrimSpace(firstNonEmptyEnvPair(EnvCoworkMemoryExtraGuidelines, "CLAUDE_COWORK_MEMORY_EXTRA_GUIDELINES"))
+	if s == "" {
+		return nil
+	}
+	return []string{s}
+}
+
+// RemoteModeWithoutMemoryDir is true when remote env is on and no remote memory dir is set (auto memory off path).
+func RemoteModeWithoutMemoryDir() bool {
+	if !truthy(firstNonEmptyEnvPair(EnvRemote, EnvClaudeRemote)) {
+		return false
+	}
+	md := strings.TrimSpace(firstNonEmptyEnvPair(EnvRemoteMemoryDir, EnvClaudeRemoteMemoryDir))
+	return md == ""
 }
 
 func parseJSONBoolSetting(v interface{}) (bool, bool) {

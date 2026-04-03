@@ -1,0 +1,115 @@
+package memdir
+
+import (
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/2456868764/rabbit-code/internal/query"
+	"github.com/2456868764/rabbit-code/internal/query/querydeps"
+)
+
+func TestCountModelVisibleMessagesSince_and_HasMemoryWritesSince(t *testing.T) {
+	u := query.RabbitMessageUUIDKey
+	raw := []byte(`[
+	  {"role":"user","content":[{"type":"text","text":"a"}],"` + u + `":"m0"},
+	  {"role":"assistant","content":[{"type":"tool_use","id":"1","name":"Write","input":{"file_path":"/outside/x.md","content":"z"}}],"` + u + `":"m1"},
+	  {"role":"user","content":[{"type":"text","text":"b"}],"` + u + `":"m2"}
+	]`)
+	if n := CountModelVisibleMessagesSince(raw, "m0", u); n != 2 {
+		t.Fatalf("after m0 want 2 visible, got %d", n)
+	}
+	if !HasMemoryWritesSince(raw, "m0", "/outside", u) {
+		t.Fatal("expected write detected")
+	}
+	memRoot := filepath.Clean("/tmp/proj/memory")
+	if HasMemoryWritesSince(raw, "m0", memRoot, u) {
+		t.Fatal("path outside auto mem should not count")
+	}
+}
+
+func TestIsExtractReadOnlyBash(t *testing.T) {
+	if !IsExtractReadOnlyBash([]byte(`{"cmd":"ls -la"}`)) {
+		t.Fatal("ls")
+	}
+	if IsExtractReadOnlyBash([]byte(`{"cmd":"rm -rf /"}`)) {
+		t.Fatal("deny rm")
+	}
+	if IsExtractReadOnlyBash([]byte(`{"cmd":"ls | wc"}`)) {
+		t.Fatal("deny pipe")
+	}
+	if !IsExtractReadOnlyBash([]byte(`{"cmd":"git log -1 --oneline"}`)) {
+		t.Fatal("allow read-only git")
+	}
+	if IsExtractReadOnlyBash([]byte(`{"cmd":"git push"}`)) {
+		t.Fatal("deny git push")
+	}
+}
+
+func TestAutoMemToolRunner(t *testing.T) {
+	inner := passthroughTools{}
+	mem := filepath.Clean("/mem/root")
+	w := &AutoMemToolRunner{Inner: inner, MemoryDir: mem}
+	ctx := context.Background()
+	_, err := w.RunTool(ctx, "Read", []byte(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.RunTool(ctx, "Write", []byte(`{"file_path":"/other/x.md"}`))
+	if err == nil {
+		t.Fatal("expected deny")
+	}
+	good := filepath.Join(mem, "a.md")
+	_, err = w.RunTool(ctx, "Write", []byte(`{"file_path":"`+good+`"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.RunTool(ctx, "REPL", []byte(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+type passthroughTools struct{}
+
+func (passthroughTools) RunTool(context.Context, string, []byte) ([]byte, error) {
+	return json.Marshal(map[string]any{"ok": true})
+}
+
+func TestRunForkedExtractMemory_writesUnderMemdir(t *testing.T) {
+	memDir := filepath.Join(t.TempDir(), "memory")
+	if err := os.MkdirAll(memDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(memDir, "note.md")
+	inWrite, _ := json.Marshal(map[string]any{
+		"file_path": target,
+		"content":   "hello",
+	})
+	turn := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+		{ToolUses: []querydeps.ToolUseCall{{ID: "w1", Name: "Write", Input: inWrite}}},
+		{Text: "done"},
+	}}
+	parent, _ := query.InitialUserMessagesJSON("user turn")
+	dep := ForkedExtractDeps{
+		Tools:     passthroughTools{},
+		Turn:      turn,
+		Model:     "m",
+		MaxTokens: 256,
+	}
+	res, err := RunForkedExtractMemory(context.Background(), dep, ForkedExtractParams{
+		ParentMessagesJSON: parent,
+		UserPrompt:         "extract prompt",
+		MemoryDir:          memDir,
+		MaxTurns:           5,
+		QuerySource:        query.QuerySourceExtractMemories,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.MemoryFilePaths) != 1 || res.MemoryFilePaths[0] != target {
+		t.Fatalf("paths %+v", res.MemoryFilePaths)
+	}
+}

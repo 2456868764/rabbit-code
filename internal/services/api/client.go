@@ -84,6 +84,7 @@ type vertexStreamJSONBody struct {
 	MaxTokens        int             `json:"max_tokens"`
 	Stream           bool            `json:"stream"`
 	Messages         json.RawMessage `json:"messages"`
+	System           json.RawMessage `json:"system,omitempty"`
 	OutputConfig     *OutputConfig   `json:"output_config,omitempty"`
 	AnthropicBeta    []string        `json:"anthropic_beta,omitempty"`
 	AnthropicVersion string          `json:"anthropic_version"`
@@ -108,6 +109,7 @@ func (c *Client) marshalMessagesStreamJSON(body MessagesStreamBody) ([]byte, err
 			MaxTokens:        body.MaxTokens,
 			Stream:           true,
 			Messages:         body.Messages,
+			System:           body.System,
 			OutputConfig:     body.OutputConfig,
 			AnthropicBeta:    append([]string(nil), body.AnthropicBeta...),
 			AnthropicVersion: VertexDefaultAnthropicVersion,
@@ -150,6 +152,8 @@ type MessagesStreamBody struct {
 	MaxTokens int             `json:"max_tokens"`
 	Stream    bool            `json:"stream"`
 	Messages  json.RawMessage `json:"messages"`
+	// System is optional plain-text system prompt (loadMemoryPrompt / memdir.ts analogue).
+	System json.RawMessage `json:"system,omitempty"`
 	// OutputConfig carries task_budget etc. (claude.ts configureTaskBudgetParams).
 	OutputConfig *OutputConfig `json:"output_config,omitempty"`
 	// AnthropicBeta is sent as JSON "anthropic_beta" (Bedrock: betas in BEDROCK_EXTRA_PARAMS_HEADERS; 1P often uses header only).

@@ -257,6 +257,95 @@ func TestAutoMemoryEnabledFromMerged(t *testing.T) {
 	}
 }
 
+func TestTeamMemoryEnabledFromMerged(t *testing.T) {
+	clear := func() {
+		for _, k := range []string{
+			EnvDisableAutoMemory, EnvClaudeDisableAutoMemory,
+			EnvSimple, EnvClaudeSimple,
+			EnvRemote, EnvClaudeRemote,
+			EnvRemoteMemoryDir, EnvClaudeRemoteMemoryDir,
+			EnvTeamMem,
+		} {
+			_ = os.Unsetenv(k)
+		}
+	}
+	clear()
+	if TeamMemoryEnabled() {
+		t.Fatal("default off without env")
+	}
+	t.Setenv(EnvTeamMem, "1")
+	if !TeamMemoryEnabled() {
+		t.Fatal("env on")
+	}
+	clear()
+	if !TeamMemoryEnabledFromMerged(map[string]interface{}{"teamMemoryEnabled": true}) {
+		t.Fatal("merged on")
+	}
+	if TeamMemoryEnabledFromMerged(map[string]interface{}{"teamMemoryEnabled": false}) {
+		t.Fatal("merged off")
+	}
+	t.Setenv(EnvDisableAutoMemory, "1")
+	if TeamMemoryEnabledFromMerged(map[string]interface{}{"teamMemoryEnabled": true}) {
+		t.Fatal("auto memory off disables team")
+	}
+}
+
+func TestMemorySearchPastContextEnabled(t *testing.T) {
+	t.Setenv(EnvMemorySearchPastContext, "")
+	if MemorySearchPastContextEnabled() {
+		t.Fatal()
+	}
+	t.Setenv(EnvMemorySearchPastContext, "1")
+	if !MemorySearchPastContextEnabled() {
+		t.Fatal()
+	}
+}
+
+func TestExtractMemoriesAllowed(t *testing.T) {
+	t.Setenv(EnvExtractMemories, "")
+	if ExtractMemoriesAllowed(false) {
+		t.Fatal("off")
+	}
+	t.Setenv(EnvExtractMemories, "1")
+	if !ExtractMemoriesAllowed(false) {
+		t.Fatal("interactive on")
+	}
+	if ExtractMemoriesAllowed(true) {
+		t.Fatal("non-interactive needs extra env")
+	}
+	t.Setenv(EnvExtractMemoriesNonInteractive, "1")
+	if !ExtractMemoriesAllowed(true) {
+		t.Fatal("non-interactive allowed")
+	}
+}
+
+func TestExtractMemoriesInterval(t *testing.T) {
+	t.Setenv(EnvExtractMemoriesInterval, "")
+	if ExtractMemoriesInterval() != 1 {
+		t.Fatal()
+	}
+	t.Setenv(EnvExtractMemoriesInterval, "3")
+	if ExtractMemoriesInterval() != 3 {
+		t.Fatal()
+	}
+}
+
+func TestRemoteModeWithoutMemoryDir(t *testing.T) {
+	t.Setenv(EnvRemote, "")
+	t.Setenv(EnvRemoteMemoryDir, "")
+	if RemoteModeWithoutMemoryDir() {
+		t.Fatal()
+	}
+	t.Setenv(EnvRemote, "1")
+	if !RemoteModeWithoutMemoryDir() {
+		t.Fatal("remote without dir")
+	}
+	t.Setenv(EnvRemoteMemoryDir, "/m")
+	if RemoteModeWithoutMemoryDir() {
+		t.Fatal("remote with dir")
+	}
+}
+
 func TestTokenBudgetMaxAttachmentBytes_whenEnabled(t *testing.T) {
 	t.Setenv(EnvTokenBudget, "1")
 	if TokenBudgetMaxAttachmentBytes() != 0 {

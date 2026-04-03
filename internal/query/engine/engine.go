@@ -139,6 +139,8 @@ type Config struct {
 	RestoredAutoCompactTracking *query.AutoCompactTracking
 	// RestoredSnipRemovalLog optional; prepended into each Submit's LoopState.SnipRemovalLog for session continuity (H7).
 	RestoredSnipRemovalLog []query.SnipRemovalEntry
+	// ExtractMemoriesSaved runs after a successful forked extract when new topic files were written (extractMemories appendSystemMessage analogue).
+	ExtractMemoriesSaved func(memoryPaths []string, teamMemoryCount int)
 }
 
 // Engine coordinates cancellable query turns (stub or real StreamAssistant / RunTurnLoop).
@@ -153,6 +155,7 @@ type Engine struct {
 	stubDelay                        time.Duration
 	memdirExplicitPaths              []string
 	memdirMemoryDir                  string
+	memdirProjectRoot                string // for memory system prompt "## Searching past context"
 	memdirRecentTools                []string
 	memdirTextComplete               memdir.TextCompleteFunc
 	memdirRelevanceMode              memdir.RelevanceMode
@@ -191,6 +194,10 @@ type Engine struct {
 	restoredSnipRemovalLog         []query.SnipRemovalEntry
 	// streamOutputTotal accumulates UsageDelta.OutputTokens via chained Anthropic OnStreamUsage (H5.5).
 	streamOutputTotal atomic.Int64
+
+	extractCtl             *memdir.ExtractController
+	initialSettings        map[string]interface{}
+	extractMemoriesSavedFn func(memoryPaths []string, teamMemoryCount int)
 }
 
 // NewEngine is equivalent to New(parent, nil) (stub assistant).
@@ -211,6 +218,7 @@ func New(parent context.Context, cfg *Config) *Engine {
 		stubDelay:           50 * time.Millisecond,
 		memdirSurfaced:      make(map[string]struct{}),
 		memdirRelevanceMode: memdir.RelevanceModeHeuristic,
+		extractCtl:          &memdir.ExtractController{},
 	}
 	if cfg != nil {
 		deps := cfg.Deps
@@ -231,8 +239,16 @@ func New(parent context.Context, cfg *Config) *Engine {
 		}
 		e.memdirExplicitPaths = append([]string(nil), cfg.MemdirPaths...)
 		e.memdirMemoryDir = resolveEngineMemdirMemoryDir(cfg)
+		e.memdirProjectRoot = engineMemdirProjectRoot(cfg)
 		if e.memdirMemoryDir != "" {
 			_ = memdir.EnsureMemoryDirExists(e.memdirMemoryDir)
+		}
+		if e.memdirMemoryDir != "" && features.TeamMemoryEnabledFromMerged(cfg.InitialSettings) && e.deps.Tools != nil {
+			e.deps.Tools = &memdir.TeamMemSecretGuardRunner{
+				Inner:      e.deps.Tools,
+				AutoMemDir: e.memdirMemoryDir,
+				Enabled:    true,
+			}
 		}
 		e.memdirRecentTools = append([]string(nil), cfg.MemdirRecentTools...)
 		e.memdirTextComplete = cfg.MemdirTextComplete
@@ -253,6 +269,7 @@ func New(parent context.Context, cfg *Config) *Engine {
 		if cfg.StopHook != nil {
 			e.stopHooks = append(e.stopHooks, cfg.StopHook)
 		}
+		e.initialSettings = cfg.InitialSettings
 		e.recoverStrategy = cfg.RecoverStrategy
 		e.orphanPermissionAdvisor = cfg.OrphanPermissionAdvisor
 		if cfg.MaxAssistantTurns > 0 {
@@ -287,7 +304,9 @@ func New(parent context.Context, cfg *Config) *Engine {
 		}
 		e.restoredAutoCompactTracking = query.CloneAutoCompactTracking(cfg.RestoredAutoCompactTracking)
 		e.restoredSnipRemovalLog = query.CloneSnipRemovalLog(cfg.RestoredSnipRemovalLog)
+		e.extractMemoriesSavedFn = cfg.ExtractMemoriesSaved
 	}
+	e.stopHooks = append(e.stopHooks, e.stopHookExtractMemories)
 	return e
 }
 
@@ -342,6 +361,20 @@ func engineAutoMemoryEnabled(cfg *Config) bool {
 		return features.AutoMemoryEnabledFromMerged(cfg.InitialSettings)
 	}
 	return features.AutoMemoryEnabled()
+}
+
+func engineMemdirProjectRoot(cfg *Config) string {
+	if cfg == nil {
+		return ""
+	}
+	if r := strings.TrimSpace(cfg.MemdirProjectRoot); r != "" {
+		return filepath.Clean(r)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return "."
+	}
+	return filepath.Clean(wd)
 }
 
 func resolveEngineMemdirMemoryDir(cfg *Config) string {
@@ -615,6 +648,7 @@ func (e *Engine) submitTokenEstimate(ctx context.Context, mode, resolved string,
 func (e *Engine) runTurnLoop(userText string) {
 	restoreUsage := e.chainStreamUsage()
 	defer restoreUsage()
+	e.refreshMemorySystemPromptForAssistant()
 	turnOutputBaseline := e.streamOutputTotal.Load()
 	budgetTracker := query.NewBudgetTracker()
 	parsedOutputBudget, haveOutputBudget := query.ParseTokenBudget(userText)

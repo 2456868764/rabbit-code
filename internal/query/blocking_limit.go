@@ -17,7 +17,7 @@ func BlockingLimitPreCheckApplies(querySource string, skipDueToPostCompactContin
 		return false
 	}
 	qs := strings.TrimSpace(querySource)
-	if qs == QuerySourceSessionMemory || qs == QuerySourceCompact {
+	if qs == QuerySourceSessionMemory || qs == QuerySourceCompact || qs == QuerySourceExtractMemories {
 		return false
 	}
 	// Reactive compact + auto on: let the real API / reactive path handle overflow (no synthetic preempt).

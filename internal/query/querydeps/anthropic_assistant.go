@@ -3,6 +3,7 @@ package querydeps
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/services/api"
@@ -18,6 +19,8 @@ type AnthropicAssistant struct {
 	ExtraReadOptions []anthropic.ReadAssistantOption
 	// MicrocompactBuffer optional; MarkToolsSentToAPIState after successful stream (microCompact.ts markToolsSentToAPIState).
 	MicrocompactBuffer MicrocompactAPIStateMarker
+	// SystemPrompt when non-empty is sent as the Messages API "system" string (memdir loadMemoryPrompt analogue, H8).
+	SystemPrompt string
 }
 
 func (a *AnthropicAssistant) readOpts(ctx context.Context) []anthropic.ReadAssistantOption {
@@ -34,6 +37,12 @@ func (a *AnthropicAssistant) streamBody(model string, maxTokens int, messagesJSO
 		Model:     model,
 		MaxTokens: maxTokens,
 		Messages:  json.RawMessage(messagesJSON),
+	}
+	if a != nil {
+		if s := strings.TrimSpace(a.SystemPrompt); s != "" {
+			b, _ := json.Marshal(s)
+			body.System = b
+		}
 	}
 	if features.CachedMicrocompactEnabled() {
 		body.AnthropicBeta = []string{anthropic.BetaCachedMicrocompactBody}

@@ -12,6 +12,9 @@ func TestBlockingLimitPreCheckApplies_sessionMemoryFork(t *testing.T) {
 	if BlockingLimitPreCheckApplies(QuerySourceSessionMemory, false) {
 		t.Fatal("session_memory fork should skip blocking limit")
 	}
+	if BlockingLimitPreCheckApplies(QuerySourceExtractMemories, false) {
+		t.Fatal("extract_memories fork should skip blocking limit")
+	}
 	if !BlockingLimitPreCheckApplies("", false) {
 		t.Fatal("main thread should apply when gates pass")
 	}
