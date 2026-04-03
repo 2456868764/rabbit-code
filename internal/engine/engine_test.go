@@ -1133,7 +1133,7 @@ func TestEngine_Submit_withStreamAssistant_doneTurnCount(t *testing.T) {
 	}
 }
 
-func TestEngine_Phase5_breakCacheTemplatesMicrocompactEvents(t *testing.T) {
+func TestEngine_headlessEnv_breakCacheTemplatesMicrocompactEvents(t *testing.T) {
 	t.Setenv(features.EnvBreakCacheCommand, "true")
 	t.Setenv(features.EnvTemplates, "true")
 	t.Setenv(features.EnvTemplateNames, "a,b")
@@ -1209,7 +1209,7 @@ func TestEngine_templateMarkdownAppendixFromDir(t *testing.T) {
 	}
 }
 
-func TestEngine_UserSubmit_carriesPhase5ModeTags(t *testing.T) {
+func TestEngine_UserSubmit_carriesHeadlessModeTags(t *testing.T) {
 	t.Setenv(features.EnvUltrathink, "true")
 	t.Setenv(features.EnvUltraplan, "true")
 	e := New(context.Background(), &Config{
@@ -1237,7 +1237,7 @@ func TestEngine_UserSubmit_carriesPhase5ModeTags(t *testing.T) {
 	}
 }
 
-func TestEngine_Phase5_ultrathinkInjectsIntoMessagesJSON(t *testing.T) {
+func TestEngine_ultrathinkInjectsIntoMessagesJSON(t *testing.T) {
 	t.Setenv(features.EnvUltrathink, "true")
 	var captured string
 	e := New(context.Background(), &Config{
@@ -1266,7 +1266,7 @@ func TestEngine_Phase5_ultrathinkInjectsIntoMessagesJSON(t *testing.T) {
 	}
 }
 
-func TestEngine_Phase5_reactiveCompactFromEnv_minTokens(t *testing.T) {
+func TestEngine_reactiveCompactFromEnv_minTokens(t *testing.T) {
 	t.Setenv(features.EnvReactiveCompact, "true")
 	t.Setenv(features.EnvReactiveCompactMinBytes, "999999")
 	t.Setenv(features.EnvReactiveCompactMinTokens, "1")
@@ -1300,7 +1300,7 @@ func TestEngine_Phase5_reactiveCompactFromEnv_minTokens(t *testing.T) {
 	}
 }
 
-func TestEngine_Phase5_reactiveCompactFromEnv(t *testing.T) {
+func TestEngine_reactiveCompactFromEnv(t *testing.T) {
 	t.Setenv(features.EnvReactiveCompact, "true")
 	t.Setenv(features.EnvReactiveCompactMinBytes, "1")
 	e := New(context.Background(), &Config{
@@ -1333,7 +1333,7 @@ func TestEngine_Phase5_reactiveCompactFromEnv(t *testing.T) {
 	}
 }
 
-func TestEngine_Phase5_historySnipBetweenRounds(t *testing.T) {
+func TestEngine_historySnipBetweenRounds(t *testing.T) {
 	t.Setenv(features.EnvHistorySnip, "true")
 	t.Setenv(features.EnvHistorySnipMaxBytes, "280")
 	t.Setenv(features.EnvHistorySnipMaxRounds, "2")
@@ -1413,6 +1413,57 @@ func (cacheBreakFireTurn) AssistantTurn(ctx context.Context, model string, maxTo
 		cb()
 	}
 	return querydeps.TurnResult{Text: "ok"}, nil
+}
+
+type failOncePromptCacheBreakTurn struct {
+	n int
+}
+
+func (f *failOncePromptCacheBreakTurn) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (querydeps.TurnResult, error) {
+	f.n++
+	if f.n == 1 {
+		return querydeps.TurnResult{}, anthropic.ErrPromptCacheBreakDetected
+	}
+	return querydeps.TurnResult{Text: "ok"}, nil
+}
+
+func TestEngine_promptCacheBreakAutoCompact_recovery(t *testing.T) {
+	t.Setenv(features.EnvPromptCacheBreak, "1")
+	t.Setenv(features.EnvPromptCacheBreakTrimResend, "0")
+	t.Setenv(features.EnvPromptCacheBreakAutoCompact, "1")
+	var sawCompactRetry bool
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Turn: &failOncePromptCacheBreakTurn{},
+		},
+		CompactExecutor: func(ctx context.Context, phase compact.RunPhase, transcriptJSON []byte) (string, []byte, error) {
+			_ = ctx
+			_ = phase
+			_ = transcriptJSON
+			return "s", []byte(`[{"role":"user","content":[{"type":"text","text":"after-compact"}]}]`), nil
+		},
+	})
+	e.Submit("hi")
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindPromptCacheBreakRecovery && ev.PhaseDetail == "compact_retry" {
+				sawCompactRetry = true
+			}
+			if ev.Kind == EventKindDone {
+				if !sawCompactRetry {
+					t.Fatal("expected compact_retry recovery event")
+				}
+				e.Wait()
+				return
+			}
+			if ev.Kind == EventKindError {
+				t.Fatalf("error: %v", ev.Err)
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
 }
 
 func TestEngine_promptCacheBreakSuggestCompact(t *testing.T) {

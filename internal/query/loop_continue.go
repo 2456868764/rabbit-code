@@ -15,6 +15,10 @@ const (
 	ContinueReasonSubmitRecoverRetry = "submit_recover_retry"
 	// ContinueReasonAutoCompactExecuted records a successful post-loop auto compact executor run (headless bookkeeping).
 	ContinueReasonAutoCompactExecuted = "auto_compact_executed"
+	// ContinueReasonPromptCacheBreakTrimResend records strip cache_control + retry after stream cache break (H1).
+	ContinueReasonPromptCacheBreakTrimResend = "prompt_cache_break_trim_resend"
+	// ContinueReasonPromptCacheBreakCompactRetry records compact executor seed + retry after trim path failed (H1).
+	ContinueReasonPromptCacheBreakCompactRetry = "prompt_cache_break_compact_retry"
 )
 
 // LoopContinue mirrors query.ts Continue (discriminated by Reason; optional payloads).
@@ -43,4 +47,17 @@ func ClearLoopContinue(st *LoopState) {
 		return
 	}
 	st.LoopContinue = LoopContinue{}
+}
+
+// ResetLoopStateFieldsForNextQueryIteration mirrors query.ts queryLoop's `next` State after tool results
+// (before the recursive assistant call): maxOutputTokensRecoveryCount=0, hasAttemptedReactiveCompact=false,
+// maxOutputTokensOverride cleared. See query.ts assignment to `next` before state = next.
+func ResetLoopStateFieldsForNextQueryIteration(st *LoopState) {
+	if st == nil {
+		return
+	}
+	st.MaxOutputTokensRecoveryCount = 0
+	st.HasAttemptedReactiveCompact = false
+	st.MaxOutputTokensOverrideActive = false
+	st.MaxOutputTokensOverride = 0
 }

@@ -1,0 +1,390 @@
+package features
+
+import (
+	"os"
+	"strconv"
+	"strings"
+)
+
+// --- API / HTTP client env (SOURCE_FEATURE_FLAGS, client.ts, withRetry.ts; rabbit-code prefixed) ---
+
+const (
+	EnvUnattendedRetry = "RABBIT_CODE_UNATTENDED_RETRY"
+	// EnvFastRetry shortens HTTP retry backoff (withRetry.ts fast path); mirrors CLAUDE_CODE_FAST_RETRY when set.
+	EnvFastRetry            = "RABBIT_CODE_FAST_RETRY"
+	EnvAdditionalProtection = "RABBIT_CODE_ADDITIONAL_PROTECTION"
+	EnvUseBedrock           = "RABBIT_CODE_USE_BEDROCK"
+	EnvUseVertex            = "RABBIT_CODE_USE_VERTEX"
+	EnvUseFoundry           = "RABBIT_CODE_USE_FOUNDRY"
+	EnvSkipBedrockAuth      = "RABBIT_CODE_SKIP_BEDROCK_AUTH"
+	EnvSkipVertexAuth       = "RABBIT_CODE_SKIP_VERTEX_AUTH"
+	EnvSkipFoundryAuth      = "RABBIT_CODE_SKIP_FOUNDRY_AUTH"
+	EnvAntiDistillation     = "RABBIT_CODE_ANTI_DISTILLATION_CC"
+	// EnvAntiDistillationHeader overrides the HTTP header name when anti-distillation is on (default x-rabbit-code-anti-distillation).
+	EnvAntiDistillationHeader = "RABBIT_CODE_ANTI_DISTILLATION_HEADER"
+	// EnvAntiDistillationValue sets the header value (default 1).
+	EnvAntiDistillationValue = "RABBIT_CODE_ANTI_DISTILLATION_VALUE"
+	// EnvAntiDistillationFakeTools when truthy with ANTI_DISTILLATION_CC adds JSON anti_distillation: ["fake_tools"] (claude.ts getExtraBodyParams).
+	EnvAntiDistillationFakeTools = "RABBIT_CODE_ANTI_DISTILLATION_FAKE_TOOLS"
+	// EnvOAuthBetaAppend is a comma-separated list of extra anthropic-beta names for OAuth sessions (constants/oauth.ts OAUTH_BETA_HEADER patterns).
+	EnvOAuthBetaAppend = "RABBIT_CODE_OAUTH_BETA_APPEND"
+	EnvNativeAttestation = "RABBIT_CODE_NATIVE_CLIENT_ATTESTATION"
+	// EnvNativeAttestationHeader overrides the HTTP header name when native attestation is on.
+	EnvNativeAttestationHeader = "RABBIT_CODE_NATIVE_ATTESTATION_HEADER"
+	// EnvNativeAttestationValue sets the header value (default 1).
+	EnvNativeAttestationValue = "RABBIT_CODE_NATIVE_ATTESTATION_VALUE"
+	EnvPromptCacheBreak = "RABBIT_CODE_PROMPT_CACHE_BREAK_DETECTION"
+	EnvE2EMockAPI       = "RABBIT_CODE_E2E_MOCK_API"
+	// EnvOAuthBaseURL overrides console base for usage.ts fetchUtilization (default https://console.anthropic.com).
+	EnvOAuthBaseURL = "RABBIT_CODE_OAUTH_BASE_URL"
+	// EnvHTTPUserAgent overrides default User-Agent for API HTTP clients (utils/http.ts).
+	EnvHTTPUserAgent = "RABBIT_CODE_USER_AGENT"
+	// EnvStrictForeground529 sets DefaultPolicy().StrictForeground529 (withRetry.ts FOREGROUND_529_RETRY_SOURCES gate for HTTP 529).
+	EnvStrictForeground529 = "RABBIT_CODE_STRICT_FOREGROUND_529"
+	// EnvAttributionHeader when set to a falsy value disables the billing attribution system line (CLAUDE_CODE_ATTRIBUTION_HEADER); unset = enabled.
+	EnvAttributionHeader = "RABBIT_CODE_ATTRIBUTION_HEADER"
+	// EnvDisableKeepAliveOnECONNRESET when truthy wraps *http.Transport to set DisableKeepAlives after ECONNRESET/EPIPE (proxy.ts disableKeepAlive + withRetry.ts stale socket path).
+	EnvDisableKeepAliveOnECONNRESET = "RABBIT_CODE_DISABLE_KEEPALIVE_ON_ECONNRESET"
+)
+
+// UnattendedRetryEnabled mirrors UNATTENDED_RETRY + CLAUDE_CODE_UNATTENDED_RETRY.
+func UnattendedRetryEnabled() bool {
+	return truthy(os.Getenv(EnvUnattendedRetry))
+}
+
+// FastRetryEnabled mirrors withRetry.ts fast-mode backoff when CLAUDE_CODE_FAST_RETRY / RABBIT_CODE_FAST_RETRY is set.
+func FastRetryEnabled() bool {
+	return truthy(os.Getenv(EnvFastRetry))
+}
+
+// AdditionalProtectionHeader mirrors CLAUDE_CODE_ADDITIONAL_PROTECTION → x-anthropic-additional-protection.
+func AdditionalProtectionHeader() bool {
+	return truthy(os.Getenv(EnvAdditionalProtection))
+}
+
+func UseBedrock() bool         { return truthy(os.Getenv(EnvUseBedrock)) }
+func UseVertex() bool          { return truthy(os.Getenv(EnvUseVertex)) }
+func UseFoundry() bool         { return truthy(os.Getenv(EnvUseFoundry)) }
+func SkipBedrockAuth() bool    { return truthy(os.Getenv(EnvSkipBedrockAuth)) }
+func SkipVertexAuth() bool     { return truthy(os.Getenv(EnvSkipVertexAuth)) }
+func SkipFoundryAuth() bool    { return truthy(os.Getenv(EnvSkipFoundryAuth)) }
+func AntiDistillationCC() bool { return truthy(os.Getenv(EnvAntiDistillation)) }
+
+// AntiDistillationFakeToolsInBody mirrors getExtraBodyParams anti_distillation: opt-in body field when CC is on.
+func AntiDistillationFakeToolsInBody() bool {
+	return AntiDistillationCC() && truthy(os.Getenv(EnvAntiDistillationFakeTools))
+}
+
+// AntiDistillationRequestHeader returns the header name/value to send when ANTI_DISTILLATION_CC is enabled.
+func AntiDistillationRequestHeader() (name, value string, ok bool) {
+	if !AntiDistillationCC() {
+		return "", "", false
+	}
+	name = strings.TrimSpace(os.Getenv(EnvAntiDistillationHeader))
+	if name == "" {
+		name = "x-rabbit-code-anti-distillation"
+	}
+	value = strings.TrimSpace(os.Getenv(EnvAntiDistillationValue))
+	if value == "" {
+		value = "1"
+	}
+	return name, value, true
+}
+
+// OAuthBetaAppendNames returns extra beta header tokens from RABBIT_CODE_OAUTH_BETA_APPEND (comma-separated).
+func OAuthBetaAppendNames() []string {
+	s := strings.TrimSpace(os.Getenv(EnvOAuthBetaAppend))
+	if s == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func NativeClientAttestation() bool {
+	return truthy(os.Getenv(EnvNativeAttestation))
+}
+
+// NativeAttestationRequestHeader returns the header name/value when NATIVE_CLIENT_ATTESTATION is enabled.
+func NativeAttestationRequestHeader() (name, value string, ok bool) {
+	if !NativeClientAttestation() {
+		return "", "", false
+	}
+	name = strings.TrimSpace(os.Getenv(EnvNativeAttestationHeader))
+	if name == "" {
+		name = "x-rabbit-code-client-attestation"
+	}
+	value = strings.TrimSpace(os.Getenv(EnvNativeAttestationValue))
+	if value == "" {
+		value = "1"
+	}
+	return name, value, true
+}
+
+func PromptCacheBreakDetection() bool {
+	return truthy(os.Getenv(EnvPromptCacheBreak))
+}
+
+func E2EMockAPI() bool {
+	return truthy(os.Getenv(EnvE2EMockAPI))
+}
+
+// StrictForeground529Enabled when true, DefaultPolicy uses strict 529 retry whitelist (see anthropic.foreground529RetrySources).
+func StrictForeground529Enabled() bool {
+	return truthy(os.Getenv(EnvStrictForeground529))
+}
+
+// DisableKeepAliveOnECONNRESETEnabled gates Client transport wrapping (see anthropic.keepAliveResetTransport).
+func DisableKeepAliveOnECONNRESETEnabled() bool {
+	return truthy(os.Getenv(EnvDisableKeepAliveOnECONNRESET))
+}
+
+// AttributionHeaderPromptEnabled mirrors system.ts isAttributionHeaderEnabled: default true unless RABBIT_CODE_ATTRIBUTION_HEADER is set and falsy.
+func AttributionHeaderPromptEnabled() bool {
+	v, ok := os.LookupEnv(EnvAttributionHeader)
+	if !ok {
+		return true
+	}
+	return truthy(v)
+}
+
+// --- Headless query / engine env (SOURCE_FEATURE_FLAGS.md P5.F.*; defaults off) ---
+
+const (
+	EnvTokenBudget                 = "RABBIT_CODE_TOKEN_BUDGET"
+	EnvTokenBudgetMaxInputBytes    = "RABBIT_CODE_TOKEN_BUDGET_MAX_INPUT_BYTES"
+	EnvTokenBudgetMaxInputTokens   = "RABBIT_CODE_TOKEN_BUDGET_MAX_INPUT_TOKENS"
+	EnvTokenBudgetMaxAttachmentBytes = "RABBIT_CODE_TOKEN_BUDGET_MAX_ATTACHMENT_BYTES"
+	EnvReactiveCompact             = "RABBIT_CODE_REACTIVE_COMPACT"
+	EnvContextCollapse             = "RABBIT_CODE_CONTEXT_COLLAPSE"
+	EnvSessionRestore              = "RABBIT_CODE_SESSION_RESTORE"
+	EnvUltrathink                  = "RABBIT_CODE_ULTRATHINK"
+	EnvUltraplan                   = "RABBIT_CODE_ULTRAPLAN"
+	EnvBreakCacheCommand           = "RABBIT_CODE_BREAK_CACHE_COMMAND"
+	EnvTemplates                   = "RABBIT_CODE_TEMPLATES"
+	EnvCachedMicrocompact          = "RABBIT_CODE_CACHED_MICROCOMPACT"
+	EnvHistorySnip                 = "RABBIT_CODE_HISTORY_SNIP"
+	EnvBashExec                    = "RABBIT_CODE_BASH_EXEC"
+	EnvSnipCompact                 = "RABBIT_CODE_SNIP_COMPACT"
+	EnvSnipCompactMaxBytes         = "RABBIT_CODE_SNIP_COMPACT_MAX_BYTES"
+	EnvSnipCompactMaxRounds        = "RABBIT_CODE_SNIP_COMPACT_MAX_ROUNDS"
+	EnvReactiveCompactMinBytes     = "RABBIT_CODE_REACTIVE_COMPACT_MIN_BYTES"
+	EnvReactiveCompactMinTokens    = "RABBIT_CODE_REACTIVE_COMPACT_MIN_TOKENS"
+	EnvHistorySnipMaxBytes         = "RABBIT_CODE_HISTORY_SNIP_MAX_BYTES"
+	EnvHistorySnipMaxRounds        = "RABBIT_CODE_HISTORY_SNIP_MAX_ROUNDS"
+	EnvTemplateNames               = "RABBIT_CODE_TEMPLATE_NAMES"
+	EnvTemplateDir                 = "RABBIT_CODE_TEMPLATE_DIR"
+	EnvPromptCacheBreakSuggestCompact = "RABBIT_CODE_PROMPT_CACHE_BREAK_SUGGEST_COMPACT"
+	EnvPromptCacheBreakTrimResend  = "RABBIT_CODE_PROMPT_CACHE_BREAK_TRIM_RESEND"
+	EnvPromptCacheBreakAutoCompact = "RABBIT_CODE_PROMPT_CACHE_BREAK_AUTO_COMPACT"
+)
+
+func TokenBudgetEnabled() bool { return truthy(os.Getenv(EnvTokenBudget)) }
+
+// TokenBudgetMaxInputBytes enforces a UTF-8 byte cap on resolved Submit text when TOKEN_BUDGET is on.
+func TokenBudgetMaxInputBytes() int {
+	if !TokenBudgetEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvTokenBudgetMaxInputBytes))
+	if s == "" {
+		return 4_000_000
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 4_000_000
+	}
+	return v
+}
+
+func TokenBudgetMaxInputTokens() int {
+	if !TokenBudgetEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvTokenBudgetMaxInputTokens))
+	if s == "" {
+		return 0
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 0
+	}
+	return v
+}
+
+func TokenBudgetMaxAttachmentBytes() int {
+	if !TokenBudgetEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvTokenBudgetMaxAttachmentBytes))
+	if s == "" {
+		return 0
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 0
+	}
+	return v
+}
+
+func ReactiveCompactEnabled() bool      { return truthy(os.Getenv(EnvReactiveCompact)) }
+func ContextCollapseEnabled() bool      { return truthy(os.Getenv(EnvContextCollapse)) }
+func SessionRestoreEnabled() bool       { return truthy(os.Getenv(EnvSessionRestore)) }
+func UltrathinkEnabled() bool           { return truthy(os.Getenv(EnvUltrathink)) }
+func UltraplanEnabled() bool            { return truthy(os.Getenv(EnvUltraplan)) }
+func BreakCacheCommandEnabled() bool    { return truthy(os.Getenv(EnvBreakCacheCommand)) }
+func TemplatesEnabled() bool            { return truthy(os.Getenv(EnvTemplates)) }
+func CachedMicrocompactEnabled() bool   { return truthy(os.Getenv(EnvCachedMicrocompact)) }
+func HistorySnipEnabled() bool          { return truthy(os.Getenv(EnvHistorySnip)) }
+func SnipCompactEnabled() bool          { return truthy(os.Getenv(EnvSnipCompact)) }
+func BashExecEnabled() bool             { return truthy(os.Getenv(EnvBashExec)) }
+
+func SnipCompactMaxBytes() int {
+	if !SnipCompactEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvSnipCompactMaxBytes))
+	if s == "" {
+		return 32768
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 32768
+	}
+	return v
+}
+
+func SnipCompactMaxRounds() int {
+	if !SnipCompactEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvSnipCompactMaxRounds))
+	if s == "" {
+		return 4
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 4
+	}
+	return v
+}
+
+// PromptCacheBreakDetectionEnabled aliases PROMPT_CACHE_BREAK_DETECTION (shared with anthropic stream path).
+func PromptCacheBreakDetectionEnabled() bool { return PromptCacheBreakDetection() }
+
+func PromptCacheBreakSuggestCompactEnabled() bool {
+	return truthy(os.Getenv(EnvPromptCacheBreakSuggestCompact))
+}
+
+func PromptCacheBreakTrimResendEnabled() bool {
+	if !PromptCacheBreakDetection() {
+		return false
+	}
+	v := strings.TrimSpace(os.Getenv(EnvPromptCacheBreakTrimResend))
+	if v == "" {
+		return true
+	}
+	return truthy(v)
+}
+
+func PromptCacheBreakAutoCompactEnabled() bool {
+	if !PromptCacheBreakDetection() {
+		return false
+	}
+	return truthy(os.Getenv(EnvPromptCacheBreakAutoCompact))
+}
+
+func ReactiveCompactMinTranscriptBytes() int {
+	if !ReactiveCompactEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvReactiveCompactMinBytes))
+	if s == "" {
+		return 8192
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 8192
+	}
+	return v
+}
+
+func ReactiveCompactMinEstimatedTokens() int {
+	if !ReactiveCompactEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvReactiveCompactMinTokens))
+	if s == "" {
+		return 0
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 0
+	}
+	return v
+}
+
+func HistorySnipMaxBytes() int {
+	if !HistorySnipEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvHistorySnipMaxBytes))
+	if s == "" {
+		return 32768
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 32768
+	}
+	return v
+}
+
+func HistorySnipMaxRounds() int {
+	if !HistorySnipEnabled() {
+		return 0
+	}
+	s := strings.TrimSpace(os.Getenv(EnvHistorySnipMaxRounds))
+	if s == "" {
+		return 4
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 4
+	}
+	return v
+}
+
+func TemplateNames() []string {
+	if !TemplatesEnabled() {
+		return nil
+	}
+	return splitCommaEnv(os.Getenv(EnvTemplateNames))
+}
+
+func TemplateMarkdownDir() string {
+	if !TemplatesEnabled() {
+		return ""
+	}
+	return strings.TrimSpace(os.Getenv(EnvTemplateDir))
+}
+
+func splitCommaEnv(s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}

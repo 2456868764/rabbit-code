@@ -9,19 +9,21 @@ import (
 	"github.com/2456868764/rabbit-code/internal/bootstrap"
 )
 
+const testManagedEnvKey = "RABBIT_CODE_MANAGED_ENV_TEST_KEY"
+
 func TestApplyManagedEnvFromMerged(t *testing.T) {
-	t.Setenv("PHASE2_TEST_VAR", "")
+	t.Setenv(testManagedEnvKey, "")
 	m := map[string]interface{}{
 		"managed_env": map[string]interface{}{
-			"PHASE2_TEST_VAR": "from-config",
+			testManagedEnvKey: "from-config",
 		},
 	}
 	keys := ApplyManagedEnvFromMerged(m)
-	if len(keys) != 1 || keys[0] != "PHASE2_TEST_VAR" {
+	if len(keys) != 1 || keys[0] != testManagedEnvKey {
 		t.Fatalf("keys %v", keys)
 	}
-	if os.Getenv("PHASE2_TEST_VAR") != "from-config" {
-		t.Fatal(os.Getenv("PHASE2_TEST_VAR"))
+	if os.Getenv(testManagedEnvKey) != "from-config" {
+		t.Fatal(os.Getenv(testManagedEnvKey))
 	}
 }
 
@@ -30,11 +32,11 @@ func TestLoadAndApplyMergedConfig(t *testing.T) {
 	root := t.TempDir()
 	_ = os.MkdirAll(global, 0o755)
 	path := filepath.Join(global, "config.json")
-	content := `{"managed_env":{"PHASE2_TEST_VAR":"x"}}`
+	content := `{"managed_env":{"` + testManagedEnvKey + `":"x"}}`
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PHASE2_TEST_VAR", "")
+	t.Setenv(testManagedEnvKey, "")
 	st := bootstrap.NewState()
 	st.SetProjectRoot(root)
 	rt := &Runtime{
@@ -45,7 +47,7 @@ func TestLoadAndApplyMergedConfig(t *testing.T) {
 	if err := LoadAndApplyMergedConfig(rt); err != nil {
 		t.Fatal(err)
 	}
-	if os.Getenv("PHASE2_TEST_VAR") != "x" {
-		t.Fatal(os.Getenv("PHASE2_TEST_VAR"))
+	if os.Getenv(testManagedEnvKey) != "x" {
+		t.Fatal(os.Getenv(testManagedEnvKey))
 	}
 }

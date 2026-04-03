@@ -10,4 +10,6 @@ type LoopObservers struct {
 	OnHistorySnip func(bytesBefore, bytesAfter, rounds int)
 	// OnSnipCompact fires when P5.2.2 SNIP_COMPACT trimming removed leading messages (independent env thresholds).
 	OnSnipCompact func(bytesBefore, bytesAfter, rounds int)
+	// OnPromptCacheBreakRecovery fires for H1 recovery steps: phase "trim_resend" or "compact_retry".
+	OnPromptCacheBreakRecovery func(phase string)
 }

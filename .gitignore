@@ -13,7 +13,5 @@
 !.env.example
 coverage.out
 coverage.html
-# Ignore generated docs under docs/ except phase specs (tracked for SPEC/E2E).
-/docs/*
-!/docs/phases/
-!/docs/phases/**
+# ignore all docs
+docs/

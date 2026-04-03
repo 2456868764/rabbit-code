@@ -7,7 +7,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/config"
 )
 
-// LoadAndApplyMergedConfig runs after trust: LoadMerged + ApplyManagedEnvFromMerged (Phase 2).
+// LoadAndApplyMergedConfig runs after trust: LoadMerged + ApplyManagedEnvFromMerged.
 func LoadAndApplyMergedConfig(rt *Runtime) error {
 	if rt == nil {
 		return nil
@@ -63,7 +63,7 @@ func RunConfigDump() error {
 	return err
 }
 
-// RunConfigSet writes a top-level key to the user config file (Phase 2 minimal; Phase 10 may extend).
+// RunConfigSet writes a top-level key to the user config file.
 func RunConfigSet(key, value string) error {
 	globalDir, err := GlobalConfigDir()
 	if err != nil {
@@ -73,7 +73,6 @@ func RunConfigSet(key, value string) error {
 }
 
 // ApplyManagedEnvFromMerged sets process env from merged config "managed_env" (call only after trust).
-// Returns keys set (for tests). Does not unset on missing key in map.
 func ApplyManagedEnvFromMerged(m map[string]interface{}) []string {
 	if m == nil {
 		return nil

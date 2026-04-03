@@ -9,7 +9,7 @@ import (
 
 	"github.com/2456868764/rabbit-code/internal/app"
 	"github.com/2456868764/rabbit-code/internal/anthropic/services"
-	"github.com/2456868764/rabbit-code/internal/phase5cli"
+	"github.com/2456868764/rabbit-code/internal/contextcli"
 	"github.com/2456868764/rabbit-code/internal/version"
 )
 
@@ -40,7 +40,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "usage: rabbit-code context break-cache\n")
 				os.Exit(1)
 			}
-			if err := phase5cli.WriteBreakCacheCommandJSON(os.Stdout); err != nil {
+			if err := contextcli.WriteBreakCacheCommandJSON(os.Stdout); err != nil {
 				fmt.Fprintf(os.Stderr, "rabbit-code: context: %v\n", err)
 				os.Exit(1)
 			}

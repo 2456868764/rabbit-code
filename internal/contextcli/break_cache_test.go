@@ -1,4 +1,4 @@
-package phase5cli
+package contextcli
 
 import (
 	"bytes"

@@ -202,7 +202,7 @@ func (e *Engine) Submit(userText string) {
 	e.wg.Add(1)
 	go func() {
 		defer e.wg.Done()
-		modeTags := query.FormatPhase5HeadlessModeTags(query.Phase5UserTextFlags{
+		modeTags := query.FormatHeadlessModeTags(query.UserTextHintFlags{
 			ContextCollapse: features.ContextCollapseEnabled(),
 			Ultrathink:      features.UltrathinkEnabled(),
 			Ultraplan:       features.UltraplanEnabled(),
@@ -308,6 +308,9 @@ func (e *Engine) loopObservers() *query.LoopObservers {
 				PhaseAuxInt2: after,
 			})
 		},
+		OnPromptCacheBreakRecovery: func(phase string) {
+			e.trySend(EngineEvent{Kind: EventKindPromptCacheBreakRecovery, PhaseDetail: phase})
+		},
 	}
 }
 
@@ -370,7 +373,7 @@ func (e *Engine) runTurnLoop(userText string) {
 		e.trySend(EngineEvent{Kind: EventKindCachedMicrocompactActive, PhaseDetail: "api_body_flags_deferred"})
 	}
 
-	resolved = query.ApplyPhase5UserTextHints(resolved, query.Phase5UserTextFlags{
+	resolved = query.ApplyUserTextHints(resolved, query.UserTextHintFlags{
 		ContextCollapse: features.ContextCollapseEnabled(),
 		Ultrathink:      features.UltrathinkEnabled(),
 		Ultraplan:       features.UltraplanEnabled(),

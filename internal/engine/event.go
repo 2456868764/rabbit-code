@@ -18,6 +18,7 @@ const (
 	// P5.F.6–F.10 headless signals (TUI / telemetry).
 	EventKindBreakCacheCommand
 	EventKindPromptCacheBreakDetected
+	EventKindPromptCacheBreakRecovery
 	EventKindTemplatesActive
 	EventKindCachedMicrocompactActive
 	EventKindHistorySnipApplied

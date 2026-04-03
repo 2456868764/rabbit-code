@@ -16,7 +16,7 @@ import (
 const maxSubmitContinuationRounds = 8
 
 func (e *Engine) loopDriver() query.LoopDriver {
-	return query.LoopDriver{
+	d := query.LoopDriver{
 		Deps: querydeps.Deps{
 			Tools:     e.deps.Tools,
 			Assistant: e.deps.Assistant,
@@ -34,6 +34,26 @@ func (e *Engine) loopDriver() query.LoopDriver {
 		SnipCompactMaxBytes:  features.SnipCompactMaxBytes(),
 		SnipCompactMaxRounds: features.SnipCompactMaxRounds(),
 	}
+	if features.PromptCacheBreakAutoCompactEnabled() && e.compactExecutor != nil {
+		d.PromptCacheBreakRecovery = e.promptCacheBreakCompactRecovery
+	}
+	return d
+}
+
+func (e *Engine) promptCacheBreakCompactRecovery(ctx context.Context, msgs json.RawMessage) (json.RawMessage, bool, error) {
+	if e.compactExecutor == nil {
+		return nil, false, nil
+	}
+	ph := compact.RunIdle.Next(false, true)
+	_, next, err := e.compactExecutor(ctx, ph, msgs)
+	if err != nil {
+		return nil, false, err
+	}
+	next = bytes.TrimSpace(next)
+	if len(next) == 0 {
+		return nil, false, nil
+	}
+	return json.RawMessage(append([]byte(nil), next...)), true, nil
 }
 
 // executeRunTurnLoopAttempts runs RunTurnLoop with optional RecoverStrategy second attempt (P5.1.3) and collapse-drain bookkeeping (H6).

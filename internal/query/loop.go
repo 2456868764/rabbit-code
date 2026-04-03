@@ -32,6 +32,8 @@ type LoopDriver struct {
 	// SnipCompactMaxBytes / SnipCompactMaxRounds implement P5.2.2 when both > 0 (RABBIT_CODE_SNIP_COMPACT).
 	SnipCompactMaxBytes  int
 	SnipCompactMaxRounds int
+	// PromptCacheBreakRecovery optional compact transcript after trim+resend still sees cache break (H1).
+	PromptCacheBreakRecovery PromptCacheBreakRecovery
 }
 
 func (d *LoopDriver) streamer() querydeps.StreamAssistant {
@@ -147,6 +149,7 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 		st.SetMessagesJSON(msgs)
 	}
 	model, max := d.modelAndMax()
+	var turn querydeps.TurnResult
 	for {
 		if st != nil && st.MaxTurns > 0 && st.TurnCount >= st.MaxTurns {
 			st.SetMessagesJSON(msgs)
@@ -176,7 +179,7 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 			msgs = newMsgs
 			st.SetMessagesJSON(msgs)
 		}
-		turn, err := d.turner().AssistantTurn(ctx, model, max, msgs)
+		turn, msgs, err = d.assistantTurnWithPromptCacheBreakHandling(ctx, st, model, max, msgs)
 		if err != nil {
 			if st != nil && errors.Is(err, context.Canceled) {
 				st.ToolUseContext.AbortSignalAborted = true
@@ -237,6 +240,7 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 		}
 		st.SetMessagesJSON(msgs)
 		if st != nil {
+			ResetLoopStateFieldsForNextQueryIteration(st)
 			RecordLoopContinue(st, LoopContinue{Reason: ContinueReasonNextTurn})
 		}
 	}

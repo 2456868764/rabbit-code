@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 )
 
@@ -24,7 +25,17 @@ func TestMessage_JSONRoundTrip(t *testing.T) {
 	if got.Role != m.Role || len(got.Content) != 2 {
 		t.Fatalf("%+v", got)
 	}
-	if got.Content[1].Name != "bash" || string(got.Content[1].Input) != `{"cmd":"ls"}` {
+	if got.Content[1].Name != "bash" {
 		t.Fatalf("%+v", got.Content[1])
+	}
+	var wantInput, gotInput any
+	if err := json.Unmarshal(m.Content[1].Input, &wantInput); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(got.Content[1].Input, &gotInput); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(wantInput, gotInput) {
+		t.Fatalf("input: want %#v got %#v", wantInput, gotInput)
 	}
 }

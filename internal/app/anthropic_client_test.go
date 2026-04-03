@@ -41,7 +41,7 @@ func TestNewAnthropicClient_sessionAndAuthHeaders(t *testing.T) {
 	t.Setenv("RABBIT_CODE_CLIENT_KEY", "")
 
 	st := bootstrap.NewState()
-	st.SetSessionID("sess-phase4")
+	st.SetSessionID("sess-test-api")
 
 	rt := &Runtime{
 		State:           st,
@@ -59,7 +59,7 @@ func TestNewAnthropicClient_sessionAndAuthHeaders(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = resp.Body.Close()
-	if sawSession != "sess-phase4" {
+	if sawSession != "sess-test-api" {
 		t.Fatalf("session header: got %q", sawSession)
 	}
 }

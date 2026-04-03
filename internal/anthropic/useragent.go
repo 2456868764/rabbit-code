@@ -7,7 +7,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/features"
 )
 
-const defaultUserAgent = "rabbit-code/phase4"
+const defaultUserAgent = "rabbit-code/api"
 
 // UserAgent returns the HTTP User-Agent for Anthropic API calls (utils/http.ts getUserAgent parity).
 // Override with RABBIT_CODE_USER_AGENT (mirrors CLAUDE_CODE-side env when present in product).

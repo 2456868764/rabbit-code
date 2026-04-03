@@ -90,7 +90,7 @@ func TestDoRequest_UnattendedPersistent_ContextCancel(t *testing.T) {
 	}
 }
 
-func TestDoRequest_PersistentPhase503Returns(t *testing.T) {
+func TestDoRequest_Persistent503Returns(t *testing.T) {
 	var n atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c := n.Add(1)
