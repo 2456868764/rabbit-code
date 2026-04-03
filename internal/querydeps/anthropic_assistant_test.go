@@ -2,6 +2,7 @@ package querydeps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -118,6 +119,57 @@ func TestAnthropicAssistant_AssistantTurn_promptCacheBreakFromContext(t *testing
 	}
 	if hookCalls != 1 {
 		t.Fatalf("prompt cache break hook (AssistantTurn path): want 1 call, got %d", hookCalls)
+	}
+}
+
+func TestAnthropicAssistant_streamBody_anthropicBetaCachedMicrocompact(t *testing.T) {
+	t.Setenv(features.EnvCachedMicrocompact, "true")
+	t.Setenv(features.EnvUseBedrock, "")
+	t.Setenv(features.EnvUseVertex, "")
+	t.Setenv(features.EnvUseFoundry, "")
+
+	okCh := make(chan bool, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(r.Body)
+		if err != nil {
+			okCh <- false
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		var body struct {
+			AnthropicBeta []string `json:"anthropic_beta"`
+		}
+		if err := json.Unmarshal(b, &body); err != nil {
+			okCh <- false
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		ok := len(body.AnthropicBeta) == 1 && body.AnthropicBeta[0] == anthropic.BetaCachedMicrocompactBody
+		okCh <- ok
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"z\"}}\n\n")
+		_, _ = io.WriteString(w, "data: {\"type\":\"message_stop\"}\n\n")
+	}))
+	defer srv.Close()
+
+	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl.BaseURL = srv.URL
+	cl.Provider = anthropic.ProviderAnthropic
+
+	a := &AnthropicAssistant{
+		Client:           cl,
+		DefaultModel:     "m",
+		DefaultMaxTokens: 8,
+		Policy:           anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+	}
+	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
+	_, err := a.StreamAssistant(context.Background(), "", 0, msgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !<-okCh {
+		t.Fatal("expected JSON anthropic_beta with BetaCachedMicrocompactBody when RABBIT_CODE_CACHED_MICROCOMPACT is on")
 	}
 }
 
