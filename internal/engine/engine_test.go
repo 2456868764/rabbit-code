@@ -897,6 +897,8 @@ func TestEngine_ConfigAgentIDNonInteractive_inLoopState(t *testing.T) {
 		Model:          "custom-model",
 		AgentID:        "engine-agent",
 		NonInteractive: true,
+		SessionID:      " sid ",
+		Debug:          true,
 		StopHooks: []StopHookFunc{
 			func(_ context.Context, st query.LoopState, _ error) { captured = st },
 		},
@@ -910,8 +912,91 @@ func TestEngine_ConfigAgentIDNonInteractive_inLoopState(t *testing.T) {
 	if captured.ToolUseContext.MainLoopModel != "custom-model" {
 		t.Fatalf("model %q", captured.ToolUseContext.MainLoopModel)
 	}
+	if captured.ToolUseContext.SessionID != "sid" || !captured.ToolUseContext.Debug {
+		t.Fatalf("%+v", captured.ToolUseContext)
+	}
 	if len(captured.MessagesJSON) == 0 || !strings.Contains(string(captured.MessagesJSON), "hi") {
 		t.Fatalf("MessagesJSON %s", captured.MessagesJSON)
+	}
+}
+
+func TestEngine_StopHooksAfterSuccessfulTurn_preventContinuation(t *testing.T) {
+	t.Setenv(features.EnvTokenBudget, "true")
+	t.Setenv(features.EnvTokenBudgetMaxInputBytes, "999999")
+	var tokenCalls int
+	var captured query.LoopState
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "ok", nil
+			}),
+		},
+		StopHooksAfterSuccessfulTurn: []StopHookAfterTurnFunc{
+			func(context.Context, query.LoopState, json.RawMessage) StopHookAfterTurnResult {
+				return StopHookAfterTurnResult{PreventContinuation: true, StopReason: "user-stop"}
+			},
+		},
+		TokenBudgetContinueAfterTurn: func(context.Context, query.LoopState, json.RawMessage) bool {
+			tokenCalls++
+			return true
+		},
+		StopHooks: []StopHookFunc{
+			func(_ context.Context, st query.LoopState, _ error) { captured = st },
+		},
+	})
+	e.Submit("x")
+	ch := e.Events()
+	deadline := time.After(2 * time.Second)
+	var sawDone bool
+	for !sawDone {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindDone {
+				sawDone = true
+				if ev.PhaseDetail != "user-stop" {
+					t.Fatalf("PhaseDetail %q", ev.PhaseDetail)
+				}
+			}
+			if ev.Kind == EventKindError {
+				t.Fatal(ev.Err)
+			}
+		case <-deadline:
+			t.Fatal("timeout")
+		}
+	}
+	e.Wait()
+	if tokenCalls != 0 {
+		t.Fatalf("token hook should not run after prevent: %d", tokenCalls)
+	}
+	if captured.LoopContinue.Reason != query.ContinueReasonStopHookPrevented {
+		t.Fatalf("%+v", captured.LoopContinue)
+	}
+}
+
+func TestEngine_StopHooksAfterSuccessfulTurn_blockingContinue(t *testing.T) {
+	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+		{Text: "a"},
+		{Text: "b"},
+	}}
+	var afterCalls int
+	e := New(context.Background(), &Config{
+		Deps:  querydeps.Deps{Turn: turns},
+		Model: "m", MaxTokens: 8,
+		StopHooksAfterSuccessfulTurn: []StopHookAfterTurnFunc{
+			func(context.Context, query.LoopState, json.RawMessage) StopHookAfterTurnResult {
+				afterCalls++
+				if afterCalls == 1 {
+					return StopHookAfterTurnResult{BlockingContinue: true}
+				}
+				return StopHookAfterTurnResult{}
+			},
+		},
+	})
+	e.Submit("hi")
+	drainUntilTerminal(t, e.Events())
+	e.Wait()
+	if afterCalls != 2 {
+		t.Fatalf("after-turn hooks %d", afterCalls)
 	}
 }
 

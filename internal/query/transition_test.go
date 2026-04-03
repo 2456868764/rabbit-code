@@ -33,15 +33,18 @@ func TestApplyTransition_table(t *testing.T) {
 func TestApplyTransition_preservesMessagesJSONAndToolUseContext(t *testing.T) {
 	raw := json.RawMessage(`[{"role":"user"}]`)
 	s := LoopState{
-		TurnCount:      0,
-		MessagesJSON:   raw,
-		ToolUseContext: ToolUseContextMirror{AgentID: "ag", MainLoopModel: "m", NonInteractive: true},
+		TurnCount:    0,
+		MessagesJSON: raw,
+		ToolUseContext: ToolUseContextMirror{
+			AgentID: "ag", MainLoopModel: "m", NonInteractive: true, SessionID: "s", Debug: true,
+		},
 	}
 	got := ApplyTransition(s, TranReceiveAssistant)
 	if string(got.MessagesJSON) != string(raw) {
 		t.Fatalf("MessagesJSON: %s", got.MessagesJSON)
 	}
-	if got.ToolUseContext.AgentID != "ag" || got.ToolUseContext.MainLoopModel != "m" || !got.ToolUseContext.NonInteractive {
+	if got.ToolUseContext.AgentID != "ag" || got.ToolUseContext.MainLoopModel != "m" || !got.ToolUseContext.NonInteractive ||
+		got.ToolUseContext.SessionID != "s" || !got.ToolUseContext.Debug {
 		t.Fatalf("%+v", got.ToolUseContext)
 	}
 }

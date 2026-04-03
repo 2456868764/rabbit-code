@@ -35,6 +35,19 @@ type StopHookBlockingContinue func(ctx context.Context, st query.LoopState) bool
 // TokenBudgetContinueAfterTurn returns true to run another RunTurnLoop when TOKEN_BUDGET is on (query.ts token_budget_continuation).
 type TokenBudgetContinueAfterTurn func(ctx context.Context, st query.LoopState, transcriptJSON json.RawMessage) bool
 
+// StopHookAfterTurnResult is the headless analogue of query/stopHooks.ts aggregate after handleStopHooks (H6).
+type StopHookAfterTurnResult struct {
+	// BlockingContinue requests another RunTurnLoop (query.ts stop_hook_blocking).
+	BlockingContinue bool
+	// PreventContinuation ends Submit like query.ts stop_hook_prevented (skips token budget and further turns).
+	PreventContinuation bool
+	// StopReason optional; default PhaseDetail on Done is stop_hook_prevented.
+	StopReason string
+}
+
+// StopHookAfterTurnFunc runs after a successful RunTurnLoop wave, before StopHookBlockingContinue / token budget (query.ts order).
+type StopHookAfterTurnFunc func(ctx context.Context, st query.LoopState, transcriptJSON json.RawMessage) StopHookAfterTurnResult
+
 // Config configures optional streaming backend (nil Assistant keeps stub behavior).
 type Config struct {
 	Deps        querydeps.Deps
@@ -70,6 +83,12 @@ type Config struct {
 	AgentID string
 	// NonInteractive mirrors toolUseContext.options.isNonInteractiveSession (H6).
 	NonInteractive bool
+	// SessionID optional ToolUseContextMirror / analytics (H6).
+	SessionID string
+	// Debug mirrors toolUseContext.options.debug (H6).
+	Debug bool
+	// StopHooksAfterSuccessfulTurn run after each successful turn-loop wave (see StopHookAfterTurnFunc).
+	StopHooksAfterSuccessfulTurn []StopHookAfterTurnFunc
 }
 
 // Engine coordinates cancellable query turns (stub or real StreamAssistant / RunTurnLoop).
@@ -96,6 +115,9 @@ type Engine struct {
 	tokenBudgetContinueAfterTurn     TokenBudgetContinueAfterTurn
 	agentID                          string
 	nonInteractive                   bool
+	sessionID                        string
+	debug                            bool
+	stopHooksAfterSuccessfulTurn     []StopHookAfterTurnFunc
 	cacheBreakSeen                   int32 // atomic: prompt-cache break callback ran this Submit
 }
 
@@ -152,6 +174,9 @@ func New(parent context.Context, cfg *Config) *Engine {
 		e.tokenBudgetContinueAfterTurn = cfg.TokenBudgetContinueAfterTurn
 		e.agentID = strings.TrimSpace(cfg.AgentID)
 		e.nonInteractive = cfg.NonInteractive
+		e.sessionID = strings.TrimSpace(cfg.SessionID)
+		e.debug = cfg.Debug
+		e.stopHooksAfterSuccessfulTurn = append([]StopHookAfterTurnFunc(nil), cfg.StopHooksAfterSuccessfulTurn...)
 	}
 	return e
 }
@@ -378,7 +403,33 @@ func (e *Engine) runTurnLoop(userText string) {
 			return
 		}
 		loopErr = nil
-		if e.stopHookBlockingContinue != nil && e.stopHookBlockingContinue(e.ctx, *st) {
+		var stopPrevent bool
+		var stopReason string
+		var blockFromAfterTurn bool
+		for _, h := range e.stopHooksAfterSuccessfulTurn {
+			if h == nil {
+				continue
+			}
+			r := h(e.ctx, *st, msgs)
+			if r.PreventContinuation {
+				stopPrevent = true
+				stopReason = r.StopReason
+				break
+			}
+			if r.BlockingContinue {
+				blockFromAfterTurn = true
+			}
+		}
+		if stopPrevent {
+			if stopReason == "" {
+				stopReason = query.ContinueReasonStopHookPrevented
+			}
+			query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonStopHookPrevented})
+			e.trySend(EngineEvent{Kind: EventKindDone, LoopTurnCount: st.TurnCount, PhaseDetail: stopReason})
+			return
+		}
+		needStopHookBlock := blockFromAfterTurn || (e.stopHookBlockingContinue != nil && e.stopHookBlockingContinue(e.ctx, *st))
+		if needStopHookBlock {
 			query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonStopHookBlocking})
 			PrepareLoopStateForStopHookBlockingContinuation(st)
 			continue

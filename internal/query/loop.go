@@ -21,6 +21,10 @@ type LoopDriver struct {
 	AgentID string
 	// NonInteractive mirrors toolUseContext.options.isNonInteractiveSession when true.
 	NonInteractive bool
+	// SessionID optional mirror for toolUseContext / session analytics (H6).
+	SessionID string
+	// Debug mirrors toolUseContext.options.debug (H6).
+	Debug bool
 	Observe   *LoopObservers
 	// HistorySnipMaxBytes / HistorySnipMaxRounds implement P5.F.10 when both > 0 (engine sets from features).
 	HistorySnipMaxBytes  int
@@ -130,10 +134,16 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 		}
 	}
 	if st != nil {
+		st.ToolUseContext.AbortSignalAborted = false
 		model0, _ := d.modelAndMax()
 		st.ToolUseContext.MainLoopModel = model0
 		st.ToolUseContext.AgentID = d.AgentID
 		st.ToolUseContext.NonInteractive = d.NonInteractive
+		st.ToolUseContext.SessionID = d.SessionID
+		st.ToolUseContext.Debug = d.Debug
+		if errors.Is(ctx.Err(), context.Canceled) {
+			st.ToolUseContext.AbortSignalAborted = true
+		}
 		st.SetMessagesJSON(msgs)
 	}
 	model, max := d.modelAndMax()
@@ -168,6 +178,9 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 		}
 		turn, err := d.turner().AssistantTurn(ctx, model, max, msgs)
 		if err != nil {
+			if st != nil && errors.Is(err, context.Canceled) {
+				st.ToolUseContext.AbortSignalAborted = true
+			}
 			st.SetMessagesJSON(msgs)
 			return msgs, lastAssistantText, err
 		}

@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/2456868764/rabbit-code/internal/querydeps"
@@ -46,4 +47,25 @@ type mockToolRunner struct{}
 
 func (mockToolRunner) RunTool(context.Context, string, []byte) ([]byte, error) {
 	return []byte(`{"ok":true}`), nil
+}
+
+func TestLoopDriver_RunTurnLoop_preCanceledContext_setsAbortMirror(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	d := LoopDriver{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(ctx context.Context, _ string, _ int, _ []byte) (string, error) {
+				return "", ctx.Err()
+			}),
+		},
+		Model: "m", MaxTokens: 8,
+	}
+	st := LoopState{}
+	_, _, err := d.RunTurnLoop(ctx, &st, "hi")
+	if err == nil || !errors.Is(err, context.Canceled) {
+		t.Fatalf("got %v", err)
+	}
+	if !st.ToolUseContext.AbortSignalAborted {
+		t.Fatalf("ToolUseContext %+v", st.ToolUseContext)
+	}
 }

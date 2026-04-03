@@ -26,6 +26,8 @@ func (e *Engine) loopDriver() query.LoopDriver {
 		MaxTokens:        e.maxTokens,
 		AgentID:          e.agentID,
 		NonInteractive:   e.nonInteractive,
+		SessionID:        e.sessionID,
+		Debug:            e.debug,
 		Observe:          e.loopObservers(),
 		HistorySnipMaxBytes:  features.HistorySnipMaxBytes(),
 		HistorySnipMaxRounds: features.HistorySnipMaxRounds(),

@@ -3,13 +3,19 @@ package query
 import "encoding/json"
 
 // ToolUseContextMirror holds a headless subset of query.ts ToolUseContext (H6).
-// Full TS type includes AppState, MCP, hooks, etc.; Go mirrors fields used for token-budget / analytics parity.
+// Full TS type includes AppState, MCP, hooks, etc.; PARITY follow-on extends this struct.
 type ToolUseContextMirror struct {
 	AgentID        string
 	MainLoopModel  string
 	NonInteractive bool
 	QueryChainID   string
 	QueryDepth     int
+	// SessionID optional analytics / session key (query.ts session-adjacent wiring).
+	SessionID string
+	// Debug mirrors toolUseContext.options.debug when set via engine.Config.
+	Debug bool
+	// AbortSignalAborted is true after a context.Canceled assistant/tool path in this RunTurnLoop invocation.
+	AbortSignalAborted bool
 }
 
 // LoopState tracks cross-iteration query loop metadata aligned with query.ts State (H6).

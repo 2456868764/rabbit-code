@@ -7,6 +7,8 @@ const (
 	ContinueReasonMaxOutputTokensEscalate = "max_output_tokens_escalate"
 	ContinueReasonMaxOutputTokensRecovery = "max_output_tokens_recovery"
 	ContinueReasonStopHookBlocking        = "stop_hook_blocking"
+	// ContinueReasonStopHookPrevented mirrors query.ts terminal stop_hook_prevented (H6 headless).
+	ContinueReasonStopHookPrevented = "stop_hook_prevented"
 	ContinueReasonTokenBudgetContinuation = "token_budget_continuation"
 	ContinueReasonNextTurn                = "next_turn"
 	// ContinueReasonSubmitRecoverRetry is the engine-level second RunTurnLoop after RecoverStrategy (no 1:1 name in query.ts outer Submit).
