@@ -183,6 +183,15 @@ const (
 	EnvPromptCacheBreakSuggestCompact = "RABBIT_CODE_PROMPT_CACHE_BREAK_SUGGEST_COMPACT"
 	EnvPromptCacheBreakTrimResend  = "RABBIT_CODE_PROMPT_CACHE_BREAK_TRIM_RESEND"
 	EnvPromptCacheBreakAutoCompact = "RABBIT_CODE_PROMPT_CACHE_BREAK_AUTO_COMPACT"
+	// Autocompact / proactive compact (autoCompact.ts + isAutoCompactEnabled; rabbit-code prefixed).
+	EnvDisableCompact                 = "RABBIT_CODE_DISABLE_COMPACT"
+	EnvDisableAutoCompact             = "RABBIT_CODE_DISABLE_AUTO_COMPACT"
+	EnvAutoCompact                    = "RABBIT_CODE_AUTO_COMPACT" // unset = on; "0"/"false" = user off
+	EnvSuppressProactiveAutoCompact   = "RABBIT_CODE_SUPPRESS_PROACTIVE_AUTO_COMPACT"
+	EnvContextWindowTokens            = "RABBIT_CODE_CONTEXT_WINDOW_TOKENS"
+	EnvAutoCompactWindow              = "RABBIT_CODE_AUTO_COMPACT_WINDOW"
+	EnvAutocompactPctOverride         = "RABBIT_CODE_AUTOCOMPACT_PCT_OVERRIDE"
+	EnvBlockingLimitOverride          = "RABBIT_CODE_BLOCKING_LIMIT_OVERRIDE"
 )
 
 func TokenBudgetEnabled() bool { return truthy(os.Getenv(EnvTokenBudget)) }
@@ -235,6 +244,109 @@ func TokenBudgetMaxAttachmentBytes() int {
 
 func ReactiveCompactEnabled() bool      { return truthy(os.Getenv(EnvReactiveCompact)) }
 func ContextCollapseEnabled() bool      { return truthy(os.Getenv(EnvContextCollapse)) }
+
+// DisableCompact mirrors DISABLE_COMPACT (blocks autocompact entry in autoCompact.ts).
+func DisableCompact() bool { return truthy(os.Getenv(EnvDisableCompact)) }
+
+// DisableAutoCompact mirrors DISABLE_AUTO_COMPACT.
+func DisableAutoCompact() bool { return truthy(os.Getenv(EnvDisableAutoCompact)) }
+
+// AutoCompactUserPreferenceEnabled mirrors userConfig.autoCompactEnabled when env is unset (default on).
+// Empty string is treated like unset so t.Setenv(EnvAutoCompact, "") does not disable autocompact.
+func AutoCompactUserPreferenceEnabled() bool {
+	v, ok := os.LookupEnv(EnvAutoCompact)
+	if !ok {
+		return true
+	}
+	s := strings.TrimSpace(v)
+	if s == "" {
+		return true
+	}
+	return truthy(s)
+}
+
+// IsAutoCompactEnabled mirrors isAutoCompactEnabled() in autoCompact.ts.
+func IsAutoCompactEnabled() bool {
+	if DisableCompact() {
+		return false
+	}
+	if DisableAutoCompact() {
+		return false
+	}
+	return AutoCompactUserPreferenceEnabled()
+}
+
+// SuppressProactiveAutoCompact mirrors reactive-only / context-collapse style suppression of shouldAutoCompact
+// (tengu_cobalt_raccoon is a separate GrowthBook flag in TS; headless uses RABBIT_CODE_SUPPRESS_PROACTIVE_AUTO_COMPACT).
+func SuppressProactiveAutoCompact() bool {
+	return truthy(os.Getenv(EnvSuppressProactiveAutoCompact))
+}
+
+func defaultContextWindowForModel(model string) int {
+	m := strings.ToLower(strings.TrimSpace(model))
+	if strings.Contains(m, "1m") || strings.Contains(m, "1000000") {
+		return 1_000_000
+	}
+	return 200_000
+}
+
+// ContextWindowTokensForModel returns RABBIT_CODE_CONTEXT_WINDOW_TOKENS or a heuristic default (200k / 1M).
+// Does not apply RABBIT_CODE_AUTO_COMPACT_WINDOW — use ApplyAutoCompactWindowCap after this.
+func ContextWindowTokensForModel(model string) int {
+	s := strings.TrimSpace(os.Getenv(EnvContextWindowTokens))
+	if s != "" {
+		v, err := strconv.Atoi(s)
+		if err == nil && v > 0 {
+			return v
+		}
+	}
+	return defaultContextWindowForModel(model)
+}
+
+// ApplyAutoCompactWindowCap mirrors CLAUDE_CODE_AUTO_COMPACT_WINDOW (caps context window from above).
+func ApplyAutoCompactWindowCap(contextWindow int) int {
+	if contextWindow <= 0 {
+		return contextWindow
+	}
+	s := strings.TrimSpace(os.Getenv(EnvAutoCompactWindow))
+	if s == "" {
+		return contextWindow
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return contextWindow
+	}
+	if v < contextWindow {
+		return v
+	}
+	return contextWindow
+}
+
+// AutocompactPctOverride mirrors CLAUDE_AUTOCOMPACT_PCT_OVERRIDE (0 = unset).
+func AutocompactPctOverride() float64 {
+	s := strings.TrimSpace(os.Getenv(EnvAutocompactPctOverride))
+	if s == "" {
+		return 0
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil || v <= 0 || v > 100 {
+		return 0
+	}
+	return v
+}
+
+// BlockingLimitOverrideTokens mirrors CLAUDE_CODE_BLOCKING_LIMIT_OVERRIDE for calculateTokenWarningState (0 = use default).
+func BlockingLimitOverrideTokens() int {
+	s := strings.TrimSpace(os.Getenv(EnvBlockingLimitOverride))
+	if s == "" {
+		return 0
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 0
+	}
+	return v
+}
 func SessionRestoreEnabled() bool       { return truthy(os.Getenv(EnvSessionRestore)) }
 func UltrathinkEnabled() bool           { return truthy(os.Getenv(EnvUltrathink)) }
 func UltraplanEnabled() bool            { return truthy(os.Getenv(EnvUltraplan)) }

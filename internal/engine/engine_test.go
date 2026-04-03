@@ -30,6 +30,54 @@ func drainChFor(d time.Duration, ch <-chan EngineEvent) {
 	}
 }
 
+func TestEngine_ProactiveAutoCompact_suggestWithoutAdvisor(t *testing.T) {
+	t.Setenv(features.EnvContextWindowTokens, "50000")
+	t.Setenv(features.EnvDisableCompact, "")
+	t.Setenv(features.EnvDisableAutoCompact, "")
+	t.Setenv(features.EnvAutoCompact, "")
+	t.Setenv(features.EnvContextCollapse, "")
+	t.Setenv(features.EnvSuppressProactiveAutoCompact, "")
+	longReply := strings.Repeat("z", 150_000)
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return longReply, nil
+			}),
+		},
+		Model: "m", MaxTokens: 1024,
+		CompactExecutor: func(_ context.Context, phase compact.RunPhase, _ []byte) (string, []byte, error) {
+			_ = phase
+			return "auto-compact", nil, nil
+		},
+	})
+	e.Submit("hi")
+	ch := e.Events()
+	deadline := time.After(3 * time.Second)
+	var sawSuggest bool
+	for {
+		select {
+		case ev := <-ch:
+			switch ev.Kind {
+			case EventKindCompactSuggest:
+				if !ev.SuggestAutoCompact || ev.SuggestReactiveCompact {
+					t.Fatalf("want auto-only suggest: %+v", ev)
+				}
+				sawSuggest = true
+			case EventKindDone:
+				if !sawSuggest {
+					t.Fatal("expected compact suggest before done")
+				}
+				e.Wait()
+				return
+			case EventKindError:
+				t.Fatal(ev.Err)
+			}
+		case <-deadline:
+			t.Fatal("timeout")
+		}
+	}
+}
+
 func TestEngine_CompactE2E_longTranscriptTriggersExecutor(t *testing.T) {
 	longReply := strings.Repeat("xy ", 400)
 	e := New(context.Background(), &Config{

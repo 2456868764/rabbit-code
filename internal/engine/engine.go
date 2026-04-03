@@ -74,6 +74,8 @@ type Config struct {
 	OrphanPermissionAdvisor func(st query.LoopState) (orphanToolUseID string, ok bool)
 	// TemplateDir if set overrides RABBIT_CODE_TEMPLATE_DIR for loading <name>.md when TEMPLATES is on (P5.F.7).
 	TemplateDir string
+	// ContextWindowTokens if > 0 overrides RABBIT_CODE_CONTEXT_WINDOW_TOKENS / model default for proactive autocompact threshold (H2 / autoCompact.ts).
+	ContextWindowTokens int
 	// ContextCollapseDrain optional trim before compact on PTL when RABBIT_CODE_CONTEXT_COLLAPSE is on (H6).
 	ContextCollapseDrain ContextCollapseDrain
 	// StopHookBlockingContinue optional second RunTurnLoop after success (H6).
@@ -111,6 +113,7 @@ type Engine struct {
 	maxAssistantTurns                int
 	suggestCompactOnRecoverableError bool
 	templateDir                      string
+	contextWindowTokens              int
 	contextCollapseDrain             ContextCollapseDrain
 	stopHookBlockingContinue         StopHookBlockingContinue
 	tokenBudgetContinueAfterTurn     TokenBudgetContinueAfterTurn
@@ -170,6 +173,9 @@ func New(parent context.Context, cfg *Config) *Engine {
 		}
 		e.suggestCompactOnRecoverableError = cfg.SuggestCompactOnRecoverableError
 		e.templateDir = strings.TrimSpace(cfg.TemplateDir)
+		if cfg.ContextWindowTokens > 0 {
+			e.contextWindowTokens = cfg.ContextWindowTokens
+		}
 		e.contextCollapseDrain = cfg.ContextCollapseDrain
 		e.stopHookBlockingContinue = cfg.StopHookBlockingContinue
 		e.tokenBudgetContinueAfterTurn = cfg.TokenBudgetContinueAfterTurn
@@ -485,6 +491,14 @@ func (e *Engine) runTurnLoop(userText string) {
 	auto, react := false, false
 	if e.compactAdvisor != nil {
 		auto, react = e.compactAdvisor(*st, msgs)
+	}
+	cw := e.contextWindowTokens
+	if cw <= 0 {
+		cw = features.ContextWindowTokensForModel(e.model)
+	}
+	cw = features.ApplyAutoCompactWindowCap(cw)
+	if query.ProactiveAutoCompactSuggested(msgs, e.model, e.maxTokens, cw, 0) {
+		auto = true
 	}
 	if query.TranscriptReactiveCompactSuggested(st, msgs, features.ReactiveCompactMinTranscriptBytes(), features.ReactiveCompactMinEstimatedTokens()) {
 		react = true

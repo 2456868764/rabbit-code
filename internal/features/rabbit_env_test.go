@@ -233,3 +233,55 @@ func TestTemplateNames(t *testing.T) {
 		t.Fatalf("%#v", n)
 	}
 }
+
+func TestIsAutoCompactEnabled_envChain(t *testing.T) {
+	t.Setenv(EnvDisableCompact, "")
+	t.Setenv(EnvDisableAutoCompact, "")
+	t.Setenv(EnvAutoCompact, "")
+	if !IsAutoCompactEnabled() {
+		t.Fatal("default on")
+	}
+	t.Setenv(EnvAutoCompact, "0")
+	if IsAutoCompactEnabled() {
+		t.Fatal("user off")
+	}
+	t.Setenv(EnvAutoCompact, "1")
+	t.Setenv(EnvDisableAutoCompact, "true")
+	if IsAutoCompactEnabled() {
+		t.Fatal("disable auto")
+	}
+	t.Setenv(EnvDisableAutoCompact, "")
+	t.Setenv(EnvDisableCompact, "1")
+	if IsAutoCompactEnabled() {
+		t.Fatal("disable compact")
+	}
+}
+
+func TestApplyAutoCompactWindowCap(t *testing.T) {
+	t.Setenv(EnvAutoCompactWindow, "")
+	if ApplyAutoCompactWindowCap(200_000) != 200_000 {
+		t.Fatal()
+	}
+	t.Setenv(EnvAutoCompactWindow, "50000")
+	if ApplyAutoCompactWindowCap(200_000) != 50_000 {
+		t.Fatal()
+	}
+	if ApplyAutoCompactWindowCap(40_000) != 40_000 {
+		t.Fatal("cap should not raise window")
+	}
+}
+
+func TestContextWindowTokensForModel(t *testing.T) {
+	t.Setenv(EnvContextWindowTokens, "")
+	t.Setenv(EnvAutoCompactWindow, "")
+	if ContextWindowTokensForModel("claude-foo") != 200_000 {
+		t.Fatalf("default 200k got %d", ContextWindowTokensForModel("claude-foo"))
+	}
+	if ContextWindowTokensForModel("opus-1m-extra") != 1_000_000 {
+		t.Fatalf("1m hint got %d", ContextWindowTokensForModel("opus-1m-extra"))
+	}
+	t.Setenv(EnvContextWindowTokens, "12345")
+	if ContextWindowTokensForModel("x") != 12_345 {
+		t.Fatal()
+	}
+}
