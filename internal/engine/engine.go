@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/2456868764/rabbit-code/internal/anthropic"
 	"github.com/2456868764/rabbit-code/internal/compact"
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/memdir"
@@ -347,24 +348,7 @@ func (e *Engine) runTurnLoop(userText string) {
 				st.MaxTurns = e.maxAssistantTurns
 			}
 		} else {
-			preserve := struct {
-				maxTurns         int
-				compactCount     int
-				recoveryAttempts int
-				recoveryPhase    query.RecoveryPhase
-			}{
-				maxTurns:         st.MaxTurns,
-				compactCount:     st.CompactCount,
-				recoveryAttempts: st.RecoveryAttempts,
-				recoveryPhase:    st.RecoveryPhase,
-			}
-			*st = query.LoopState{
-				MaxTurns:         preserve.maxTurns,
-				CompactCount:     preserve.compactCount,
-				RecoveryAttempts: preserve.recoveryAttempts,
-				RecoveryPhase:    preserve.recoveryPhase,
-			}
-			st.RecoveryPhase = query.RecoveryRetriedOnce
+			resetLoopStateForRetryAttempt(st)
 		}
 
 		d := query.LoopDriver{
@@ -417,10 +401,22 @@ func (e *Engine) runTurnLoop(userText string) {
 					CompactSummary: sum,
 					Err:            exErr,
 				})
+				if exErr == nil {
+					query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonReactiveCompactRetry})
+				}
 			}
 		}
 		willRetry := attempt+1 < maxAttempts && e.recoverStrategy != nil && e.recoverStrategy(e.ctx, *st, runErr)
 		if willRetry {
+			if kind == string(anthropic.KindMaxOutputTokens) {
+				st.MaxOutputTokensRecoveryCount++
+				query.RecordLoopContinue(st, query.LoopContinue{
+					Reason:  query.ContinueReasonMaxOutputTokensRecovery,
+					Attempt: st.MaxOutputTokensRecoveryCount,
+				})
+			} else {
+				query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonSubmitRecoverRetry})
+			}
 			continue
 		}
 		e.trySend(EngineEvent{
@@ -451,6 +447,9 @@ func (e *Engine) runTurnLoop(userText string) {
 				CompactSummary: sum,
 				Err:            exErr,
 			})
+			if exErr == nil {
+				query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonReactiveCompactRetry})
+			}
 		}
 	}
 
@@ -486,7 +485,13 @@ func (e *Engine) runTurnLoop(userText string) {
 				CompactSummary: sum,
 				Err:            exErr,
 			})
-			_ = exErr
+			if exErr == nil {
+				if react {
+					query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonReactiveCompactRetry})
+				} else if auto {
+					query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonAutoCompactExecuted})
+				}
+			}
 		}
 	}
 

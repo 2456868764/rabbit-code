@@ -602,6 +602,85 @@ recDone:
 	}
 }
 
+func TestEngine_RecoverStrategy_StopHook_seesSubmitRecoverContinue(t *testing.T) {
+	var captured query.LoopState
+	var n int
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				n++
+				if n == 1 {
+					return "", errors.New("transient")
+				}
+				return "ok", nil
+			}),
+		},
+		RecoverStrategy: func(context.Context, query.LoopState, error) bool { return true },
+		StopHooks: []StopHookFunc{
+			func(_ context.Context, st query.LoopState, _ error) { captured = st },
+		},
+	})
+	e.Submit("x")
+	drainUntilTerminal(t, e.Events())
+	e.Wait()
+	if captured.LoopContinue.Reason != query.ContinueReasonSubmitRecoverRetry {
+		t.Fatalf("want submit_recover_retry, got %+v", captured.LoopContinue)
+	}
+}
+
+func TestEngine_RecoverStrategy_maxOutputTokens_recordsRecoveryContinue(t *testing.T) {
+	var captured query.LoopState
+	var n int
+	apiErr := &anthropic.APIError{Kind: anthropic.KindMaxOutputTokens, Status: 400, Msg: "otk"}
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				n++
+				if n == 1 {
+					return "", fmt.Errorf("wrap: %w", apiErr)
+				}
+				return "ok", nil
+			}),
+		},
+		RecoverStrategy: func(context.Context, query.LoopState, error) bool { return true },
+		StopHooks: []StopHookFunc{
+			func(_ context.Context, st query.LoopState, _ error) { captured = st },
+		},
+	})
+	e.Submit("x")
+	drainUntilTerminal(t, e.Events())
+	e.Wait()
+	if captured.LoopContinue.Reason != query.ContinueReasonMaxOutputTokensRecovery || captured.LoopContinue.Attempt != 1 {
+		t.Fatalf("got %+v", captured.LoopContinue)
+	}
+	if captured.MaxOutputTokensRecoveryCount != 1 {
+		t.Fatalf("count %d", captured.MaxOutputTokensRecoveryCount)
+	}
+}
+
+func TestEngine_recoverableError_compactStub_recordsReactiveContinue(t *testing.T) {
+	var captured query.LoopState
+	apiErr := &anthropic.APIError{Kind: anthropic.KindPromptTooLong, Status: 400, Msg: "ptl"}
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "", fmt.Errorf("w: %w", apiErr)
+			}),
+		},
+		SuggestCompactOnRecoverableError: true,
+		CompactExecutor:                  compact.ExecuteStub,
+		StopHooks: []StopHookFunc{
+			func(_ context.Context, st query.LoopState, _ error) { captured = st },
+		},
+	})
+	e.Submit("x")
+	drainUntilTerminal(t, e.Events())
+	e.Wait()
+	if captured.LoopContinue.Reason != query.ContinueReasonReactiveCompactRetry {
+		t.Fatalf("got %+v", captured.LoopContinue)
+	}
+}
+
 func TestEngine_BashStubToolRunner(t *testing.T) {
 	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
 		{Text: "run", ToolUses: []querydeps.ToolUseCall{{ID: "t1", Name: "bash", Input: json.RawMessage(`{"cmd":"ls"}`)}}},

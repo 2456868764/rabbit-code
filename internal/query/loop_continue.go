@@ -9,6 +9,10 @@ const (
 	ContinueReasonStopHookBlocking        = "stop_hook_blocking"
 	ContinueReasonTokenBudgetContinuation = "token_budget_continuation"
 	ContinueReasonNextTurn                = "next_turn"
+	// ContinueReasonSubmitRecoverRetry is the engine-level second RunTurnLoop after RecoverStrategy (no 1:1 name in query.ts outer Submit).
+	ContinueReasonSubmitRecoverRetry = "submit_recover_retry"
+	// ContinueReasonAutoCompactExecuted records a successful post-loop auto compact executor run (headless bookkeeping).
+	ContinueReasonAutoCompactExecuted = "auto_compact_executed"
 )
 
 // LoopContinue mirrors query.ts Continue (discriminated by Reason; optional payloads).
