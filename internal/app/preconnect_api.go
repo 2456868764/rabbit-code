@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/2456868764/rabbit-code/internal/anthropic"
+	"github.com/2456868764/rabbit-code/internal/services/api"
 )
 
 func runAPIPreconnect(ctx context.Context, pool *x509.CertPool, log *slog.Logger) {

@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/2456868764/rabbit-code/internal/anthropic"
+	"github.com/2456868764/rabbit-code/internal/services/api"
 )
 
 func TestRoundTripProbe_Mock(t *testing.T) {

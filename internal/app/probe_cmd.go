@@ -6,8 +6,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/2456868764/rabbit-code/internal/anthropic"
-	"github.com/2456868764/rabbit-code/internal/anthropic/services"
+	"github.com/2456868764/rabbit-code/internal/services/api"
+	"github.com/2456868764/rabbit-code/internal/services/api/services"
 	"github.com/2456868764/rabbit-code/internal/config"
 )
 

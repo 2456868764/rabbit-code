@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/2456868764/rabbit-code/internal/anthropic"
+	"github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query"

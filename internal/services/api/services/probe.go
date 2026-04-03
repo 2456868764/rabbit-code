@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/2456868764/rabbit-code/internal/anthropic"
+	"github.com/2456868764/rabbit-code/internal/services/api"
 )
 
 // RoundTripProbe builds a probe request for the named services/api TS file and executes it with

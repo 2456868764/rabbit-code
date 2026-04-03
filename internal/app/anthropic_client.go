@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/2456868764/rabbit-code/internal/anthropic"
+	"github.com/2456868764/rabbit-code/internal/services/api"
 )
 
 // NewAnthropicClient builds a Messages API client using the same outbound resolution as Bootstrap

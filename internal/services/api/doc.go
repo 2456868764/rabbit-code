@@ -1,5 +1,6 @@
 // Package anthropic implements the Anthropic Messages HTTP client surface aligned with
 // claude-code-sourcemap/restored-src/src/services/api (streaming, retry, errors, auth, betas, preconnect).
+// Go import path: github.com/2456868764/rabbit-code/internal/services/api (directory mirrors src/services/api).
 //
 // Phase 4 scope (this module + app wiring): outbound, signing (Bedrock/Vertex), preconnect, Client
 // factories, usage hook, retry/stream behavior, services/api probe shapes (AC4-7 best-effort paths),

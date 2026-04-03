@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/2456868764/rabbit-code/internal/anthropic"
+	"github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/features"
 )
 
-// AnthropicAssistant implements StreamAssistant using internal/anthropic.Client (Phase 4 + Phase 5 bridge).
+// AnthropicAssistant implements StreamAssistant using internal/services/api Client (Phase 4 + Phase 5 bridge).
 type AnthropicAssistant struct {
 	Client           *anthropic.Client
 	DefaultModel     string

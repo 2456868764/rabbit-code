@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/2456868764/rabbit-code/internal/anthropic"
-	"github.com/2456868764/rabbit-code/internal/anthropic/services"
+	"github.com/2456868764/rabbit-code/internal/services/api"
+	"github.com/2456868764/rabbit-code/internal/services/api/services"
 )
 
 // ProbeServiceAPI issues a request shaped like the named services/api TS module (AC4-7 / P4.6.1) using

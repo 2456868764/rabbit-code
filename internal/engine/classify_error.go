@@ -3,7 +3,7 @@ package engine
 import (
 	"errors"
 
-	"github.com/2456868764/rabbit-code/internal/anthropic"
+	"github.com/2456868764/rabbit-code/internal/services/api"
 )
 
 // classifyAnthropicError returns API error kind string and whether compact/trim recovery is suggested (P5.1.3).
