@@ -26,7 +26,10 @@ func (d *LoopDriver) assistantTurnWithPromptCacheBreakHandling(ctx context.Conte
 
 	if features.PromptCacheBreakTrimResendEnabled() {
 		next, stripped, serr := StripCacheControlFromMessagesJSON(msgs)
-		if serr == nil && stripped {
+		if serr != nil {
+			return querydeps.TurnResult{}, msgs, serr
+		}
+		if stripped {
 			if st != nil {
 				RecordLoopContinue(st, LoopContinue{Reason: ContinueReasonPromptCacheBreakTrimResend})
 			}
