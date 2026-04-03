@@ -44,5 +44,15 @@ func IsPromptCacheBreakStreamJSON(jsonLine []byte) bool {
 	if bytes.Contains(b, []byte("cache_key")) && bytes.Contains(b, []byte("invalid")) {
 		return true
 	}
+	// Additional API / proxy phrasing (H1 parity with promptCacheBreakDetection.ts extensions).
+	if bytes.Contains(b, []byte("prompt_cache_key")) && (bytes.Contains(b, []byte("invalid")) || bytes.Contains(b, []byte("unknown")) || bytes.Contains(b, []byte("missing"))) {
+		return true
+	}
+	if bytes.Contains(b, []byte("cached")) && bytes.Contains(b, []byte("block")) && bytes.Contains(b, []byte("invalid")) {
+		return true
+	}
+	if bytes.Contains(b, []byte("ephemeral")) && bytes.Contains(b, []byte("cache")) && bytes.Contains(b, []byte("stale")) {
+		return true
+	}
 	return false
 }
