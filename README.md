@@ -30,6 +30,7 @@ IDE **bridge**, **direct connect / server** modes, **remote** and **upstream pro
 
 ## Architecture choices
 
+- **Reference tree:** When adding packages, prefer paths that mirror **`claude-code-sourcemap/restored-src/src/`** (e.g. **`internal/services/compact`** ↔ **`src/services/compact`**, **`internal/commands/breakcache`** ↔ **`src/commands/break-cache`**). Go `internal/` and module layout may fold paths; record exceptions in Phase **§4** / **PARITY** (see **`docs/phases/PHASE_ITERATION_RULES.md` §四-4.3**).
 - **Core vs UI:** Packages such as `internal/engine`, `internal/query`, and `internal/tools` **do not import** the TUI framework. The UI subscribes to **`EngineEvent`** streams and emits **`UserIntent`** through channels or narrow interfaces so the engine can be unit-tested and run without a terminal.
 - **UI stack:** [Bubble Tea v2](https://github.com/charmbracelet/bubbletea) (`charm.land/bubbletea/v2`, e.g. **v2.0.2**) for the Elm-style loop, [Bubbles v2](https://github.com/charmbracelet/bubbles) (`charm.land/bubbles/v2`) for reusable widgets (text inputs, lists, viewports, spinners, …), and [Lip Gloss v2](https://github.com/charmbracelet/lipgloss) (`charm.land/lipgloss/v2`, e.g. **v2.0.2**) for layout and theming.
 - **Quality bar:** Non-UI packages target high line coverage on critical paths; TUI code favors **model reduction tests** and **stable string snapshots** of rendered views so refactors do not silently break layouts or key handling.

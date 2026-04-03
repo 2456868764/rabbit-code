@@ -1,4 +1,5 @@
-package contextcli
+// Package breakcache mirrors restored-src/src/commands/break-cache (headless JSON for P5.F.6).
+package breakcache
 
 import (
 	"encoding/json"
