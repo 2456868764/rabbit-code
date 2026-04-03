@@ -465,6 +465,7 @@ func (e *Engine) runTurnLoop(userText string) {
 			})
 			if exErr == nil {
 				query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonReactiveCompactRetry})
+				st.HasAttemptedReactiveCompact = true
 			}
 		}
 	}
@@ -482,7 +483,7 @@ func (e *Engine) runTurnLoop(userText string) {
 	if e.compactAdvisor != nil {
 		auto, react = e.compactAdvisor(*st, msgs)
 	}
-	if query.ReactiveCompactByTranscript(msgs, features.ReactiveCompactMinTranscriptBytes(), features.ReactiveCompactMinEstimatedTokens()) {
+	if query.TranscriptReactiveCompactSuggested(st, msgs, features.ReactiveCompactMinTranscriptBytes(), features.ReactiveCompactMinEstimatedTokens()) {
 		react = true
 	}
 	if auto || react {
@@ -504,6 +505,7 @@ func (e *Engine) runTurnLoop(userText string) {
 			if exErr == nil {
 				if react {
 					query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonReactiveCompactRetry})
+					st.HasAttemptedReactiveCompact = true
 				} else if auto {
 					query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonAutoCompactExecuted})
 				}

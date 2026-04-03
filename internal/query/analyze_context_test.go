@@ -20,3 +20,14 @@ func TestReactiveCompactByTranscript_tokensOnly(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+func TestTranscriptReactiveCompactSuggested_respectsHasAttemptedFlag(t *testing.T) {
+	st := &LoopState{HasAttemptedReactiveCompact: true}
+	if TranscriptReactiveCompactSuggested(st, []byte("long-enough-bytes"), 1, 0) {
+		t.Fatal("expected suppressed when HasAttemptedReactiveCompact")
+	}
+	st.HasAttemptedReactiveCompact = false
+	if !TranscriptReactiveCompactSuggested(st, []byte("long-enough-bytes"), 1, 0) {
+		t.Fatal("expected true when flag cleared")
+	}
+}
