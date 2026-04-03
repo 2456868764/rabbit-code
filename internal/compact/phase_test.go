@@ -1,6 +1,9 @@
 package compact
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestRunPhase_String(t *testing.T) {
 	if g, w := RunIdle.String(), "idle"; g != w {
@@ -38,5 +41,26 @@ func TestAfterSuccessfulCompactExecution(t *testing.T) {
 	}
 	if g, w := AfterSuccessfulCompactExecution(RunReactivePending), RunReactivePending; g != w {
 		t.Fatalf("pending unchanged: got %v want %v", g, w)
+	}
+}
+
+func TestExecutorPhaseAfterSchedule(t *testing.T) {
+	if g, w := ExecutorPhaseAfterSchedule(RunAutoPending), RunExecuting; g != w {
+		t.Fatalf("auto_pending: got %v want %v", g, w)
+	}
+	if g, w := ExecutorPhaseAfterSchedule(RunReactivePending), RunExecuting; g != w {
+		t.Fatalf("reactive_pending: got %v want %v", g, w)
+	}
+	if g, w := ExecutorPhaseAfterSchedule(RunIdle), RunIdle; g != w {
+		t.Fatalf("idle: got %v want %v", g, w)
+	}
+}
+
+func TestResultPhaseAfterCompactExecutor(t *testing.T) {
+	if g, w := ResultPhaseAfterCompactExecutor(RunExecuting, nil), RunIdle; g != w {
+		t.Fatalf("success: got %v want %v", g, w)
+	}
+	if g, w := ResultPhaseAfterCompactExecutor(RunExecuting, errors.New("fail")), RunExecuting; g != w {
+		t.Fatalf("error: got %v want %v", g, w)
 	}
 }

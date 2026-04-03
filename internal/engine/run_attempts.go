@@ -116,10 +116,12 @@ func (e *Engine) executeRunTurnLoopAttempts(ctxLoop context.Context, st *query.L
 				SuggestAutoCompact: true,
 			})
 			if e.compactExecutor != nil {
-				sum, next, exErr := e.compactExecutor(e.ctx, ph, msgs)
+				execPh := compact.ExecutorPhaseAfterSchedule(ph)
+				sum, next, exErr := e.compactExecutor(e.ctx, execPh, msgs)
+				resPh := compact.ResultPhaseAfterCompactExecutor(execPh, exErr)
 				e.trySend(EngineEvent{
 					Kind:           EventKindCompactResult,
-					CompactPhase:   ph.String(),
+					CompactPhase:   resPh.String(),
 					CompactSummary: sum,
 					Err:            exErr,
 				})

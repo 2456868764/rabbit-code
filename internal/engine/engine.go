@@ -457,10 +457,12 @@ func (e *Engine) runTurnLoop(userText string) {
 			SuggestReactiveCompact: true,
 		})
 		if e.compactExecutor != nil {
-			sum, _, exErr := e.compactExecutor(e.ctx, ph, msgs)
+			execPh := compact.ExecutorPhaseAfterSchedule(ph)
+			sum, _, exErr := e.compactExecutor(e.ctx, execPh, msgs)
+			resPh := compact.ResultPhaseAfterCompactExecutor(execPh, exErr)
 			e.trySend(EngineEvent{
 				Kind:           EventKindCompactResult,
-				CompactPhase:   ph.String(),
+				CompactPhase:   resPh.String(),
 				CompactSummary: sum,
 				Err:            exErr,
 			})
@@ -496,10 +498,12 @@ func (e *Engine) runTurnLoop(userText string) {
 			SuggestReactiveCompact: react,
 		})
 		if e.compactExecutor != nil {
-			sum, _, exErr := e.compactExecutor(e.ctx, phase, msgs)
+			execPh := compact.ExecutorPhaseAfterSchedule(phase)
+			sum, _, exErr := e.compactExecutor(e.ctx, execPh, msgs)
+			resPh := compact.ResultPhaseAfterCompactExecutor(execPh, exErr)
 			e.trySend(EngineEvent{
 				Kind:           EventKindCompactResult,
-				CompactPhase:   phase.String(),
+				CompactPhase:   resPh.String(),
 				CompactSummary: sum,
 				Err:            exErr,
 			})

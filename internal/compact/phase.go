@@ -69,3 +69,21 @@ func AfterSuccessfulCompactExecution(p RunPhase) RunPhase {
 	}
 	return p
 }
+
+// ExecutorPhaseAfterSchedule is the phase passed to CompactExecutor (pending → executing; H3).
+func ExecutorPhaseAfterSchedule(scheduled RunPhase) RunPhase {
+	switch scheduled {
+	case RunAutoPending, RunReactivePending:
+		return RunExecuting
+	default:
+		return scheduled
+	}
+}
+
+// ResultPhaseAfterCompactExecutor is the phase for EventKindCompactResult: idle on success, else exec phase.
+func ResultPhaseAfterCompactExecutor(execPhase RunPhase, execErr error) RunPhase {
+	if execErr != nil {
+		return execPhase
+	}
+	return AfterSuccessfulCompactExecution(execPhase)
+}
