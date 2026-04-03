@@ -93,8 +93,9 @@
 | H7.6 | **中区删除重放** | **`SnipRemovalEntry.removedIndices`** + **`snipRemoveMessageIndices`**；**`ReplaySnipRemovalsEx`** 按条重放（与仅前缀互补） | **[x]** |
 | H7.7 | **removedUuids 互操作** | JSON 字段 **`removedUuids`**；**`ReplaySnipRemovalsEx` + `SnipReplayOptions.UUIDToIndex`** 重放（宿主提供 message UUID→下标映射） | **[x]** |
 | H7.8 | **日志合并** | **`MergeSnipRemovalLogs`**（按 **`id`** 去重追加） | **[x]** |
+| H7.9 | **转录内 UUID 侧车** | 默认键 **`rabbit_message_uuid`**：**`BuildUUIDToIndexFromMessagesJSON`**、**`StripMessageFieldFromTranscriptJSON`**、**`ReplaySnipRemovalsAuto`**（无需宿主单独传 `UUIDToIndex`） | **[x]** |
 
-**仍属 PARITY / 非本仓库 headless 范围**：TS **`sessionStorage.ts`** 的 **`Map<UUID, TranscriptMessage>`** 整表加载、**`parentUuid`** 自动重链、JSONL 追加存储与 **SnipTool** 运行时中区执行 — 需 **Phase 8 / 会话层** 或宿主注入 UUID 映射与存储格式；Go 已提供 **索引 / UUID 映射重放** 与 **侧车 JSON** 对接点。
+**仍属 PARITY / 非本仓库 headless 范围**：TS **`sessionStorage.ts`** 的 **`Map<UUID, TranscriptMessage>`** 整表加载、**`parentUuid`** 自动重链、JSONL 追加存储与 **SnipTool** 运行时中区执行 — 需 **Phase 8 / 会话层**；Go 已提供 **前缀/索引/`removedUuids` 重放**、**侧车 JSON** 与 **H7.9 转录内 UUID** 对接点。
 
 ### TUI / REPL（在 Headless 主干之后）
 
