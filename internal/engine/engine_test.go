@@ -1163,6 +1163,9 @@ func TestEngine_headlessEnv_breakCacheTemplatesMicrocompactEvents(t *testing.T) 
 				}
 			case EventKindCachedMicrocompactActive:
 				microSeen = true
+				if ev.PhaseDetail != anthropic.BetaCachedMicrocompactBody {
+					t.Fatalf("micro PhaseDetail: got %q want %q", ev.PhaseDetail, anthropic.BetaCachedMicrocompactBody)
+				}
 			case EventKindDone:
 				if !breakSeen || !tplSeen || !microSeen {
 					t.Fatalf("break=%v tpl=%v micro=%v", breakSeen, tplSeen, microSeen)

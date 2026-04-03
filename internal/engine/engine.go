@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/2456868764/rabbit-code/internal/anthropic"
 	"github.com/2456868764/rabbit-code/internal/compact"
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/memdir"
@@ -370,7 +371,7 @@ func (e *Engine) runTurnLoop(userText string) {
 		e.trySend(EngineEvent{Kind: EventKindTemplatesActive, PhaseDetail: strings.Join(names, ",")})
 	}
 	if features.CachedMicrocompactEnabled() {
-		e.trySend(EngineEvent{Kind: EventKindCachedMicrocompactActive, PhaseDetail: "api_body_flags_deferred"})
+		e.trySend(EngineEvent{Kind: EventKindCachedMicrocompactActive, PhaseDetail: anthropic.BetaCachedMicrocompactBody})
 	}
 
 	resolved = query.ApplyUserTextHints(resolved, query.UserTextHintFlags{
