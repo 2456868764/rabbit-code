@@ -12,6 +12,11 @@ func ReactiveSuggestFromTranscript(transcript []byte, minBytes, minTokens int) b
 	return query.ReactiveCompactByTranscript(transcript, minBytes, minTokens)
 }
 
+// TranscriptReactiveSuggest delegates to query.TranscriptReactiveCompactSuggested (H2: hasAttemptedReactiveCompact gate).
+func TranscriptReactiveSuggest(st *query.LoopState, transcript []byte, minBytes, minTokens int) bool {
+	return query.TranscriptReactiveCompactSuggested(st, transcript, minBytes, minTokens)
+}
+
 // FormatStubCompactSummary builds a deterministic summary string including transcript heuristics (tests / logging).
 func FormatStubCompactSummary(phase RunPhase, transcript []byte) string {
 	return fmt.Sprintf("[stub compact phase=%s bytes=%d estTok=%d]", phase.String(), len(transcript), query.EstimateTranscriptJSONTokens(transcript))

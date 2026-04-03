@@ -4,11 +4,24 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"github.com/2456868764/rabbit-code/internal/query"
 )
 
 func TestReactiveSuggestFromTranscript(t *testing.T) {
 	if !ReactiveSuggestFromTranscript([]byte("abcde"), 0, 2) {
 		t.Fatal()
+	}
+}
+
+func TestTranscriptReactiveSuggest_respectsLoopState(t *testing.T) {
+	st := &query.LoopState{HasAttemptedReactiveCompact: true}
+	if TranscriptReactiveSuggest(st, []byte("abcde"), 0, 2) {
+		t.Fatal("expected suppressed when HasAttemptedReactiveCompact")
+	}
+	st.HasAttemptedReactiveCompact = false
+	if !TranscriptReactiveSuggest(st, []byte("abcde"), 0, 2) {
+		t.Fatal("expected suggest when flag cleared")
 	}
 }
 
