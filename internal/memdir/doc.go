@@ -1,2 +1,2 @@
-// Package memdir holds session-start system / memory-dir injection hooks (memdir/* parity, Phase 5).
+// Package memdir holds memory-dir scan, recall, inject formatting, and entrypoint helpers (memdir/* parity, Phase 5 / H8).
 package memdir

@@ -407,7 +407,7 @@ func (e *Engine) applyMemdirWithPaths(userText string, paths []string) (resolved
 	if len(paths) == 0 {
 		return userText, 0, 0, nil
 	}
-	frags, injectRawBytes, err := memdir.SessionFragmentsFromPaths(paths)
+	frags, injectRawBytes, err := memdir.SessionFragmentsFromPathsWithAttachmentHeaders(paths)
 	if err != nil {
 		return "", 0, 0, err
 	}
