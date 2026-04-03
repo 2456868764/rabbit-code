@@ -200,6 +200,15 @@ const (
 	EnvMemdirRelevanceMode = "RABBIT_CODE_MEMDIR_RELEVANCE_MODE"
 	// EnvMemdirStrictLLM when truthy, LLM memdir selection errors yield no memories (no heuristic fallback; TS-aligned).
 	EnvMemdirStrictLLM = "RABBIT_CODE_MEMDIR_STRICT_LLM"
+	// Auto-memory gates (memdir/paths.ts isAutoMemoryEnabled; settings.json branch omitted in headless).
+	EnvDisableAutoMemory       = "RABBIT_CODE_DISABLE_AUTO_MEMORY"
+	EnvClaudeDisableAutoMemory = "CLAUDE_CODE_DISABLE_AUTO_MEMORY"
+	EnvSimple                  = "RABBIT_CODE_SIMPLE"
+	EnvClaudeSimple            = "CLAUDE_CODE_SIMPLE"
+	EnvRemote                  = "RABBIT_CODE_REMOTE"
+	EnvClaudeRemote            = "CLAUDE_CODE_REMOTE"
+	EnvRemoteMemoryDir         = "RABBIT_CODE_REMOTE_MEMORY_DIR"
+	EnvClaudeRemoteMemoryDir   = "CLAUDE_CODE_REMOTE_MEMORY_DIR"
 )
 
 // MemdirRelevanceMode returns memdir.RelevanceMode values: "heuristic" or "llm".
@@ -216,6 +225,58 @@ func MemdirRelevanceMode() string {
 // MemdirStrictLLM mirrors strict LLM-only recall (findRelevantMemories.ts returns [] on sideQuery failure).
 func MemdirStrictLLM() bool {
 	return truthy(os.Getenv(EnvMemdirStrictLLM))
+}
+
+func envDefinedDual(rabbitKey, claudeKey string) (string, bool) {
+	if v, ok := os.LookupEnv(rabbitKey); ok {
+		return v, true
+	}
+	if v, ok := os.LookupEnv(claudeKey); ok {
+		return v, true
+	}
+	return "", false
+}
+
+func firstNonEmptyEnvPair(rabbitKey, claudeKey string) string {
+	if s := strings.TrimSpace(os.Getenv(rabbitKey)); s != "" {
+		return s
+	}
+	return os.Getenv(claudeKey)
+}
+
+func explicitFalsyEnv(s string) bool {
+	s = strings.TrimSpace(strings.ToLower(s))
+	switch s {
+	case "0", "false", "no", "off":
+		return true
+	}
+	if b, err := strconv.ParseBool(s); err == nil && !b {
+		return true
+	}
+	return false
+}
+
+// AutoMemoryEnabled mirrors paths.ts isAutoMemoryEnabled (no settings.json autoMemoryEnabled in headless).
+func AutoMemoryEnabled() bool {
+	v, ok := envDefinedDual(EnvDisableAutoMemory, EnvClaudeDisableAutoMemory)
+	if ok {
+		if truthy(v) {
+			return false
+		}
+		if explicitFalsyEnv(v) {
+			return true
+		}
+	}
+	if truthy(firstNonEmptyEnvPair(EnvSimple, EnvClaudeSimple)) {
+		return false
+	}
+	if truthy(firstNonEmptyEnvPair(EnvRemote, EnvClaudeRemote)) {
+		md := strings.TrimSpace(firstNonEmptyEnvPair(EnvRemoteMemoryDir, EnvClaudeRemoteMemoryDir))
+		if md == "" {
+			return false
+		}
+	}
+	return true
 }
 
 func TokenBudgetEnabled() bool { return truthy(os.Getenv(EnvTokenBudget)) }

@@ -1,6 +1,7 @@
 package features
 
 import (
+	"os"
 	"testing"
 )
 
@@ -154,6 +155,53 @@ func TestMemdirStrictLLM(t *testing.T) {
 	t.Setenv(EnvMemdirStrictLLM, "1")
 	if !MemdirStrictLLM() {
 		t.Fatal()
+	}
+}
+
+func TestAutoMemoryEnabled(t *testing.T) {
+	clear := func() {
+		for _, k := range []string{
+			EnvDisableAutoMemory, EnvClaudeDisableAutoMemory,
+			EnvSimple, EnvClaudeSimple,
+			EnvRemote, EnvClaudeRemote,
+			EnvRemoteMemoryDir, EnvClaudeRemoteMemoryDir,
+		} {
+			_ = os.Unsetenv(k)
+		}
+	}
+	clear()
+	if !AutoMemoryEnabled() {
+		t.Fatal("default on")
+	}
+	t.Setenv(EnvDisableAutoMemory, "1")
+	if AutoMemoryEnabled() {
+		t.Fatal("disable rabbit")
+	}
+	clear()
+	t.Setenv(EnvClaudeDisableAutoMemory, "true")
+	if AutoMemoryEnabled() {
+		t.Fatal("disable claude")
+	}
+	clear()
+	t.Setenv(EnvDisableAutoMemory, "0")
+	if !AutoMemoryEnabled() {
+		t.Fatal("explicit off should re-enable when truthy chain cleared")
+	}
+	clear()
+	t.Setenv(EnvSimple, "1")
+	if AutoMemoryEnabled() {
+		t.Fatal("simple off")
+	}
+	clear()
+	t.Setenv(EnvRemote, "1")
+	if AutoMemoryEnabled() {
+		t.Fatal("remote without memory dir off")
+	}
+	clear()
+	t.Setenv(EnvRemote, "1")
+	t.Setenv(EnvRemoteMemoryDir, "/tmp/x")
+	if !AutoMemoryEnabled() {
+		t.Fatal("remote with memory dir on")
 	}
 }
 
