@@ -22,6 +22,11 @@ func TranscriptProactiveAutoSuggest(transcript []byte, model string, maxOutputTo
 	return query.ProactiveAutoCompactSuggested(transcript, model, maxOutputTokens, contextWindowTokens, snipTokensFreed)
 }
 
+// TranscriptProactiveAutoSuggestWithSource passes querySource fork gates (H2).
+func TranscriptProactiveAutoSuggestWithSource(transcript []byte, model string, maxOutputTokens, contextWindowTokens, snipTokensFreed int, querySource string) bool {
+	return query.ProactiveAutoCompactSuggestedWithSource(transcript, model, maxOutputTokens, contextWindowTokens, snipTokensFreed, querySource)
+}
+
 // FormatStubCompactSummary builds a deterministic summary string including transcript heuristics (tests / logging).
 func FormatStubCompactSummary(phase RunPhase, transcript []byte) string {
 	return fmt.Sprintf("[stub compact phase=%s bytes=%d estTok=%d]", phase.String(), len(transcript), query.EstimateTranscriptJSONTokens(transcript))

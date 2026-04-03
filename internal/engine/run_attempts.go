@@ -28,6 +28,7 @@ func (e *Engine) loopDriver() query.LoopDriver {
 		NonInteractive:   e.nonInteractive,
 		SessionID:        e.sessionID,
 		Debug:            e.debug,
+		QuerySource:      e.querySource,
 		Observe:          e.loopObservers(),
 		HistorySnipMaxBytes:  features.HistorySnipMaxBytes(),
 		HistorySnipMaxRounds: features.HistorySnipMaxRounds(),

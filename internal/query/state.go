@@ -16,6 +16,8 @@ type ToolUseContextMirror struct {
 	Debug bool
 	// AbortSignalAborted is true after a context.Canceled assistant/tool path in this RunTurnLoop invocation.
 	AbortSignalAborted bool
+	// QuerySource mirrors query.ts QuerySource when the loop runs inside a forked agent (headless subset).
+	QuerySource string
 }
 
 // LoopState tracks cross-iteration query loop metadata aligned with query.ts State (H6).

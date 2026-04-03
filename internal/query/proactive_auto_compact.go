@@ -2,10 +2,27 @@ package query
 
 import "github.com/2456868764/rabbit-code/internal/features"
 
-// ProactiveAutoCompactSuggested mirrors shouldAutoCompact headless inputs: transcript heuristic token count vs
-// getAutoCompactThreshold (autoCompact.ts), gated like isAutoCompactEnabled + shouldAutoCompact suppressions.
-// contextWindowTokens should be the capped context window (after RABBIT_CODE_AUTO_COMPACT_WINDOW); use 0 to resolve from model inside features (not recommended from engine — pass resolved window).
+func proactiveAutoCompactPreflight(querySource string) bool {
+	if !ProactiveAutoCompactAllowedForQuerySource(querySource) {
+		return false
+	}
+	if features.ReactiveCompactEnabled() && features.TenguCobaltRaccoon() {
+		return false
+	}
+	return true
+}
+
+// ProactiveAutoCompactSuggested mirrors shouldAutoCompact for the main loop (empty querySource).
 func ProactiveAutoCompactSuggested(transcriptJSON []byte, model string, maxOutputTokens int, contextWindowTokens int, snipTokensFreed int) bool {
+	return ProactiveAutoCompactSuggestedWithSource(transcriptJSON, model, maxOutputTokens, contextWindowTokens, snipTokensFreed, "")
+}
+
+// ProactiveAutoCompactSuggestedWithSource mirrors shouldAutoCompact including querySource fork gates and
+// reactive-only cobalt suppression (autoCompact.ts); contextWindowTokens should already include AUTO_COMPACT_WINDOW cap.
+func ProactiveAutoCompactSuggestedWithSource(transcriptJSON []byte, model string, maxOutputTokens int, contextWindowTokens int, snipTokensFreed int, querySource string) bool {
+	if !proactiveAutoCompactPreflight(querySource) {
+		return false
+	}
 	if !features.IsAutoCompactEnabled() {
 		return false
 	}

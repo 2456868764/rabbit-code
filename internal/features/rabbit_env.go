@@ -162,6 +162,8 @@ const (
 	EnvTokenBudgetMaxInputTokens   = "RABBIT_CODE_TOKEN_BUDGET_MAX_INPUT_TOKENS"
 	EnvTokenBudgetMaxAttachmentBytes = "RABBIT_CODE_TOKEN_BUDGET_MAX_ATTACHMENT_BYTES"
 	EnvReactiveCompact             = "RABBIT_CODE_REACTIVE_COMPACT"
+	// EnvTenguCobaltRaccoon mirrors GrowthBook tengu_cobalt_raccoon (reactive-only mode under REACTIVE_COMPACT).
+	EnvTenguCobaltRaccoon = "RABBIT_CODE_TENGU_COBALT_RACCOON"
 	EnvContextCollapse             = "RABBIT_CODE_CONTEXT_COLLAPSE"
 	EnvSessionRestore              = "RABBIT_CODE_SESSION_RESTORE"
 	EnvUltrathink                  = "RABBIT_CODE_ULTRATHINK"
@@ -243,6 +245,11 @@ func TokenBudgetMaxAttachmentBytes() int {
 }
 
 func ReactiveCompactEnabled() bool      { return truthy(os.Getenv(EnvReactiveCompact)) }
+
+// TenguCobaltRaccoon is headless stand-in for getFeatureValue_CACHED_MAY_BE_STALE('tengu_cobalt_raccoon').
+// When ReactiveCompactEnabled and this is true, shouldAutoCompact suppresses proactive autocompact (autoCompact.ts).
+func TenguCobaltRaccoon() bool { return truthy(os.Getenv(EnvTenguCobaltRaccoon)) }
+
 func ContextCollapseEnabled() bool      { return truthy(os.Getenv(EnvContextCollapse)) }
 
 // DisableCompact mirrors DISABLE_COMPACT (blocks autocompact entry in autoCompact.ts).

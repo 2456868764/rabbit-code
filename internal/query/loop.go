@@ -34,6 +34,8 @@ type LoopDriver struct {
 	SnipCompactMaxRounds int
 	// PromptCacheBreakRecovery optional compact transcript after trim+resend still sees cache break (H1).
 	PromptCacheBreakRecovery PromptCacheBreakRecovery
+	// QuerySource optional fork id for proactive autocompact gates (autoCompact.ts).
+	QuerySource string
 }
 
 func (d *LoopDriver) streamer() querydeps.StreamAssistant {
@@ -143,6 +145,7 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 		st.ToolUseContext.NonInteractive = d.NonInteractive
 		st.ToolUseContext.SessionID = d.SessionID
 		st.ToolUseContext.Debug = d.Debug
+		st.ToolUseContext.QuerySource = d.QuerySource
 		if errors.Is(ctx.Err(), context.Canceled) {
 			st.ToolUseContext.AbortSignalAborted = true
 		}

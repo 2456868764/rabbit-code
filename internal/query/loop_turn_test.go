@@ -32,6 +32,7 @@ func TestLoopDriver_RunTurnLoop_toolThenText_AC5_3(t *testing.T) {
 		NonInteractive: true,
 		SessionID:      "sess-1",
 		Debug:          true,
+		QuerySource:    "compact_agent",
 	}
 	st := LoopState{MaxTurns: 10}
 	_, last, err := d.RunTurnLoop(context.Background(), &st, "hi")
@@ -52,6 +53,9 @@ func TestLoopDriver_RunTurnLoop_toolThenText_AC5_3(t *testing.T) {
 	}
 	if st.ToolUseContext.SessionID != "sess-1" || !st.ToolUseContext.Debug {
 		t.Fatalf("ToolUseContext %+v", st.ToolUseContext)
+	}
+	if st.ToolUseContext.QuerySource != "compact_agent" {
+		t.Fatalf("QuerySource %q", st.ToolUseContext.QuerySource)
 	}
 }
 

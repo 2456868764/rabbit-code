@@ -90,6 +90,8 @@ type Config struct {
 	SessionID string
 	// Debug mirrors toolUseContext.options.debug (H6).
 	Debug bool
+	// QuerySource optional fork id for shouldAutoCompact gates (H2 / autoCompact.ts).
+	QuerySource string
 	// StopHooksAfterSuccessfulTurn run after each successful turn-loop wave (see StopHookAfterTurnFunc).
 	StopHooksAfterSuccessfulTurn []StopHookAfterTurnFunc
 }
@@ -121,6 +123,7 @@ type Engine struct {
 	nonInteractive                   bool
 	sessionID                        string
 	debug                            bool
+	querySource                      string
 	stopHooksAfterSuccessfulTurn     []StopHookAfterTurnFunc
 	cacheBreakSeen                   int32 // atomic: prompt-cache break callback ran this Submit
 }
@@ -183,6 +186,7 @@ func New(parent context.Context, cfg *Config) *Engine {
 		e.nonInteractive = cfg.NonInteractive
 		e.sessionID = strings.TrimSpace(cfg.SessionID)
 		e.debug = cfg.Debug
+		e.querySource = strings.TrimSpace(cfg.QuerySource)
 		e.stopHooksAfterSuccessfulTurn = append([]StopHookAfterTurnFunc(nil), cfg.StopHooksAfterSuccessfulTurn...)
 	}
 	return e
@@ -497,7 +501,7 @@ func (e *Engine) runTurnLoop(userText string) {
 		cw = features.ContextWindowTokensForModel(e.model)
 	}
 	cw = features.ApplyAutoCompactWindowCap(cw)
-	if query.ProactiveAutoCompactSuggested(msgs, e.model, e.maxTokens, cw, 0) {
+	if query.ProactiveAutoCompactSuggestedWithSource(msgs, e.model, e.maxTokens, cw, 0, st.ToolUseContext.QuerySource) {
 		auto = true
 	}
 	if query.TranscriptReactiveCompactSuggested(st, msgs, features.ReactiveCompactMinTranscriptBytes(), features.ReactiveCompactMinEstimatedTokens()) {

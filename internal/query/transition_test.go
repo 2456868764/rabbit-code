@@ -36,7 +36,7 @@ func TestApplyTransition_preservesMessagesJSONAndToolUseContext(t *testing.T) {
 		TurnCount:    0,
 		MessagesJSON: raw,
 		ToolUseContext: ToolUseContextMirror{
-			AgentID: "ag", MainLoopModel: "m", NonInteractive: true, SessionID: "s", Debug: true,
+			AgentID: "ag", MainLoopModel: "m", NonInteractive: true, SessionID: "s", Debug: true, QuerySource: "q",
 		},
 	}
 	got := ApplyTransition(s, TranReceiveAssistant)
@@ -44,7 +44,7 @@ func TestApplyTransition_preservesMessagesJSONAndToolUseContext(t *testing.T) {
 		t.Fatalf("MessagesJSON: %s", got.MessagesJSON)
 	}
 	if got.ToolUseContext.AgentID != "ag" || got.ToolUseContext.MainLoopModel != "m" || !got.ToolUseContext.NonInteractive ||
-		got.ToolUseContext.SessionID != "s" || !got.ToolUseContext.Debug {
+		got.ToolUseContext.SessionID != "s" || !got.ToolUseContext.Debug || got.ToolUseContext.QuerySource != "q" {
 		t.Fatalf("%+v", got.ToolUseContext)
 	}
 }
