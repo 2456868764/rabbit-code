@@ -60,3 +60,12 @@ func (p RunPhase) Next(auto, reactive bool) RunPhase {
 		return RunIdle
 	}
 }
+
+// AfterSuccessfulCompactExecution returns the phase after a successful executor run (H3 / services/compact-style cleanup).
+// RunExecuting maps to RunIdle; other phases are unchanged.
+func AfterSuccessfulCompactExecution(p RunPhase) RunPhase {
+	if p == RunExecuting {
+		return RunIdle
+	}
+	return p
+}

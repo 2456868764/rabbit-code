@@ -31,3 +31,12 @@ func TestParsePhase(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+func TestAfterSuccessfulCompactExecution(t *testing.T) {
+	if g, w := AfterSuccessfulCompactExecution(RunExecuting), RunIdle; g != w {
+		t.Fatalf("executing -> idle: got %v want %v", g, w)
+	}
+	if g, w := AfterSuccessfulCompactExecution(RunReactivePending), RunReactivePending; g != w {
+		t.Fatalf("pending unchanged: got %v want %v", g, w)
+	}
+}
