@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -70,6 +71,67 @@ func TestEngine_ProactiveAutoCompact_suggestWithoutAdvisor(t *testing.T) {
 				e.Wait()
 				return
 			case EventKindError:
+				t.Fatal(ev.Err)
+			}
+		case <-deadline:
+			t.Fatal("timeout")
+		}
+	}
+}
+
+func TestEngine_SessionMemoryCompact_skipsLegacyAutoExecutor(t *testing.T) {
+	t.Setenv(features.EnvContextWindowTokens, "50000")
+	t.Setenv(features.EnvReactiveCompactMinBytes, "999999999")
+	t.Setenv(features.EnvReactiveCompactMinTokens, "999999999")
+	t.Setenv(features.EnvDisableCompact, "")
+	t.Setenv(features.EnvDisableAutoCompact, "")
+	t.Setenv(features.EnvAutoCompact, "")
+	t.Setenv(features.EnvContextCollapse, "")
+	t.Setenv(features.EnvSuppressProactiveAutoCompact, "")
+	var legacyCalls int32
+	longReply := strings.Repeat("z", 150_000)
+	e := New(context.Background(), &Config{
+		SessionMemoryCompact: func(ctx context.Context, agentID, model string, th int, transcript json.RawMessage) (json.RawMessage, bool, error) {
+			_ = ctx
+			_ = agentID
+			_ = model
+			_ = th
+			_ = transcript
+			return json.RawMessage(`[{"role":"user","content":[{"type":"text","text":"sm"}]}]`), true, nil
+		},
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return longReply, nil
+			}),
+		},
+		Model: "m", MaxTokens: 1024,
+		CompactExecutor: func(_ context.Context, phase compact.RunPhase, _ []byte) (string, []byte, error) {
+			_ = phase
+			atomic.AddInt32(&legacyCalls, 1)
+			return "legacy", nil, nil
+		},
+	})
+	e.Submit("hi")
+	var sawSM bool
+	ch := e.Events()
+	deadline := time.After(8 * time.Second)
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindCompactResult && ev.CompactSummary == "session_memory_compact" {
+				sawSM = true
+			}
+			if ev.Kind == EventKindDone {
+				e.Wait()
+				if !sawSM {
+					t.Fatal("expected session_memory_compact result")
+				}
+				if atomic.LoadInt32(&legacyCalls) != 0 {
+					t.Fatalf("legacy executor should not run, calls=%d", legacyCalls)
+				}
+				return
+			}
+			if ev.Kind == EventKindError {
 				t.Fatal(ev.Err)
 			}
 		case <-deadline:

@@ -48,3 +48,15 @@ func ProactiveAutoCompactSuggestedWithSource(transcriptJSON []byte, model string
 	}
 	return tok >= threshold
 }
+
+// AutoCompactThresholdForProactive returns getAutoCompactThreshold(model) headless inputs (autoCompact.ts),
+// using RABBIT_CODE_CONTEXT_WINDOW_TOKENS / cap / pct override like ProactiveAutoCompactSuggestedWithSource.
+func AutoCompactThresholdForProactive(model string, maxOutputTokens, contextWindowTokens int) int {
+	cw := contextWindowTokens
+	if cw <= 0 {
+		cw = features.ContextWindowTokensForModel(model)
+	}
+	cw = features.ApplyAutoCompactWindowCap(cw)
+	effective := EffectiveContextInputWindow(cw, maxOutputTokens)
+	return AutoCompactThresholdTokens(effective, features.AutocompactPctOverride())
+}

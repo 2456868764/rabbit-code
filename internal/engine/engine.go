@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -26,6 +27,10 @@ type RecoverStrategy func(ctx context.Context, st query.LoopState, err error) bo
 // CompactExecutor runs after a compact suggest when set (P5.2.1 stub / closure).
 // When nextTranscriptJSON is non-empty, RecoverStrategy retry seeds RunTurnLoopFromMessages with it (H6 reactive compact path).
 type CompactExecutor func(ctx context.Context, phase compact.RunPhase, transcriptJSON []byte) (summary string, nextTranscriptJSON []byte, err error)
+
+// SessionMemoryCompact runs before legacy CompactExecutor when proactive auto compact is scheduled (autoCompact.ts trySessionMemoryCompaction).
+// If ok and replacement is non-empty, the engine emits compact suggest/result and skips the legacy auto executor for that wave.
+type SessionMemoryCompact func(ctx context.Context, agentID, model string, autoCompactThreshold int, transcriptJSON json.RawMessage) (replacement json.RawMessage, ok bool, err error)
 
 // ContextCollapseDrain trims transcript on recoverable prompt_too_long when CONTEXT_COLLAPSE is on; committed feeds LoopContinue (H6).
 type ContextCollapseDrain func(ctx context.Context, st *query.LoopState, transcriptJSON json.RawMessage) (trimmed json.RawMessage, committed int, ok bool)
@@ -94,6 +99,8 @@ type Config struct {
 	QuerySource string
 	// StopHooksAfterSuccessfulTurn run after each successful turn-loop wave (see StopHookAfterTurnFunc).
 	StopHooksAfterSuccessfulTurn []StopHookAfterTurnFunc
+	// SessionMemoryCompact optional first step before legacy auto compact (H3 / autoCompact.ts).
+	SessionMemoryCompact SessionMemoryCompact
 }
 
 // Engine coordinates cancellable query turns (stub or real StreamAssistant / RunTurnLoop).
@@ -125,6 +132,7 @@ type Engine struct {
 	debug                            bool
 	querySource                      string
 	stopHooksAfterSuccessfulTurn     []StopHookAfterTurnFunc
+	sessionMemoryCompact             SessionMemoryCompact
 	cacheBreakSeen                   int32 // atomic: prompt-cache break callback ran this Submit
 	// autoCompactConsecutiveFailures counts failed auto compact executor runs across Submits (H3 / autoCompact.ts).
 	autoCompactConsecutiveFailures int
@@ -190,6 +198,7 @@ func New(parent context.Context, cfg *Config) *Engine {
 		e.debug = cfg.Debug
 		e.querySource = strings.TrimSpace(cfg.QuerySource)
 		e.stopHooksAfterSuccessfulTurn = append([]StopHookAfterTurnFunc(nil), cfg.StopHooksAfterSuccessfulTurn...)
+		e.sessionMemoryCompact = cfg.SessionMemoryCompact
 	}
 	return e
 }
@@ -510,6 +519,39 @@ func (e *Engine) runTurnLoop(userText string) {
 	if query.TranscriptReactiveCompactSuggested(st, msgs, features.ReactiveCompactMinTranscriptBytes(), features.ReactiveCompactMinEstimatedTokens()) {
 		react = true
 	}
+
+	if auto && e.sessionMemoryCompact != nil {
+		th := query.AutoCompactThresholdForProactive(e.model, e.maxTokens, cw)
+		if th > 0 {
+			next, ok, smErr := e.sessionMemoryCompact(e.ctx, st.ToolUseContext.AgentID, e.model, th, msgs)
+			switch {
+			case smErr != nil:
+				// Legacy auto path may still run.
+			case ok && len(bytes.TrimSpace(next)) > 0:
+				msgs = json.RawMessage(append([]byte(nil), next...))
+				st.SetMessagesJSON(msgs)
+				ph := compact.RunIdle.Next(true, false)
+				execPh := compact.ExecutorPhaseAfterSchedule(ph)
+				e.trySend(EngineEvent{
+					Kind:               EventKindCompactSuggest,
+					CompactPhase:       ph.String(),
+					SuggestAutoCompact: true,
+				})
+				resPh := compact.ResultPhaseAfterCompactExecutor(execPh, nil)
+				e.noteAutoCompactExecutorOutcome(true, nil)
+				e.trySend(EngineEvent{
+					Kind:           EventKindCompactResult,
+					CompactPhase:   resPh.String(),
+					CompactSummary: "session_memory_compact",
+					Err:            nil,
+				})
+				query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonAutoCompactExecuted})
+				auto = false
+				react = query.TranscriptReactiveCompactSuggested(st, msgs, features.ReactiveCompactMinTranscriptBytes(), features.ReactiveCompactMinEstimatedTokens())
+			}
+		}
+	}
+
 	if auto || react {
 		phase := compact.RunIdle.Next(auto, react)
 		e.trySend(EngineEvent{
