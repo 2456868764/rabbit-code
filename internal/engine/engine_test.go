@@ -79,6 +79,50 @@ func TestEngine_ProactiveAutoCompact_suggestWithoutAdvisor(t *testing.T) {
 	}
 }
 
+func TestEngine_PostCompactCleanup_afterSuccessfulCompactExecutor(t *testing.T) {
+	t.Setenv(features.EnvContextWindowTokens, "50000")
+	t.Setenv(features.EnvReactiveCompactMinBytes, "999999999")
+	t.Setenv(features.EnvReactiveCompactMinTokens, "999999999")
+	t.Setenv(features.EnvDisableCompact, "")
+	t.Setenv(features.EnvDisableAutoCompact, "")
+	t.Setenv(features.EnvAutoCompact, "")
+	t.Setenv(features.EnvContextCollapse, "")
+	t.Setenv(features.EnvSuppressProactiveAutoCompact, "")
+	var calls int32
+	var sawMain bool
+	longReply := strings.Repeat("z", 150_000)
+	e := New(context.Background(), &Config{
+		QuerySource: "repl_main_thread:test",
+		AgentID:     "agent-postcompact",
+		PostCompactCleanup: func(_ context.Context, querySource, agentID string, mainThread bool) {
+			atomic.AddInt32(&calls, 1)
+			if querySource != "repl_main_thread:test" || agentID != "agent-postcompact" {
+				t.Errorf("unexpected args qs=%q agent=%q", querySource, agentID)
+			}
+			sawMain = mainThread
+		},
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return longReply, nil
+			}),
+		},
+		Model: "m", MaxTokens: 1024,
+		CompactExecutor: func(_ context.Context, phase compact.RunPhase, _ []byte) (string, []byte, error) {
+			_ = phase
+			return "ok", nil, nil
+		},
+	})
+	e.Submit("hi")
+	drainEngineUntilDone(t, e.Events())
+	e.Wait()
+	if atomic.LoadInt32(&calls) != 1 {
+		t.Fatalf("post-compact calls %d", calls)
+	}
+	if !sawMain {
+		t.Fatal("expected main-thread post-compact")
+	}
+}
+
 func TestEngine_SessionMemoryCompact_skipsLegacyAutoExecutor(t *testing.T) {
 	t.Setenv(features.EnvContextWindowTokens, "50000")
 	t.Setenv(features.EnvReactiveCompactMinBytes, "999999999")

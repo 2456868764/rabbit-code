@@ -12,6 +12,15 @@ func TestIsMainThreadQuerySource(t *testing.T) {
 	}
 }
 
+func TestIsMainThreadPostCompactSource_includesSDK(t *testing.T) {
+	if !IsMainThreadPostCompactSource("sdk") {
+		t.Fatal("sdk should be main-thread for post-compact cleanup")
+	}
+	if IsMainThreadPostCompactSource("agent:foo") {
+		t.Fatal("subagent should not run main-thread resets")
+	}
+}
+
 func TestCollectCompactableToolUseIDsFromTranscriptJSON(t *testing.T) {
 	raw := []byte(`[
 	  {"role":"user","content":[{"type":"text","text":"hi"}]},

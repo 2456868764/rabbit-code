@@ -10,12 +10,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/2456868764/rabbit-code/internal/services/api"
-	"github.com/2456868764/rabbit-code/internal/services/compact"
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/memdir"
 	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/query/querydeps"
+	"github.com/2456868764/rabbit-code/internal/services/api"
+	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
 // StopHookFunc runs after each Submit’s RunTurnLoop attempt finishes (success or failure). Hooks run in slice order; legacy StopHook is appended after StopHooks (P5.1.4).
@@ -31,6 +31,9 @@ type CompactExecutor func(ctx context.Context, phase compact.RunPhase, transcrip
 // SessionMemoryCompact runs before legacy CompactExecutor when proactive auto compact is scheduled (autoCompact.ts trySessionMemoryCompaction).
 // If ok and replacement is non-empty, the engine emits compact suggest/result and skips the legacy auto executor for that wave.
 type SessionMemoryCompact func(ctx context.Context, agentID, model string, autoCompactThreshold int, transcriptJSON json.RawMessage) (replacement json.RawMessage, ok bool, err error)
+
+// PostCompactCleanup mirrors runPostCompactCleanup side effects (postCompactCleanup.ts); mainThreadCompact matches isMainThreadCompact.
+type PostCompactCleanup func(ctx context.Context, querySource, agentID string, mainThreadCompact bool)
 
 // ContextCollapseDrain trims transcript on recoverable prompt_too_long when CONTEXT_COLLAPSE is on; committed feeds LoopContinue (H6).
 type ContextCollapseDrain func(ctx context.Context, st *query.LoopState, transcriptJSON json.RawMessage) (trimmed json.RawMessage, committed int, ok bool)
@@ -101,6 +104,10 @@ type Config struct {
 	StopHooksAfterSuccessfulTurn []StopHookAfterTurnFunc
 	// SessionMemoryCompact optional first step before legacy auto compact (H3 / autoCompact.ts).
 	SessionMemoryCompact SessionMemoryCompact
+	// PostCompactCleanup optional hook after any successful compact executor / session-memory compact (H3).
+	PostCompactCleanup PostCompactCleanup
+	// MicrocompactEditBuffer optional; reset on successful compact and wired to AnthropicAssistant when possible (H4).
+	MicrocompactEditBuffer *compact.MicrocompactEditBuffer
 }
 
 // Engine coordinates cancellable query turns (stub or real StreamAssistant / RunTurnLoop).
@@ -133,6 +140,8 @@ type Engine struct {
 	querySource                      string
 	stopHooksAfterSuccessfulTurn     []StopHookAfterTurnFunc
 	sessionMemoryCompact             SessionMemoryCompact
+	postCompactCleanup               PostCompactCleanup
+	microcompactEditBuffer           *compact.MicrocompactEditBuffer
 	cacheBreakSeen                   int32 // atomic: prompt-cache break callback ran this Submit
 	// autoCompactConsecutiveFailures counts failed auto compact executor runs across Submits (H3 / autoCompact.ts).
 	autoCompactConsecutiveFailures int
@@ -199,6 +208,14 @@ func New(parent context.Context, cfg *Config) *Engine {
 		e.querySource = strings.TrimSpace(cfg.QuerySource)
 		e.stopHooksAfterSuccessfulTurn = append([]StopHookAfterTurnFunc(nil), cfg.StopHooksAfterSuccessfulTurn...)
 		e.sessionMemoryCompact = cfg.SessionMemoryCompact
+		e.postCompactCleanup = cfg.PostCompactCleanup
+		e.microcompactEditBuffer = cfg.MicrocompactEditBuffer
+		if aa, ok := e.deps.Assistant.(*querydeps.AnthropicAssistant); ok && cfg.MicrocompactEditBuffer != nil {
+			aa.MicrocompactBuffer = cfg.MicrocompactEditBuffer
+		}
+		if aa, ok := e.deps.Turn.(*querydeps.AnthropicAssistant); ok && cfg.MicrocompactEditBuffer != nil {
+			aa.MicrocompactBuffer = cfg.MicrocompactEditBuffer
+		}
 	}
 	return e
 }
@@ -490,6 +507,7 @@ func (e *Engine) runTurnLoop(userText string) {
 			if exErr == nil {
 				query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonReactiveCompactRetry})
 				st.HasAttemptedReactiveCompact = true
+				e.afterCompactSuccess(st)
 			}
 		}
 	}
@@ -548,6 +566,7 @@ func (e *Engine) runTurnLoop(userText string) {
 				query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonAutoCompactExecuted})
 				auto = false
 				react = query.TranscriptReactiveCompactSuggested(st, msgs, features.ReactiveCompactMinTranscriptBytes(), features.ReactiveCompactMinEstimatedTokens())
+				e.afterCompactSuccess(st)
 			}
 		}
 	}
@@ -578,11 +597,29 @@ func (e *Engine) runTurnLoop(userText string) {
 				} else if auto {
 					query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonAutoCompactExecuted})
 				}
+				e.afterCompactSuccess(st)
 			}
 		}
 	}
 
 	e.trySend(EngineEvent{Kind: EventKindDone, LoopTurnCount: st.TurnCount})
+}
+
+func (e *Engine) effectiveQuerySource(st *query.LoopState) string {
+	if st != nil {
+		if s := strings.TrimSpace(st.ToolUseContext.QuerySource); s != "" {
+			return s
+		}
+	}
+	return e.querySource
+}
+
+func (e *Engine) afterCompactSuccess(st *query.LoopState) {
+	compact.ResetMicrocompactStateIfAny(e.microcompactEditBuffer)
+	if e.postCompactCleanup != nil {
+		src := e.effectiveQuerySource(st)
+		e.postCompactCleanup(e.ctx, src, e.agentID, compact.IsMainThreadPostCompactSource(src))
+	}
 }
 
 func (e *Engine) autoCompactCircuitTripped() bool {

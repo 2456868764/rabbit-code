@@ -9,9 +9,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/features"
+	"github.com/2456868764/rabbit-code/internal/services/api"
 )
+
+type testMicrocompactMarker struct {
+	marked bool
+}
+
+func (t *testMicrocompactMarker) MarkToolsSentToAPIState() { t.marked = true }
 
 func TestAnthropicAssistant_nilClient(t *testing.T) {
 	a := &AnthropicAssistant{Client: nil}
@@ -170,6 +176,42 @@ func TestAnthropicAssistant_streamBody_anthropicBetaCachedMicrocompact(t *testin
 	}
 	if !<-okCh {
 		t.Fatal("expected JSON anthropic_beta with BetaCachedMicrocompactBody when RABBIT_CODE_CACHED_MICROCOMPACT is on")
+	}
+}
+
+func TestAnthropicAssistant_MicrocompactBuffer_markAfterStreamSuccess(t *testing.T) {
+	t.Setenv(features.EnvCachedMicrocompact, "true")
+	t.Setenv(features.EnvUseBedrock, "")
+	t.Setenv(features.EnvUseVertex, "")
+	t.Setenv(features.EnvUseFoundry, "")
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ok\"}}\n\n")
+		_, _ = io.WriteString(w, "data: {\"type\":\"message_stop\"}\n\n")
+	}))
+	defer srv.Close()
+
+	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl.BaseURL = srv.URL
+	cl.Provider = anthropic.ProviderAnthropic
+
+	var buf testMicrocompactMarker
+	a := &AnthropicAssistant{
+		Client:             cl,
+		DefaultModel:       "m",
+		DefaultMaxTokens:   8,
+		Policy:             anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		MicrocompactBuffer: &buf,
+	}
+	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
+	_, err := a.StreamAssistant(context.Background(), "", 0, msgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !buf.marked {
+		t.Fatal("expected MarkToolsSentToAPIState after successful stream when CACHED_MICROCOMPACT is on")
 	}
 }
 

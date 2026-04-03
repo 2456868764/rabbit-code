@@ -134,6 +134,7 @@ func (e *Engine) executeRunTurnLoopAttempts(ctxLoop context.Context, st *query.L
 						msgs = json.RawMessage(append([]byte(nil), next...))
 						st.SetMessagesJSON(msgs)
 					}
+					e.afterCompactSuccess(st)
 				}
 			}
 		}

@@ -9,8 +9,10 @@ const ToolTokenCountOverhead = 500
 
 // HeadlessContextReport is a non-UI subset of analyzeContext ContextData: transcript metrics + threshold ladder.
 type HeadlessContextReport struct {
-	TranscriptBytes             int
-	EstimatedTokens             int
+	TranscriptBytes int
+	EstimatedTokens int
+	// StructuredMessageTokens is set when transcriptJSON parses as a messages array (microCompact.ts estimateMessageTokens path); 0 if unavailable.
+	StructuredMessageTokens     int
 	ContextWindowTokens         int
 	EffectiveInputWindow        int
 	AutoCompactThreshold        int
@@ -24,8 +26,15 @@ func BuildHeadlessContextReport(transcriptJSON []byte, model string, maxOutputTo
 	var r HeadlessContextReport
 	r.TranscriptBytes = len(transcriptJSON)
 	r.EstimatedTokens = EstimateTranscriptJSONTokens(transcriptJSON)
+	if n, err := EstimateMessageTokensFromTranscriptJSON(transcriptJSON); err == nil {
+		r.StructuredMessageTokens = n
+	}
 	if tokenUsage <= 0 {
-		tokenUsage = r.EstimatedTokens
+		if r.StructuredMessageTokens > 0 {
+			tokenUsage = r.StructuredMessageTokens
+		} else {
+			tokenUsage = r.EstimatedTokens
+		}
 	}
 	cw := contextWindowTokens
 	if cw <= 0 {

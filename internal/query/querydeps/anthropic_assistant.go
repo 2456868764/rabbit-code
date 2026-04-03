@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/features"
+	"github.com/2456868764/rabbit-code/internal/services/api"
 )
 
 // AnthropicAssistant implements StreamAssistant using internal/services/api Client (Phase 4 + Phase 5 bridge).
@@ -16,6 +16,8 @@ type AnthropicAssistant struct {
 	Policy           anthropic.Policy
 	// ExtraReadOptions are appended after context-derived options (tests / host hooks).
 	ExtraReadOptions []anthropic.ReadAssistantOption
+	// MicrocompactBuffer optional; MarkToolsSentToAPIState after successful stream (microCompact.ts markToolsSentToAPIState).
+	MicrocompactBuffer MicrocompactAPIStateMarker
 }
 
 func (a *AnthropicAssistant) readOpts(ctx context.Context) []anthropic.ReadAssistantOption {
@@ -62,6 +64,9 @@ func (a *AnthropicAssistant) StreamAssistant(ctx context.Context, model string, 
 	}
 	body := a.streamBody(model, maxTokens, messagesJSON)
 	text, _, err := a.Client.PostMessagesStreamReadAssistant(ctx, body, pol, a.readOpts(ctx)...)
+	if err == nil {
+		a.markMicrocompactAfterSuccessfulAPI()
+	}
 	return text, err
 }
 
@@ -91,6 +96,7 @@ func (a *AnthropicAssistant) AssistantTurn(ctx context.Context, model string, ma
 	if err != nil {
 		return TurnResult{}, err
 	}
+	a.markMicrocompactAfterSuccessfulAPI()
 	out := TurnResult{
 		Text:       turn.Text,
 		StopReason: turn.StopReason,
@@ -107,4 +113,11 @@ func (a *AnthropicAssistant) AssistantTurn(ctx context.Context, model string, ma
 		})
 	}
 	return out, nil
+}
+
+func (a *AnthropicAssistant) markMicrocompactAfterSuccessfulAPI() {
+	if a == nil || a.MicrocompactBuffer == nil || !features.CachedMicrocompactEnabled() {
+		return
+	}
+	a.MicrocompactBuffer.MarkToolsSentToAPIState()
 }

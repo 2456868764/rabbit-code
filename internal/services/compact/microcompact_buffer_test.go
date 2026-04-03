@@ -3,7 +3,14 @@ package compact
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 )
+
+func TestMicrocompactEditBuffer_implementsQuerydepsMarker(t *testing.T) {
+	var m querydeps.MicrocompactAPIStateMarker = &MicrocompactEditBuffer{}
+	m.MarkToolsSentToAPIState()
+}
 
 func TestMicrocompactEditBuffer_flow(t *testing.T) {
 	var b MicrocompactEditBuffer
