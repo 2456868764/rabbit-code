@@ -90,8 +90,11 @@
 | H7.3 | **侧车 JSON** | **`MarshalSnipRemovalLogJSON` / `UnmarshalSnipRemovalLogJSON`** 供会话保存 | **[x]** |
 | H7.4 | **重放往返** | **`ReplaySnipRemovals`**：对「完整前缀」转录按序执行 **`SnipDropFirstMessages`**，与运行时裁剪一致 | **[x]** |
 | H7.5 | **引擎与事件** | **`EventKindHistorySnipApplied` / `SnipCompactApplied`** 填 **`EngineEvent.SnipID`**；**`Engine.SnipRemovalLogForPersistence`**；**`Config.RestoredSnipRemovalLog`** 注入下一轮 **`LoopState`** | **[x]** |
+| H7.6 | **中区删除重放** | **`SnipRemovalEntry.removedIndices`** + **`snipRemoveMessageIndices`**；**`ReplaySnipRemovalsEx`** 按条重放（与仅前缀互补） | **[x]** |
+| H7.7 | **removedUuids 互操作** | JSON 字段 **`removedUuids`**；**`ReplaySnipRemovalsEx` + `SnipReplayOptions.UUIDToIndex`** 重放（宿主提供 message UUID→下标映射） | **[x]** |
+| H7.8 | **日志合并** | **`MergeSnipRemovalLogs`**（按 **`id`** 去重追加） | **[x]** |
 
-**相对 `sessionStorage.ts` 全量**：TS 为 `Map<UUID, TranscriptMessage>` 中区删除 + **parentUuid** 重链；Go 为 **线性 Messages API 数组** 的前缀裁剪日志，语义对齐「前缀 snip」路径，不覆盖中区 snip / JSONL 专有条目。
+**仍属 PARITY / 非本仓库 headless 范围**：TS **`sessionStorage.ts`** 的 **`Map<UUID, TranscriptMessage>`** 整表加载、**`parentUuid`** 自动重链、JSONL 追加存储与 **SnipTool** 运行时中区执行 — 需 **Phase 8 / 会话层** 或宿主注入 UUID 映射与存储格式；Go 已提供 **索引 / UUID 映射重放** 与 **侧车 JSON** 对接点。
 
 ### TUI / REPL（在 Headless 主干之后）
 
