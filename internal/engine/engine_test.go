@@ -773,6 +773,42 @@ func TestEngine_ContextCollapseDrain_recordsContinueOnPTL(t *testing.T) {
 	}
 }
 
+func TestEngine_ContextCollapseDrain_recoverRetryUsesDrainedSeed(t *testing.T) {
+	t.Setenv(features.EnvContextCollapse, "true")
+	apiErr := &anthropic.APIError{Kind: anthropic.KindPromptTooLong, Status: 400, Msg: "ptl"}
+	trimmed, err := query.InitialUserMessagesJSON("SEED_MARKER")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	var secondBody string
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+				n++
+				if n == 1 {
+					return "", fmt.Errorf("w: %w", apiErr)
+				}
+				secondBody = string(messagesJSON)
+				return "ok", nil
+			}),
+		},
+		RecoverStrategy: func(context.Context, query.LoopState, error) bool { return true },
+		ContextCollapseDrain: func(_ context.Context, _ *query.LoopState, _ json.RawMessage) (json.RawMessage, int, bool) {
+			return trimmed, 1, true
+		},
+	})
+	e.Submit("original-user-should-not-appear-on-retry")
+	drainUntilTerminal(t, e.Events())
+	e.Wait()
+	if n != 2 {
+		t.Fatalf("want 2 assistant calls, got %d", n)
+	}
+	if !strings.Contains(secondBody, "SEED_MARKER") || strings.Contains(secondBody, "original-user-should-not-appear-on-retry") {
+		t.Fatalf("retry should use drained transcript; got %q", secondBody)
+	}
+}
+
 func TestEngine_BashStubToolRunner(t *testing.T) {
 	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
 		{Text: "run", ToolUses: []querydeps.ToolUseCall{{ID: "t1", Name: "bash", Input: json.RawMessage(`{"cmd":"ls"}`)}}},

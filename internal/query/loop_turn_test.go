@@ -70,6 +70,41 @@ func TestLoopDriver_RunTurnLoop_maxTurns_blocksSecondAssistantAfterTools(t *test
 	}
 }
 
+func TestLoopDriver_RunTurnLoopFromMessages_equivalentToRunTurnLoop(t *testing.T) {
+	seed, err := InitialUserMessagesJSON("hi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mk := func() *querydeps.SequenceTurnAssistant {
+		return &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{{Text: "reply"}}}
+	}
+	d1 := LoopDriver{Deps: querydeps.Deps{Turn: mk()}, Model: "m", MaxTokens: 8}
+	d2 := LoopDriver{Deps: querydeps.Deps{Turn: mk()}, Model: "m", MaxTokens: 8}
+	st1, st2 := LoopState{}, LoopState{}
+	out1, _, err := d1.RunTurnLoop(context.Background(), &st1, "hi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out2, _, err := d2.RunTurnLoopFromMessages(context.Background(), &st2, seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out1) != string(out2) {
+		t.Fatalf("transcripts differ:\n%s\nvs\n%s", out1, out2)
+	}
+	if st1.TurnCount != st2.TurnCount || st1.TurnCount != 1 {
+		t.Fatalf("st1=%+v st2=%+v", st1, st2)
+	}
+}
+
+func TestLoopDriver_RunTurnLoopFromMessages_emptySeed(t *testing.T) {
+	d := LoopDriver{Deps: querydeps.Deps{Turn: &querydeps.SequenceTurnAssistant{}}, Model: "m", MaxTokens: 8}
+	_, _, err := d.RunTurnLoopFromMessages(context.Background(), &LoopState{}, json.RawMessage(`   `))
+	if err == nil {
+		t.Fatal("want error")
+	}
+}
+
 type countingToolRunner struct {
 	n  int
 	mu sync.Mutex

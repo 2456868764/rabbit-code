@@ -1,6 +1,7 @@
 package query
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -102,9 +103,27 @@ func (d *LoopDriver) RunAssistantChain(ctx context.Context, userText string, ste
 // RunTurnLoop runs assistant turns until the model returns no tool uses, ctx is done, or MaxTurns is exceeded.
 // When st is non-nil, TranReceiveAssistant is applied after each assistant message; RunToolStep applies tool transitions.
 func (d *LoopDriver) RunTurnLoop(ctx context.Context, st *LoopState, userText string) (msgs json.RawMessage, lastAssistantText string, err error) {
-	msgs, err = InitialUserMessagesJSON(userText)
-	if err != nil {
-		return nil, "", err
+	return d.runTurnLoop(ctx, st, userText, nil)
+}
+
+// RunTurnLoopFromMessages continues from an existing messages JSON transcript (e.g. after context-collapse drain + RecoverStrategy retry). seedMsgs must be non-empty.
+func (d *LoopDriver) RunTurnLoopFromMessages(ctx context.Context, st *LoopState, seedMsgs json.RawMessage) (msgs json.RawMessage, lastAssistantText string, err error) {
+	if len(bytes.TrimSpace(seedMsgs)) == 0 {
+		return nil, "", errors.New("query: RunTurnLoopFromMessages: empty seed")
+	}
+	return d.runTurnLoop(ctx, st, "", seedMsgs)
+}
+
+func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText string, seedMsgs json.RawMessage) (msgs json.RawMessage, lastAssistantText string, err error) {
+	if len(seedMsgs) > 0 {
+		buf := make([]byte, len(seedMsgs))
+		copy(buf, seedMsgs)
+		msgs = json.RawMessage(buf)
+	} else {
+		msgs, err = InitialUserMessagesJSON(userText)
+		if err != nil {
+			return nil, "", err
+		}
 	}
 	model, max := d.modelAndMax()
 	for {

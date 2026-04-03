@@ -34,6 +34,7 @@ func (e *Engine) loopDriver() query.LoopDriver {
 // executeRunTurnLoopAttempts runs RunTurnLoop with optional RecoverStrategy second attempt (P5.1.3) and collapse-drain bookkeeping (H6).
 func (e *Engine) executeRunTurnLoopAttempts(ctxLoop context.Context, st *query.LoopState, resolved string, maxAttempts int) (msgs json.RawMessage, succeeded bool, loopErr error) {
 	d := e.loopDriver()
+	var retrySeedMsgs json.RawMessage
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		if attempt == 0 {
 			if e.maxAssistantTurns > 0 {
@@ -43,8 +44,14 @@ func (e *Engine) executeRunTurnLoopAttempts(ctxLoop context.Context, st *query.L
 			resetLoopStateForRetryAttempt(st)
 		}
 
+		drainedForRetry := false
 		var runErr error
-		msgs, _, runErr = d.RunTurnLoop(ctxLoop, st, resolved)
+		if len(retrySeedMsgs) > 0 {
+			msgs, _, runErr = d.RunTurnLoopFromMessages(ctxLoop, st, retrySeedMsgs)
+			retrySeedMsgs = nil
+		} else {
+			msgs, _, runErr = d.RunTurnLoop(ctxLoop, st, resolved)
+		}
 		if runErr == nil {
 			return msgs, true, nil
 		}
@@ -68,6 +75,7 @@ func (e *Engine) executeRunTurnLoopAttempts(ctxLoop context.Context, st *query.L
 			trimmed, committed, ok := e.contextCollapseDrain(e.ctx, st, msgs)
 			if ok && committed > 0 {
 				msgs = trimmed
+				drainedForRetry = true
 				query.RecordLoopContinue(st, query.LoopContinue{
 					Reason:    query.ContinueReasonCollapseDrainRetry,
 					Committed: committed,
@@ -104,6 +112,9 @@ func (e *Engine) executeRunTurnLoopAttempts(ctxLoop context.Context, st *query.L
 				})
 			} else {
 				query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonSubmitRecoverRetry})
+			}
+			if drainedForRetry {
+				retrySeedMsgs = json.RawMessage(append([]byte(nil), msgs...))
 			}
 			continue
 		}
