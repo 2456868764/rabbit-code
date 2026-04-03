@@ -78,6 +78,73 @@ func TestEngine_ProactiveAutoCompact_suggestWithoutAdvisor(t *testing.T) {
 	}
 }
 
+func drainEngineUntilDone(t *testing.T, ch <-chan EngineEvent) {
+	t.Helper()
+	deadline := time.After(8 * time.Second)
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindDone {
+				return
+			}
+			if ev.Kind == EventKindError {
+				t.Fatal(ev.Err)
+			}
+		case <-deadline:
+			t.Fatal("timeout waiting for EventKindDone")
+		}
+	}
+}
+
+func TestEngine_AutoCompactCircuit_tripsAfterExecutorFailures(t *testing.T) {
+	t.Setenv(features.EnvContextWindowTokens, "50000")
+	t.Setenv(features.EnvReactiveCompactMinBytes, "999999999")
+	t.Setenv(features.EnvReactiveCompactMinTokens, "999999999")
+	t.Setenv(features.EnvDisableCompact, "")
+	t.Setenv(features.EnvDisableAutoCompact, "")
+	t.Setenv(features.EnvAutoCompact, "")
+	t.Setenv(features.EnvContextCollapse, "")
+	t.Setenv(features.EnvSuppressProactiveAutoCompact, "")
+	longReply := strings.Repeat("z", 150_000)
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return longReply, nil
+			}),
+		},
+		Model: "m", MaxTokens: 1024,
+		CompactExecutor: func(_ context.Context, phase compact.RunPhase, _ []byte) (string, []byte, error) {
+			_ = phase
+			return "", nil, errors.New("stub compact failure")
+		},
+	})
+	for range 3 {
+		e.Submit("hi")
+		drainEngineUntilDone(t, e.Events())
+		e.Wait()
+	}
+	e.Submit("hi")
+	ch := e.Events()
+	deadline := time.After(8 * time.Second)
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindCompactSuggest && ev.SuggestAutoCompact {
+				t.Fatalf("circuit should block proactive auto after 3 failures: %+v", ev)
+			}
+			if ev.Kind == EventKindDone {
+				e.Wait()
+				return
+			}
+			if ev.Kind == EventKindError {
+				t.Fatal(ev.Err)
+			}
+		case <-deadline:
+			t.Fatal("timeout")
+		}
+	}
+}
+
 func TestEngine_ProactiveAutoCompact_suppressedForQuerySourceSessionMemory(t *testing.T) {
 	t.Setenv(features.EnvContextWindowTokens, "50000")
 	t.Setenv(features.EnvReactiveCompactMinBytes, "999999999")

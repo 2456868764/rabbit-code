@@ -120,6 +120,7 @@ func (e *Engine) executeRunTurnLoopAttempts(ctxLoop context.Context, st *query.L
 				execPh := compact.ExecutorPhaseAfterSchedule(ph)
 				sum, next, exErr := e.compactExecutor(e.ctx, execPh, msgs)
 				resPh := compact.ResultPhaseAfterCompactExecutor(execPh, exErr)
+				e.noteAutoCompactExecutorOutcome(true, exErr)
 				e.trySend(EngineEvent{
 					Kind:           EventKindCompactResult,
 					CompactPhase:   resPh.String(),

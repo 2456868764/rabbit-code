@@ -126,6 +126,8 @@ type Engine struct {
 	querySource                      string
 	stopHooksAfterSuccessfulTurn     []StopHookAfterTurnFunc
 	cacheBreakSeen                   int32 // atomic: prompt-cache break callback ran this Submit
+	// autoCompactConsecutiveFailures counts failed auto compact executor runs across Submits (H3 / autoCompact.ts).
+	autoCompactConsecutiveFailures int
 }
 
 // NewEngine is equivalent to New(parent, nil) (stub assistant).
@@ -501,7 +503,8 @@ func (e *Engine) runTurnLoop(userText string) {
 		cw = features.ContextWindowTokensForModel(e.model)
 	}
 	cw = features.ApplyAutoCompactWindowCap(cw)
-	if query.ProactiveAutoCompactSuggestedWithSource(msgs, e.model, e.maxTokens, cw, 0, st.ToolUseContext.QuerySource) {
+	if !e.autoCompactCircuitTripped() &&
+		query.ProactiveAutoCompactSuggestedWithSource(msgs, e.model, e.maxTokens, cw, 0, st.ToolUseContext.QuerySource) {
 		auto = true
 	}
 	if query.TranscriptReactiveCompactSuggested(st, msgs, features.ReactiveCompactMinTranscriptBytes(), features.ReactiveCompactMinEstimatedTokens()) {
@@ -519,6 +522,7 @@ func (e *Engine) runTurnLoop(userText string) {
 			execPh := compact.ExecutorPhaseAfterSchedule(phase)
 			sum, _, exErr := e.compactExecutor(e.ctx, execPh, msgs)
 			resPh := compact.ResultPhaseAfterCompactExecutor(execPh, exErr)
+			e.noteAutoCompactExecutorOutcome(auto, exErr)
 			e.trySend(EngineEvent{
 				Kind:           EventKindCompactResult,
 				CompactPhase:   resPh.String(),
@@ -537,6 +541,22 @@ func (e *Engine) runTurnLoop(userText string) {
 	}
 
 	e.trySend(EngineEvent{Kind: EventKindDone, LoopTurnCount: st.TurnCount})
+}
+
+func (e *Engine) autoCompactCircuitTripped() bool {
+	return e.autoCompactConsecutiveFailures >= query.MaxConsecutiveAutocompactFailures
+}
+
+// noteAutoCompactExecutorOutcome updates the session-level circuit when the compact suggest included proactive auto.
+func (e *Engine) noteAutoCompactExecutorOutcome(autoInSuggest bool, err error) {
+	if !autoInSuggest {
+		return
+	}
+	if err != nil {
+		e.autoCompactConsecutiveFailures++
+		return
+	}
+	e.autoCompactConsecutiveFailures = 0
 }
 
 func (e *Engine) trySend(ev EngineEvent) bool {
