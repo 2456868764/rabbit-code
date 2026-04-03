@@ -1,6 +1,7 @@
 package query
 
-// LoopState tracks cross-iteration query loop metadata (subset of query.ts State; item 11 extends parity fields).
+// LoopState tracks cross-iteration query loop metadata aligned with query.ts State (H6).
+// Messages JSON and full toolUseContext live outside this struct in the Go headless path.
 type LoopState struct {
 	TurnCount    int
 	PendingTools int
@@ -9,11 +10,20 @@ type LoopState struct {
 	MaxTurns int
 	// CompactCount increments on TranStartCompact (P5.1.1 / P5.2.1 bookkeeping).
 	CompactCount int
-	// MaxOutputTokensRecoveryCount mirrors query.ts maxOutputTokensRecoveryCount (bookkeeping for recovery).
+	// LoopContinue mirrors query.ts transition (why the previous iteration continued).
+	LoopContinue LoopContinue
+	// AutoCompactTracking mirrors query.ts autoCompactTracking (nil = undefined).
+	AutoCompactTracking *AutoCompactTracking
+	// MaxOutputTokensRecoveryCount mirrors query.ts maxOutputTokensRecoveryCount.
 	MaxOutputTokensRecoveryCount int
 	// HasAttemptedReactiveCompact mirrors query.ts hasAttemptedReactiveCompact.
 	HasAttemptedReactiveCompact bool
-	// StopHookActive mirrors query.ts stopHookActive.
+	// MaxOutputTokensOverride mirrors query.ts maxOutputTokensOverride when OverrideActive is set.
+	MaxOutputTokensOverrideActive bool
+	MaxOutputTokensOverride       int
+	// PendingToolUseSummary mirrors query.ts pendingToolUseSummary presence (Promise → bool for headless).
+	PendingToolUseSummary bool
+	// StopHookActive mirrors query.ts stopHookActive (TS undefined → false in Go).
 	StopHookActive bool
 	// Recovery / stream metadata (P5.1.1).
 	RecoveryPhase    RecoveryPhase

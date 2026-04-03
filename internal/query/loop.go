@@ -181,6 +181,9 @@ func (d *LoopDriver) RunTurnLoop(ctx context.Context, st *LoopState, userText st
 		if err != nil {
 			return msgs, lastAssistantText, err
 		}
+		if st != nil {
+			RecordLoopContinue(st, LoopContinue{Reason: ContinueReasonNextTurn})
+		}
 	}
 	return msgs, lastAssistantText, nil
 }
