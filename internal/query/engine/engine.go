@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -66,6 +68,8 @@ type Config struct {
 	MemdirPaths []string      // optional: explicit paths prepended to each Submit (P5.4.1)
 	// MemdirMemoryDir when set triggers FindRelevantMemories per Submit (recursive scan + heuristic or LLM; H8).
 	MemdirMemoryDir string
+	// MemdirProjectRoot with RABBIT_CODE_AUTO_MEMDIR seeds memdir.ResolveAutoMemDir; empty uses cwd at engine init.
+	MemdirProjectRoot string
 	// MemdirRecentTools is passed into LLM memdir selection (suppress tool-doc memories; H8).
 	MemdirRecentTools []string
 	// MemdirTextComplete optional override for LLM selection (tests); default uses Anthropic client when mode is llm.
@@ -221,7 +225,10 @@ func New(parent context.Context, cfg *Config) *Engine {
 			e.stubDelay = cfg.StubDelay
 		}
 		e.memdirExplicitPaths = append([]string(nil), cfg.MemdirPaths...)
-		e.memdirMemoryDir = strings.TrimSpace(cfg.MemdirMemoryDir)
+		e.memdirMemoryDir = resolveEngineMemdirMemoryDir(cfg)
+		if e.memdirMemoryDir != "" {
+			_ = memdir.EnsureMemoryDirExists(e.memdirMemoryDir)
+		}
 		e.memdirRecentTools = append([]string(nil), cfg.MemdirRecentTools...)
 		e.memdirTextComplete = cfg.MemdirTextComplete
 		e.memdirRelevanceMode = effectiveMemdirRelevanceMode(cfg.MemdirRelevanceModeOverride)
@@ -323,6 +330,34 @@ func (e *Engine) Submit(userText string) {
 		}
 		e.trySend(EngineEvent{Kind: EventKindDone})
 	}()
+}
+
+func resolveEngineMemdirMemoryDir(cfg *Config) string {
+	if cfg == nil {
+		return ""
+	}
+	if s := strings.TrimSpace(cfg.MemdirMemoryDir); s != "" {
+		return s
+	}
+	if s := features.MemdirMemoryDirFromEnv(); s != "" {
+		return s
+	}
+	if !features.AutoMemdirFromProject() || !features.AutoMemoryEnabled() {
+		return ""
+	}
+	root := strings.TrimSpace(cfg.MemdirProjectRoot)
+	if root == "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			return ""
+		}
+		root = wd
+	}
+	dir, err := memdir.ResolveAutoMemDir(root)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSuffix(strings.TrimSpace(dir), string(filepath.Separator))
 }
 
 func effectiveMemdirRelevanceMode(override string) memdir.RelevanceMode {

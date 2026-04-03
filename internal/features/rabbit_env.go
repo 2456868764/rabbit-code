@@ -200,6 +200,10 @@ const (
 	EnvMemdirRelevanceMode = "RABBIT_CODE_MEMDIR_RELEVANCE_MODE"
 	// EnvMemdirStrictLLM when truthy, LLM memdir selection errors yield no memories (no heuristic fallback; TS-aligned).
 	EnvMemdirStrictLLM = "RABBIT_CODE_MEMDIR_STRICT_LLM"
+	// EnvMemdirMemoryDir sets the engine memory scan directory when Config.MemdirMemoryDir is empty (H8).
+	EnvMemdirMemoryDir = "RABBIT_CODE_MEMDIR_MEMORY_DIR"
+	// EnvAutoMemdir when truthy, resolves memdir via memdir.ResolveAutoMemDir when Config.MemdirMemoryDir and EnvMemdirMemoryDir are unset (requires AutoMemoryEnabled).
+	EnvAutoMemdir = "RABBIT_CODE_AUTO_MEMDIR"
 	// Auto-memory gates (memdir/paths.ts isAutoMemoryEnabled; settings.json branch omitted in headless).
 	EnvDisableAutoMemory       = "RABBIT_CODE_DISABLE_AUTO_MEMORY"
 	EnvClaudeDisableAutoMemory = "CLAUDE_CODE_DISABLE_AUTO_MEMORY"
@@ -225,6 +229,16 @@ func MemdirRelevanceMode() string {
 // MemdirStrictLLM mirrors strict LLM-only recall (findRelevantMemories.ts returns [] on sideQuery failure).
 func MemdirStrictLLM() bool {
 	return truthy(os.Getenv(EnvMemdirStrictLLM))
+}
+
+// MemdirMemoryDirFromEnv returns RABBIT_CODE_MEMDIR_MEMORY_DIR trimmed.
+func MemdirMemoryDirFromEnv() string {
+	return strings.TrimSpace(os.Getenv(EnvMemdirMemoryDir))
+}
+
+// AutoMemdirFromProject is true when RABBIT_CODE_AUTO_MEMDIR is truthy.
+func AutoMemdirFromProject() bool {
+	return truthy(os.Getenv(EnvAutoMemdir))
 }
 
 func envDefinedDual(rabbitKey, claudeKey string) (string, bool) {

@@ -702,7 +702,7 @@ func TestEngine_MemdirMemoryDir_heuristicAndSurfacedExcludesSecondSubmit(t *test
 				return "ok", nil
 			}),
 		},
-		MemdirMemoryDir:           memDir,
+		MemdirMemoryDir:             memDir,
 		MemdirRelevanceModeOverride: "heuristic",
 	})
 	drain := func() {
@@ -734,6 +734,87 @@ func TestEngine_MemdirMemoryDir_heuristicAndSurfacedExcludesSecondSubmit(t *test
 		t.Fatalf("second submit should not inject again; total memdir events %d", memdirCount)
 	}
 	e.Wait()
+}
+
+func TestResolveEngineMemdirMemoryDir_env(t *testing.T) {
+	memDir := t.TempDir()
+	t.Setenv(features.EnvMemdirMemoryDir, memDir)
+	if got := resolveEngineMemdirMemoryDir(&Config{}); got != memDir {
+		t.Fatalf("resolveEngineMemdirMemoryDir: got %q want %q", got, memDir)
+	}
+}
+
+func TestEngine_MemdirMemoryDir_fromEnv(t *testing.T) {
+	memDir := t.TempDir()
+	t.Setenv(features.EnvMemdirMemoryDir, memDir)
+	md := filepath.Join(memDir, "note.md")
+	if err := os.WriteFile(md, []byte("everything about bananas"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var lastUser string
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+				lastUser = string(messagesJSON)
+				return "ok", nil
+			}),
+		},
+		MemdirRelevanceModeOverride: "heuristic",
+	})
+	e.Submit("banana bread")
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindDone {
+				goto doneEnvMem
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+doneEnvMem:
+	e.Wait()
+	if !strings.Contains(lastUser, "bananas") {
+		t.Fatalf("missing fragment: %q", lastUser)
+	}
+}
+
+func TestEngine_MemdirMemoryDir_autoResolve_memoryPathOverride(t *testing.T) {
+	memDir := t.TempDir()
+	t.Setenv("RABBIT_CODE_MEMORY_PATH_OVERRIDE", memDir)
+	t.Setenv(features.EnvAutoMemdir, "1")
+	proj := t.TempDir()
+	md := filepath.Join(memDir, "note.md")
+	if err := os.WriteFile(md, []byte("everything about plums"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var lastUser string
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+				lastUser = string(messagesJSON)
+				return "ok", nil
+			}),
+		},
+		MemdirProjectRoot:           proj,
+		MemdirRelevanceModeOverride: "heuristic",
+	})
+	e.Submit("plum jam")
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindDone {
+				goto doneAuto
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+doneAuto:
+	e.Wait()
+	if !strings.Contains(lastUser, "plums") {
+		t.Fatalf("missing fragment: %q", lastUser)
+	}
 }
 
 func TestEngine_CompactSuggest_afterLoop(t *testing.T) {

@@ -158,6 +158,28 @@ func TestMemdirStrictLLM(t *testing.T) {
 	}
 }
 
+func TestMemdirMemoryDirFromEnv(t *testing.T) {
+	t.Setenv(EnvMemdirMemoryDir, "")
+	if MemdirMemoryDirFromEnv() != "" {
+		t.Fatal()
+	}
+	t.Setenv(EnvMemdirMemoryDir, "  /tmp/memdir-x  ")
+	if MemdirMemoryDirFromEnv() != "/tmp/memdir-x" {
+		t.Fatalf("%q", MemdirMemoryDirFromEnv())
+	}
+}
+
+func TestAutoMemdirFromProject(t *testing.T) {
+	t.Setenv(EnvAutoMemdir, "")
+	if AutoMemdirFromProject() {
+		t.Fatal()
+	}
+	t.Setenv(EnvAutoMemdir, "yes")
+	if !AutoMemdirFromProject() {
+		t.Fatal()
+	}
+}
+
 func TestAutoMemoryEnabled(t *testing.T) {
 	clear := func() {
 		for _, k := range []string{
