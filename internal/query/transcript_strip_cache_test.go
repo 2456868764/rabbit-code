@@ -68,3 +68,17 @@ func TestStripCacheControlFromMessagesJSON_invalidJSON(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestStripCacheControlFromMessagesJSON_nestedInToolInput(t *testing.T) {
+	raw := json.RawMessage(`[{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"x","input":{"a":1},"cache_control":{"type":"ephemeral"}}]}]`)
+	out, changed, err := StripCacheControlFromMessagesJSON(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed {
+		t.Fatal("expected cache_control removed from tool_use block")
+	}
+	if bytes.Contains(out, []byte("cache_control")) {
+		t.Fatalf("still has cache_control: %s", out)
+	}
+}
