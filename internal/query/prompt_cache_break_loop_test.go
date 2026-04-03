@@ -160,3 +160,52 @@ func TestRunTurnLoop_promptCacheBreak_trimThenCompact_chain(t *testing.T) {
 		t.Fatalf("AssistantTurn calls: want 3 (cache break → strip retry cache break → compact seed ok), got %d", turn.n)
 	}
 }
+
+type failTwiceCacheBreakThenOK struct {
+	n int
+	t *testing.T
+}
+
+func (f *failTwiceCacheBreakThenOK) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (querydeps.TurnResult, error) {
+	f.n++
+	if f.n <= 2 {
+		return querydeps.TurnResult{}, anthropic.ErrPromptCacheBreakDetected
+	}
+	if !bytes.Contains(msgs, []byte("seed2")) {
+		f.t.Fatalf("call %d: expected second compact transcript, got %s", f.n, msgs)
+	}
+	return querydeps.TurnResult{Text: "ok-second-compact"}, nil
+}
+
+func TestRunTurnLoop_promptCacheBreak_secondCompactRound(t *testing.T) {
+	t.Setenv(features.EnvPromptCacheBreak, "1")
+	t.Setenv(features.EnvPromptCacheBreakTrimResend, "0")
+	t.Setenv(features.EnvPromptCacheBreakAutoCompact, "1")
+	var recoveryCalls int
+	turn := &failTwiceCacheBreakThenOK{t: t}
+	d := LoopDriver{
+		Deps: querydeps.Deps{Turn: turn},
+		Model: "m", MaxTokens: 8,
+		PromptCacheBreakRecovery: func(ctx context.Context, msgs json.RawMessage) (json.RawMessage, bool, error) {
+			recoveryCalls++
+			if recoveryCalls == 1 {
+				return json.RawMessage(`[{"role":"user","content":[{"type":"text","text":"seed1"}]}]`), true, nil
+			}
+			return json.RawMessage(`[{"role":"user","content":[{"type":"text","text":"seed2"}]}]`), true, nil
+		},
+	}
+	st := LoopState{}
+	_, text, err := d.RunTurnLoop(context.Background(), &st, "hi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text != "ok-second-compact" {
+		t.Fatalf("text %q", text)
+	}
+	if recoveryCalls != 2 {
+		t.Fatalf("recovery calls: want 2, got %d", recoveryCalls)
+	}
+	if turn.n != 3 {
+		t.Fatalf("AssistantTurn calls: want 3 (break, break after seed1, ok after seed2), got %d", turn.n)
+	}
+}

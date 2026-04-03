@@ -15,6 +15,10 @@ import (
 // ErrPromptCacheBreakDetected (H1: compact coordination). If ok is false, the loop returns the last error.
 type PromptCacheBreakRecovery func(ctx context.Context, msgs json.RawMessage) (next json.RawMessage, ok bool, err error)
 
+// maxPromptCacheBreakCompactRounds caps compact+retry cycles per AssistantTurn wave (H1).
+// Mirrors a bounded second recovery when trim + first compact seed still sees cache break.
+const maxPromptCacheBreakCompactRounds = 2
+
 func (d *LoopDriver) assistantTurnWithPromptCacheBreakHandling(ctx context.Context, st *LoopState, model string, max int, msgs json.RawMessage) (querydeps.TurnResult, json.RawMessage, error) {
 	turn, err := d.turner().AssistantTurn(ctx, model, max, msgs)
 	if err == nil {
@@ -48,11 +52,17 @@ func (d *LoopDriver) assistantTurnWithPromptCacheBreakHandling(ctx context.Conte
 	}
 
 	if errors.Is(err, anthropic.ErrPromptCacheBreakDetected) && d.PromptCacheBreakRecovery != nil && features.PromptCacheBreakAutoCompactEnabled() {
-		next, ok, rerr := d.PromptCacheBreakRecovery(ctx, msgs)
-		if rerr != nil {
-			return querydeps.TurnResult{}, msgs, rerr
-		}
-		if ok && len(bytes.TrimSpace(next)) > 0 {
+		for round := 0; round < maxPromptCacheBreakCompactRounds; round++ {
+			if !errors.Is(err, anthropic.ErrPromptCacheBreakDetected) {
+				break
+			}
+			next, ok, rerr := d.PromptCacheBreakRecovery(ctx, msgs)
+			if rerr != nil {
+				return querydeps.TurnResult{}, msgs, rerr
+			}
+			if !ok || len(bytes.TrimSpace(next)) == 0 {
+				break
+			}
 			if st != nil {
 				RecordLoopContinue(st, LoopContinue{Reason: ContinueReasonPromptCacheBreakCompactRetry})
 			}
@@ -64,7 +74,9 @@ func (d *LoopDriver) assistantTurnWithPromptCacheBreakHandling(ctx context.Conte
 				st.SetMessagesJSON(msgs)
 			}
 			turn, err = d.turner().AssistantTurn(ctx, model, max, msgs)
-			return turn, msgs, err
+			if err == nil {
+				return turn, msgs, nil
+			}
 		}
 	}
 
