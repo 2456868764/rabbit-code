@@ -1,6 +1,10 @@
 package query
 
-import "testing"
+import (
+	"encoding/json"
+	"reflect"
+	"testing"
+)
 
 func TestApplyTransition_table(t *testing.T) {
 	cases := []struct {
@@ -19,10 +23,26 @@ func TestApplyTransition_table(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := ApplyTransition(tc.s, tc.tr)
-			if got != tc.want {
+			if !reflect.DeepEqual(got, tc.want) {
 				t.Fatalf("got %+v want %+v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestApplyTransition_preservesMessagesJSONAndToolUseContext(t *testing.T) {
+	raw := json.RawMessage(`[{"role":"user"}]`)
+	s := LoopState{
+		TurnCount:      0,
+		MessagesJSON:   raw,
+		ToolUseContext: ToolUseContextMirror{AgentID: "ag", MainLoopModel: "m", NonInteractive: true},
+	}
+	got := ApplyTransition(s, TranReceiveAssistant)
+	if string(got.MessagesJSON) != string(raw) {
+		t.Fatalf("MessagesJSON: %s", got.MessagesJSON)
+	}
+	if got.ToolUseContext.AgentID != "ag" || got.ToolUseContext.MainLoopModel != "m" || !got.ToolUseContext.NonInteractive {
+		t.Fatalf("%+v", got.ToolUseContext)
 	}
 }
 

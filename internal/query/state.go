@@ -1,7 +1,18 @@
 package query
 
+import "encoding/json"
+
+// ToolUseContextMirror holds a headless subset of query.ts ToolUseContext (H6).
+// Full TS type includes AppState, MCP, hooks, etc.; Go mirrors fields used for token-budget / analytics parity.
+type ToolUseContextMirror struct {
+	AgentID        string
+	MainLoopModel  string
+	NonInteractive bool
+	QueryChainID   string
+	QueryDepth     int
+}
+
 // LoopState tracks cross-iteration query loop metadata aligned with query.ts State (H6).
-// Messages JSON and full toolUseContext live outside this struct in the Go headless path.
 type LoopState struct {
 	TurnCount    int
 	PendingTools int
@@ -10,6 +21,10 @@ type LoopState struct {
 	MaxTurns int
 	// CompactCount increments on TranStartCompact (P5.1.1 / P5.2.1 bookkeeping).
 	CompactCount int
+	// MessagesJSON mirrors query.ts state.messages in API JSON array form; updated on each transcript mutation in RunTurnLoop.
+	MessagesJSON json.RawMessage
+	// ToolUseContext mirrors a subset of query.ts toolUseContext (see ToolUseContextMirror).
+	ToolUseContext ToolUseContextMirror
 	// LoopContinue mirrors query.ts transition (why the previous iteration continued).
 	LoopContinue LoopContinue
 	// AutoCompactTracking mirrors query.ts autoCompactTracking (nil = undefined).
@@ -32,4 +47,16 @@ type LoopState struct {
 	HadStreamError   bool
 	// LastAPIErrorKind is the anthropic.APIError kind string after a failed assistant call (P5.1.3).
 	LastAPIErrorKind string
+}
+
+// SetMessagesJSON replaces MessagesJSON with a copy of msgs (query.ts state.messages mirror, H6).
+func (st *LoopState) SetMessagesJSON(msgs json.RawMessage) {
+	if st == nil {
+		return
+	}
+	if len(msgs) == 0 {
+		st.MessagesJSON = nil
+		return
+	}
+	st.MessagesJSON = json.RawMessage(append([]byte(nil), msgs...))
 }

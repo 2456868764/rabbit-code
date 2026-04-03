@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/2456868764/rabbit-code/internal/querydeps"
@@ -42,6 +43,12 @@ func TestLoopDriver_RunTurnLoop_setsNextTurnContinueAfterTools(t *testing.T) {
 	}
 	if st.LoopContinue.Reason != ContinueReasonNextTurn {
 		t.Fatalf("want next_turn, got %+v", st.LoopContinue)
+	}
+	if len(st.MessagesJSON) == 0 || !strings.Contains(string(st.MessagesJSON), "hi") {
+		t.Fatalf("MessagesJSON mirror: %s", st.MessagesJSON)
+	}
+	if st.ToolUseContext.MainLoopModel != "m" {
+		t.Fatalf("ToolUseContext: %+v", st.ToolUseContext)
 	}
 }
 

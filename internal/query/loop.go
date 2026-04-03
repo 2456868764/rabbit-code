@@ -17,6 +17,10 @@ type LoopDriver struct {
 	Deps      querydeps.Deps
 	Model     string
 	MaxTokens int
+	// AgentID optional subagent / analytics id (query.ts toolUseContext.agentId).
+	AgentID string
+	// NonInteractive mirrors toolUseContext.options.isNonInteractiveSession when true.
+	NonInteractive bool
 	Observe   *LoopObservers
 	// HistorySnipMaxBytes / HistorySnipMaxRounds implement P5.F.10 when both > 0 (engine sets from features).
 	HistorySnipMaxBytes  int
@@ -125,33 +129,46 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 			return nil, "", err
 		}
 	}
+	if st != nil {
+		model0, _ := d.modelAndMax()
+		st.ToolUseContext.MainLoopModel = model0
+		st.ToolUseContext.AgentID = d.AgentID
+		st.ToolUseContext.NonInteractive = d.NonInteractive
+		st.SetMessagesJSON(msgs)
+	}
 	model, max := d.modelAndMax()
 	for {
 		if st != nil && st.MaxTurns > 0 && st.TurnCount >= st.MaxTurns {
+			st.SetMessagesJSON(msgs)
 			return msgs, lastAssistantText, ErrMaxTurnsExceeded
 		}
 		if d.HistorySnipMaxBytes > 0 && d.HistorySnipMaxRounds > 0 {
 			newMsgs, n, err := TrimTranscriptPrefixWhileOverBudget(msgs, d.HistorySnipMaxBytes, d.HistorySnipMaxRounds)
 			if err != nil {
+				st.SetMessagesJSON(msgs)
 				return msgs, lastAssistantText, err
 			}
 			if n > 0 && d.Observe != nil && d.Observe.OnHistorySnip != nil {
 				d.Observe.OnHistorySnip(len(msgs), len(newMsgs), n)
 			}
 			msgs = newMsgs
+			st.SetMessagesJSON(msgs)
 		}
 		if d.SnipCompactMaxBytes > 0 && d.SnipCompactMaxRounds > 0 {
 			newMsgs, n, err := TrimTranscriptPrefixWhileOverBudget(msgs, d.SnipCompactMaxBytes, d.SnipCompactMaxRounds)
 			if err != nil {
+				st.SetMessagesJSON(msgs)
 				return msgs, lastAssistantText, err
 			}
 			if n > 0 && d.Observe != nil && d.Observe.OnSnipCompact != nil {
 				d.Observe.OnSnipCompact(len(msgs), len(newMsgs), n)
 			}
 			msgs = newMsgs
+			st.SetMessagesJSON(msgs)
 		}
 		turn, err := d.turner().AssistantTurn(ctx, model, max, msgs)
 		if err != nil {
+			st.SetMessagesJSON(msgs)
 			return msgs, lastAssistantText, err
 		}
 		if len(turn.ToolUses) == 0 && turn.Text == "" {
@@ -159,8 +176,10 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 		}
 		msgs, err = AppendAssistantTurnMessage(msgs, turn.Text, turn.ToolUses)
 		if err != nil {
+			st.SetMessagesJSON(msgs)
 			return msgs, lastAssistantText, err
 		}
+		st.SetMessagesJSON(msgs)
 		if st != nil {
 			*st = ApplyTransition(*st, TranReceiveAssistant)
 			st.LastStopReason = turn.StopReason
@@ -173,6 +192,7 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 			break
 		}
 		if d.Deps.Tools == nil {
+			st.SetMessagesJSON(msgs)
 			return msgs, lastAssistantText, querydeps.ErrNoToolRunner
 		}
 		results := make([]ToolResultBlock, 0, len(turn.ToolUses))
@@ -189,6 +209,7 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 				if o := d.Observe; o != nil && o.OnToolError != nil {
 					o.OnToolError(u.Name, u.ID, err)
 				}
+				st.SetMessagesJSON(msgs)
 				return msgs, lastAssistantText, err
 			}
 			if o := d.Observe; o != nil && o.OnToolDone != nil {
@@ -198,11 +219,14 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 		}
 		msgs, err = AppendUserToolResultsMessage(msgs, results)
 		if err != nil {
+			st.SetMessagesJSON(msgs)
 			return msgs, lastAssistantText, err
 		}
+		st.SetMessagesJSON(msgs)
 		if st != nil {
 			RecordLoopContinue(st, LoopContinue{Reason: ContinueReasonNextTurn})
 		}
 	}
+	st.SetMessagesJSON(msgs)
 	return msgs, lastAssistantText, nil
 }

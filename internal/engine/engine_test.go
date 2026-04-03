@@ -809,6 +809,35 @@ func TestEngine_ContextCollapseDrain_recoverRetryUsesDrainedSeed(t *testing.T) {
 	}
 }
 
+func TestEngine_ConfigAgentIDNonInteractive_inLoopState(t *testing.T) {
+	var captured query.LoopState
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "x", nil
+			}),
+		},
+		Model:          "custom-model",
+		AgentID:        "engine-agent",
+		NonInteractive: true,
+		StopHooks: []StopHookFunc{
+			func(_ context.Context, st query.LoopState, _ error) { captured = st },
+		},
+	})
+	e.Submit("hi")
+	drainUntilTerminal(t, e.Events())
+	e.Wait()
+	if captured.ToolUseContext.AgentID != "engine-agent" || !captured.ToolUseContext.NonInteractive {
+		t.Fatalf("%+v", captured.ToolUseContext)
+	}
+	if captured.ToolUseContext.MainLoopModel != "custom-model" {
+		t.Fatalf("model %q", captured.ToolUseContext.MainLoopModel)
+	}
+	if len(captured.MessagesJSON) == 0 || !strings.Contains(string(captured.MessagesJSON), "hi") {
+		t.Fatalf("MessagesJSON %s", captured.MessagesJSON)
+	}
+}
+
 func TestEngine_BashStubToolRunner(t *testing.T) {
 	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
 		{Text: "run", ToolUses: []querydeps.ToolUseCall{{ID: "t1", Name: "bash", Input: json.RawMessage(`{"cmd":"ls"}`)}}},

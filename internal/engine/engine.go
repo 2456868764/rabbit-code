@@ -65,6 +65,10 @@ type Config struct {
 	StopHookBlockingContinue StopHookBlockingContinue
 	// TokenBudgetContinueAfterTurn optional extra RunTurnLoop when RABBIT_CODE_TOKEN_BUDGET is on (H6).
 	TokenBudgetContinueAfterTurn TokenBudgetContinueAfterTurn
+	// AgentID optional mirror of query.ts toolUseContext.agentId (H6).
+	AgentID string
+	// NonInteractive mirrors toolUseContext.options.isNonInteractiveSession (H6).
+	NonInteractive bool
 }
 
 // Engine coordinates cancellable query turns (stub or real StreamAssistant / RunTurnLoop).
@@ -89,6 +93,8 @@ type Engine struct {
 	contextCollapseDrain             ContextCollapseDrain
 	stopHookBlockingContinue         StopHookBlockingContinue
 	tokenBudgetContinueAfterTurn     TokenBudgetContinueAfterTurn
+	agentID                          string
+	nonInteractive                   bool
 	cacheBreakSeen                   int32 // atomic: prompt-cache break callback ran this Submit
 }
 
@@ -143,6 +149,8 @@ func New(parent context.Context, cfg *Config) *Engine {
 		e.contextCollapseDrain = cfg.ContextCollapseDrain
 		e.stopHookBlockingContinue = cfg.StopHookBlockingContinue
 		e.tokenBudgetContinueAfterTurn = cfg.TokenBudgetContinueAfterTurn
+		e.agentID = strings.TrimSpace(cfg.AgentID)
+		e.nonInteractive = cfg.NonInteractive
 	}
 	return e
 }

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/2456868764/rabbit-code/internal/query"
@@ -11,6 +12,8 @@ func TestResetLoopStateForRetryAttempt_preservesH6Fields(t *testing.T) {
 	st := &query.LoopState{
 		MaxTurns:                      7,
 		CompactCount:                  1,
+		MessagesJSON:                  json.RawMessage(`[1]`),
+		ToolUseContext:                query.ToolUseContextMirror{AgentID: "x", MainLoopModel: "m"},
 		RecoveryAttempts:              2,
 		RecoveryPhase:                 query.RecoveryPendingCompact,
 		LoopContinue:                  query.LoopContinue{Reason: query.ContinueReasonSubmitRecoverRetry},
@@ -36,5 +39,8 @@ func TestResetLoopStateForRetryAttempt_preservesH6Fields(t *testing.T) {
 	}
 	if st.RecoveryPhase != query.RecoveryRetriedOnce {
 		t.Fatalf("got %v", st.RecoveryPhase)
+	}
+	if string(st.MessagesJSON) != `[1]` || st.ToolUseContext.AgentID != "x" {
+		t.Fatalf("messages/tool ctx: %+v", st)
 	}
 }

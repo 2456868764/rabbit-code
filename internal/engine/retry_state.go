@@ -1,6 +1,10 @@
 package engine
 
-import "github.com/2456868764/rabbit-code/internal/query"
+import (
+	"encoding/json"
+
+	"github.com/2456868764/rabbit-code/internal/query"
+)
 
 // resetLoopStateForRetryAttempt mirrors the prior partial preserve of *st before a second RunTurnLoop,
 // but carries H6 bookkeeping (LoopContinue, overrides, auto-compact tracking) across attempts.
@@ -9,6 +13,8 @@ func resetLoopStateForRetryAttempt(st *query.LoopState) {
 	*st = query.LoopState{
 		MaxTurns:                      p.MaxTurns,
 		CompactCount:                  p.CompactCount,
+		MessagesJSON:                  append(json.RawMessage(nil), p.MessagesJSON...),
+		ToolUseContext:                p.ToolUseContext,
 		RecoveryAttempts:              p.RecoveryAttempts,
 		RecoveryPhase:                 p.RecoveryPhase,
 		LoopContinue:                  p.LoopContinue,

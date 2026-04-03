@@ -26,8 +26,10 @@ func TestLoopDriver_RunTurnLoop_toolThenText_AC5_3(t *testing.T) {
 			Tools: tr,
 			Turn:  turns,
 		},
-		Model:     "m",
-		MaxTokens: 64,
+		Model:          "m",
+		MaxTokens:      64,
+		AgentID:        "agent-test",
+		NonInteractive: true,
 	}
 	st := LoopState{MaxTurns: 10}
 	_, last, err := d.RunTurnLoop(context.Background(), &st, "hi")
@@ -42,6 +44,9 @@ func TestLoopDriver_RunTurnLoop_toolThenText_AC5_3(t *testing.T) {
 	}
 	if st.TurnCount != 2 {
 		t.Fatalf("turns %+v", st)
+	}
+	if st.ToolUseContext.AgentID != "agent-test" || !st.ToolUseContext.NonInteractive || st.ToolUseContext.MainLoopModel != "m" {
+		t.Fatalf("ToolUseContext %+v", st.ToolUseContext)
 	}
 }
 

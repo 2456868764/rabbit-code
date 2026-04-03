@@ -14,6 +14,7 @@ const (
 )
 
 // ApplyTransition returns the next state (pure, no I/O).
+// MessagesJSON and ToolUseContext are not mutated by transitions (they mirror query.ts state carried outside transition edges).
 func ApplyTransition(s LoopState, t Transition) LoopState {
 	out := s
 	switch t {
