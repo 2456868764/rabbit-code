@@ -29,7 +29,9 @@ type Runtime struct {
 	NonInteractive    bool
 	GlobalConfigDir   string
 	ProjectConfigPath string
-	Cleanup           *CleanupRegistry
+	// MergedSettings snapshot after successful LoadAndApplyMergedConfig (trust path); used for engine memdir H8.
+	MergedSettings map[string]interface{}
+	Cleanup        *CleanupRegistry
 }
 
 // Close runs registered cleanups (LIFO). Safe to call multiple times.

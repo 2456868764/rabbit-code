@@ -23,6 +23,7 @@ func LoadAndApplyMergedConfig(rt *Runtime) error {
 	if err != nil {
 		return err
 	}
+	rt.MergedSettings = m
 	cwd, _ := os.Getwd()
 	extraPaths := config.ExtraCAPEMPaths(m, root, cwd)
 	if len(extraPaths) > 0 && rt.RootCAs != nil {

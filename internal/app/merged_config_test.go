@@ -50,4 +50,11 @@ func TestLoadAndApplyMergedConfig(t *testing.T) {
 	if os.Getenv(testManagedEnvKey) != "x" {
 		t.Fatal(os.Getenv(testManagedEnvKey))
 	}
+	if rt.MergedSettings == nil {
+		t.Fatal("MergedSettings snapshot missing")
+	}
+	mm, ok := rt.MergedSettings["managed_env"].(map[string]interface{})
+	if !ok || mm[testManagedEnvKey] != "x" {
+		t.Fatalf("merged managed_env %+v", rt.MergedSettings["managed_env"])
+	}
 }
