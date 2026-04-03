@@ -64,13 +64,13 @@ func ScanMemoryFiles(ctx context.Context, memoryDir string) ([]MemoryHeader, err
 		if err != nil {
 			return nil
 		}
-		desc, typ := readMemoryFrontmatterMeta(path)
+		desc, typRaw := readMemoryFrontmatterMeta(path)
 		out = append(out, MemoryHeader{
 			Filename:    rel,
 			FilePath:    path,
 			MtimeMs:     st.ModTime().UnixMilli(),
 			Description: desc,
-			Type:        typ,
+			Type:        ParseMemoryType(typRaw),
 		})
 		return nil
 	})

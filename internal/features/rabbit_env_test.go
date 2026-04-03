@@ -146,6 +146,17 @@ func TestMemdirRelevanceMode(t *testing.T) {
 	}
 }
 
+func TestMemdirStrictLLM(t *testing.T) {
+	t.Setenv(EnvMemdirStrictLLM, "")
+	if MemdirStrictLLM() {
+		t.Fatal()
+	}
+	t.Setenv(EnvMemdirStrictLLM, "1")
+	if !MemdirStrictLLM() {
+		t.Fatal()
+	}
+}
+
 func TestTokenBudgetMaxAttachmentBytes_whenEnabled(t *testing.T) {
 	t.Setenv(EnvTokenBudget, "1")
 	if TokenBudgetMaxAttachmentBytes() != 0 {

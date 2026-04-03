@@ -25,13 +25,13 @@ func TestScanMemoryFiles_skipsMemoryMd_andNonMd(t *testing.T) {
 
 func TestScanMemoryFiles_frontmatterMeta(t *testing.T) {
 	dir := t.TempDir()
-	body := "---\ndescription: My desc\ntype: note\n---\nbody\n"
+	body := "---\ndescription: My desc\ntype: project\n---\nbody\n"
 	_ = os.WriteFile(filepath.Join(dir, "f.md"), []byte(body), 0o600)
 	got, err := ScanMemoryFiles(context.Background(), dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 || got[0].Description != "My desc" || got[0].Type != "note" {
+	if len(got) != 1 || got[0].Description != "My desc" || got[0].Type != "project" {
 		t.Fatalf("%+v", got)
 	}
 }

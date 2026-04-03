@@ -74,6 +74,12 @@ type Config struct {
 	MemdirRelevanceModeOverride string
 	// MemdirAlreadySurfaced seeds paths excluded from repeated memdir selection in-session (H8).
 	MemdirAlreadySurfaced map[string]struct{}
+	// MemdirStrictLLM skips heuristic fallback after LLM memdir failure; also when RABBIT_CODE_MEMDIR_STRICT_LLM is set.
+	MemdirStrictLLM bool
+	// MemdirSelectMaxTokens caps the side-query completion (default 256, findRelevantMemories.ts max_tokens).
+	MemdirSelectMaxTokens int
+	// MemdirOnRecallShape optional (candidates, selected) after each memdir recall (H8 telemetry hook).
+	MemdirOnRecallShape memdir.RecallShapeHook
 	// MaxAssistantTurns if > 0 sets query.LoopState.MaxTurns for each Submit (caps assistant API rounds).
 	MaxAssistantTurns int
 	// SuggestCompactOnRecoverableError emits EventKindCompactSuggest (auto) before EventKindError when the failure is RecoverableCompact (P5.1.3 hint).
@@ -142,6 +148,9 @@ type Engine struct {
 	memdirTextComplete               memdir.TextCompleteFunc
 	memdirRelevanceMode              memdir.RelevanceMode
 	memdirSurfaced                   map[string]struct{}
+	memdirStrictLLM                  bool
+	memdirSelectMaxTokens            int
+	memdirOnRecallShape              memdir.RecallShapeHook
 	compactAdvisor                   func(query.LoopState, []byte) (bool, bool)
 	compactExecutor                  CompactExecutor
 	stopHooks                        []StopHookFunc
@@ -219,6 +228,13 @@ func New(parent context.Context, cfg *Config) *Engine {
 		for k := range cfg.MemdirAlreadySurfaced {
 			e.memdirSurfaced[k] = struct{}{}
 		}
+		e.memdirStrictLLM = cfg.MemdirStrictLLM || features.MemdirStrictLLM()
+		if cfg.MemdirSelectMaxTokens > 0 {
+			e.memdirSelectMaxTokens = cfg.MemdirSelectMaxTokens
+		} else {
+			e.memdirSelectMaxTokens = 256
+		}
+		e.memdirOnRecallShape = cfg.MemdirOnRecallShape
 		e.compactAdvisor = cfg.CompactAdvisor
 		e.compactExecutor = cfg.CompactExecutor
 		e.stopHooks = append([]StopHookFunc(nil), cfg.StopHooks...)
@@ -338,9 +354,13 @@ func (e *Engine) anthropicMemdirTextComplete() memdir.TextCompleteFunc {
 		if err != nil {
 			return "", err
 		}
+		mt := e.memdirSelectMaxTokens
+		if mt <= 0 {
+			mt = 256
+		}
 		body := anthropic.MessagesStreamBody{
 			Model:     e.model,
-			MaxTokens: 1024,
+			MaxTokens: mt,
 			Messages:  msgs,
 		}
 		pol := e.anthropicPolicy()
@@ -366,6 +386,8 @@ func (e *Engine) memdirPathsForSubmit(userText string) ([]string, error) {
 			RecentTools:     e.memdirRecentTools,
 			AlreadySurfaced: e.memdirSurfaced,
 			TextComplete:    tc,
+			StrictLLM:       e.memdirStrictLLM,
+			OnRecallShape:   e.memdirOnRecallShape,
 		}
 		rel, err := memdir.FindRelevantMemories(e.ctx, userText, e.memdirMemoryDir, opts)
 		if err != nil {

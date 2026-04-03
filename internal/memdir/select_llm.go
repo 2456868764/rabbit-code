@@ -14,7 +14,7 @@ const SelectMemoriesSystemPrompt = `You are selecting memories that will be usef
 Return a JSON object with key "selected_memories" whose value is an array of filenames (strings) for the memories that will clearly be useful (up to 5). Only include memories that you are certain will be helpful based on their name and description.
 - If you are unsure if a memory will be useful in processing the user's query, then do not include it in your list. Be selective and discerning.
 - If there are no memories in the list that would clearly be useful, return {"selected_memories":[]}.
-- If a list of recently-used tools is provided, do not select memories that are usage reference or API documentation for those tools. DO still select memories containing warnings, gotchas, or known issues about those tools.`
+- If a list of recently-used tools is provided, do not select memories that are usage reference or API documentation for those tools (Claude Code is already exercising them). DO still select memories containing warnings, gotchas, or known issues about those tools — active use is exactly when those matter.`
 
 // TextCompleteFunc performs one assistant-style completion (H8.2 side-query); engine wires Anthropic streaming read.
 type TextCompleteFunc func(ctx context.Context, systemPrompt, userMessage string) (assistantText string, err error)
