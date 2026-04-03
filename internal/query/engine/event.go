@@ -23,6 +23,8 @@ const (
 	EventKindCachedMicrocompactActive
 	EventKindHistorySnipApplied
 	EventKindSnipCompactApplied
+	// EventKindSubmitTokenBudgetSnapshot reports combined heuristic submit tokens (H5): PhaseAuxInt=total, PhaseAuxInt2=inject raw bytes, PhaseDetail=mode.
+	EventKindSubmitTokenBudgetSnapshot
 )
 
 // EngineEvent is a single unit on the engine event channel.

@@ -404,6 +404,17 @@ func (e *Engine) runTurnLoop(userText string) {
 		}
 	}
 
+	if features.TokenBudgetEnabled() {
+		mode := features.SubmitTokenEstimateMode()
+		totalTok := query.EstimateSubmitTokenBudgetTotal(mode, resolved, injectRaw)
+		e.trySend(EngineEvent{
+			Kind:         EventKindSubmitTokenBudgetSnapshot,
+			PhaseAuxInt:  totalTok,
+			PhaseAuxInt2: injectRaw,
+			PhaseDetail:  mode,
+		})
+	}
+
 	if maxA := features.TokenBudgetMaxAttachmentBytes(); maxA > 0 && injectRaw > maxA {
 		loopErr = ErrTokenBudgetExceeded
 		e.trySend(EngineEvent{Kind: EventKindError, Err: loopErr})
@@ -414,10 +425,13 @@ func (e *Engine) runTurnLoop(userText string) {
 		e.trySend(EngineEvent{Kind: EventKindError, Err: loopErr})
 		return
 	}
-	if maxT := features.TokenBudgetMaxInputTokens(); maxT > 0 && query.EstimateUTF8BytesAsTokens(resolved) > maxT {
-		loopErr = ErrTokenBudgetExceeded
-		e.trySend(EngineEvent{Kind: EventKindError, Err: loopErr})
-		return
+	if maxT := features.TokenBudgetMaxInputTokens(); maxT > 0 {
+		mode := features.SubmitTokenEstimateMode()
+		if query.EstimateSubmitTokenBudgetTotal(mode, resolved, injectRaw) > maxT {
+			loopErr = ErrTokenBudgetExceeded
+			e.trySend(EngineEvent{Kind: EventKindError, Err: loopErr})
+			return
+		}
 	}
 
 	if features.BreakCacheCommandEnabled() {

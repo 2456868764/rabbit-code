@@ -161,6 +161,8 @@ const (
 	EnvTokenBudgetMaxInputBytes    = "RABBIT_CODE_TOKEN_BUDGET_MAX_INPUT_BYTES"
 	EnvTokenBudgetMaxInputTokens   = "RABBIT_CODE_TOKEN_BUDGET_MAX_INPUT_TOKENS"
 	EnvTokenBudgetMaxAttachmentBytes = "RABBIT_CODE_TOKEN_BUDGET_MAX_ATTACHMENT_BYTES"
+	// EnvTokenSubmitEstimateMode selects how resolved Submit text is tokenized for MAX_INPUT_TOKENS (H5): "bytes4" (default) or "structured" (Messages JSON array).
+	EnvTokenSubmitEstimateMode = "RABBIT_CODE_TOKEN_SUBMIT_ESTIMATE_MODE"
 	EnvReactiveCompact             = "RABBIT_CODE_REACTIVE_COMPACT"
 	// EnvTenguCobaltRaccoon mirrors GrowthBook tengu_cobalt_raccoon (reactive-only mode under REACTIVE_COMPACT).
 	EnvTenguCobaltRaccoon = "RABBIT_CODE_TENGU_COBALT_RACCOON"
@@ -242,6 +244,18 @@ func TokenBudgetMaxAttachmentBytes() int {
 		return 0
 	}
 	return v
+}
+
+// SubmitTokenEstimateMode returns "structured" or "bytes4" for query.EstimateResolvedSubmitTextTokens (only meaningful when TOKEN_BUDGET is on).
+func SubmitTokenEstimateMode() string {
+	if !TokenBudgetEnabled() {
+		return "bytes4"
+	}
+	s := strings.ToLower(strings.TrimSpace(os.Getenv(EnvTokenSubmitEstimateMode)))
+	if s == "structured" {
+		return "structured"
+	}
+	return "bytes4"
 }
 
 func ReactiveCompactEnabled() bool      { return truthy(os.Getenv(EnvReactiveCompact)) }

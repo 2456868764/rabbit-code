@@ -111,6 +111,22 @@ func TestTokenBudgetMaxInputTokens_whenEnabled(t *testing.T) {
 	}
 }
 
+func TestSubmitTokenEstimateMode(t *testing.T) {
+	t.Setenv(EnvTokenBudget, "")
+	if SubmitTokenEstimateMode() != "bytes4" {
+		t.Fatal("off should bytes4")
+	}
+	t.Setenv(EnvTokenBudget, "1")
+	t.Setenv(EnvTokenSubmitEstimateMode, "")
+	if SubmitTokenEstimateMode() != "bytes4" {
+		t.Fatal()
+	}
+	t.Setenv(EnvTokenSubmitEstimateMode, "structured")
+	if SubmitTokenEstimateMode() != "structured" {
+		t.Fatal()
+	}
+}
+
 func TestTokenBudgetMaxAttachmentBytes_whenEnabled(t *testing.T) {
 	t.Setenv(EnvTokenBudget, "1")
 	if TokenBudgetMaxAttachmentBytes() != 0 {

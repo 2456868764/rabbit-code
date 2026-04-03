@@ -1,0 +1,96 @@
+# Phase 5 待深化清单（对照 SPEC §4「部分」与 PARITY Follow-on）
+
+主清单 **§2** 已全 `[x]`；下列 **4–14** 已在 **迭代 12** 落地 **可测子集**（每步单独 commit）；与 `src/` **全量**语义之差仍见 **PARITY_PHASE5_DEFERRED.md** Follow-on。
+
+| # | 项 | 说明 | 目标 Phase / 状态 |
+|---|----|------|-------------------|
+| 1 | **P5.2.2 SnipCompact 接循环** | `RunTurnLoop` + **`EventKindSnipCompactApplied`** | **已完成**（迭代 11） |
+| 2 | **P5.F.10 滚动条** | **`messages.StripHistorySnipPieces`** | **已完成**（迭代 11） |
+| 3 | **P5.F.8 请求体 beta** | 占位 **`anthropic_beta`** | **已完成**（迭代 11） |
+| 4 | **P5.F.1 token 估计** | **`query.EstimateUTF8BytesAsTokens`**；**`RABBIT_CODE_TOKEN_BUDGET_MAX_INPUT_TOKENS`**、**`_MAX_ATTACHMENT_BYTES`**（memdir 原始注入字节） | **已完成**（迭代 12 子集；真 tokenizer / TUI 仍 defer） |
+| 5 | **P5.F.2 analyzeContext** | **`query.ReactiveCompactByTranscript`** + **`RABBIT_CODE_REACTIVE_COMPACT_MIN_TOKENS`**；**`CompactAdvisor(transcript []byte)`** | **已完成**（迭代 12 子集） |
+| 6 | **P5.F.3 sessionRestore** | **`RABBIT_CODE_SESSION_RESTORE`** 用户文提示；coordinator / 工具链仍 defer | **已完成**（迭代 12 headless） |
+| 7 | **P5.F.4 / F.5 + TUI** | **`EventKindUserSubmit.PhaseDetail`** = **`query.FormatHeadlessModeTags`** | **已完成**（迭代 12 headless；`thinking.ts` / TUI 仍 defer） |
+| 8 | **P5.F.6 CLI** | **`rabbit-code context break-cache`** → **`internal/commands/breakcache`** JSON（对齐 **`src/commands/break-cache`**） | **已完成**（迭代 12） |
+| 9 | **P5.F.7 模板正文** | **`RABBIT_CODE_TEMPLATE_DIR`** / **`Config.TemplateDir`** + **`query.LoadTemplateMarkdownAppendix`**；磁盘 **stopHooks** 仍 defer | **已完成**（迭代 12 子集） |
+| 10 | **P5.F.9 + compact** | **`RABBIT_CODE_PROMPT_CACHE_BREAK_SUGGEST_COMPACT`** → 成功后 **reactive compact suggest**（迭代 12）；**SSE** 路径 **trim / 重发 / compact 恢复** 的 headless 子集见 **H1 进度**（与 suggest 正交） | **已完成**（迭代 12 + H1 子集） |
+| 11 | **P5.1.1 query State** | **`LoopState`** 增 **`MaxOutputTokensRecoveryCount`** 等；transition 行为未全镜像 | **已完成**（迭代 12 子集） |
+| 12 | **bash** | **`querydeps.BashExecToolRunner`** + **`RABBIT_CODE_BASH_EXEC`** | **已完成**（迭代 12 桥接；权限栈 Phase 6） |
+| 13 | **memdir findRelevant** | **`memdir.FindRelevantMemoryPaths`**（启发式，无 LLM） | **已完成**（迭代 12 子集） |
+| 14 | **compact 链** | **`compact.ReactiveSuggestFromTranscript`**、**`ExecuteStubWithMeta`** / **`FormatStubCompactSummary`** | **已完成**（迭代 12 子集） |
+
+---
+
+## 全量还原推荐顺序（`src/` 对齐）
+
+**原则**：先 **headless 引擎**（`engine` / `query` / `querydeps` / `compact` / `memdir` / `anthropic`），再 **TUI/REPL**。下列编号与对话约定 **H*** / **T*** 一致；实施时仍按 **PARITY_PHASE5_DEFERRED.md** Follow-on 与 **§4** 路径对照。
+
+### Headless
+
+| 阶段 | 代号 | 内容 | 主要 `src/` 参考 |
+|------|------|------|------------------|
+| 1 | **H6** | **`query.ts` `State` 全字段 + transition / continue 语义** 与 Go **`LoopState`**、**`ApplyTransition`** 对齐 | **`headless 已收口`**（迭代 20）：见下 **H6 进度**；TS **`ToolUseContext`** 全对象见 **PARITY_PHASE5_DEFERRED.md** |
+| 2 | **H1** | **Prompt cache break** 后 **trim / 重发 / compact 协同**（不仅是 suggest）：Go **可测子集**已接（**`RABBIT_CODE_PROMPT_CACHE_BREAK_*`**，见下 **H1 进度** 与模块根 **README** `Config` 段）；`src/` 全量仍对照 TS | `services/api/promptCacheBreakDetection.ts`、**`internal/query` / `internal/engine` / `internal/features/rabbit_env.go`**、compact 调用链 |
+| 3 | **H2** | **全量 `analyzeContext` + auto/reactive compact 触发** | `utils/analyzeContext.ts`、`services/compact/autoCompact.ts` |
+| 4 | **H3** | **`services/compact/*` 全链路**（与 H2 强相关） | `services/compact/*` |
+| 5 | **H4** | **Micro-compact / cache 请求体**（正式 beta、字段与上游一致） | `services/compact/microCompact.ts`、`query.ts` |
+| 6 | **H5** | **Token / 附件预算全量**（API tokenizer、附件计入；引擎侧先落地） | `query.ts`、`utils/attachments.ts`；进度见下 **§H5** |
+| 7 | **H7** | **Snip 元数据与持久化**（UUID map、会话往返） | snip / session 相关 |
+| 8 | **H8** | **memdir 全量**（含 LLM 选记忆等） | `memdir/*`、`findRelevantMemories.ts` |
+| 9 | **H9** | **Bash / 权限真实栈**（Phase 6 工具层） | bash / permissions 与上游工具栈 |
+
+#### H6 进度（迭代 14 起）
+
+- **`LoopState`**：`LoopContinue`（对应 **`transition`**）、**`AutoCompactTracking`**、**`MaxOutputTokensOverride*`**、**`PendingToolUseSummary`**；常量 **`ContinueReason*`** 与 `query.ts` continue 站点对齐。
+- **`RunTurnLoop`**：在追加 **tool_result** 后进入下一轮前 **`RecordLoopContinue(..., ContinueReasonNextTurn)`**。
+- **`engine`（迭代 15）**：**`RecoverStrategy`** 第二次 **`RunTurnLoop`** 前 **`resetLoopStateForRetryAttempt`** 保留 H6 字段；可恢复错误路径 **`ContinueReasonReactiveCompactRetry`**（compact executor 成功）、**`ContinueReasonSubmitRecoverRetry`** / **`ContinueReasonMaxOutputTokensRecovery`**（即将重试）；成功后 **cache-break** 与 **post-loop compact** 成功执行时写入 **`LoopContinue`**（reactive / **`ContinueReasonAutoCompactExecuted`**）。
+- **`ApplyTransition`（迭代 16）**：**`TranStartCompact`** 写入 **`AutoCompactTracking`**（**`TurnID`** = `autocompact:<n>`，与 **`autoCompact.ts`** 记账对齐）。
+- **`engine`（迭代 16）**：可选 **`Config.ContextCollapseDrain`**（**`CONTEXT_COLLAPSE`** + **`prompt_too_long`** 时 trim + **`ContinueReasonCollapseDrainRetry`**，供同轮 compact 使用）；**`StopHookBlockingContinue`** / **`TokenBudgetContinueAfterTurn`** 在成功后按 **`query.ts`** 顺序（先 stop-hook 语义，再 token budget）可触发额外 **`RunTurnLoop`**（**`PrepareLoopStateForStopHookBlockingContinuation`** / **`PrepareLoopStateForTokenBudgetContinuation`**）；**`executeRunTurnLoopAttempts`**（**`run_attempts.go`**）抽取原重试循环。
+- **迭代 17**：**`RecoverStrategy`** 重试且本轮 **`ContextCollapseDrain`** 已提交时，下一轮 **`RunTurnLoopFromMessages`** 使用 drain 后的 **`msgs`**（对齐 **`query.ts`** `collapse_drain_retry` → continue 携带 **`drained.messages`**）。
+- **迭代 18**：**`LoopState.MessagesJSON`** 镜像 **`query.ts` `state.messages`**（**`RunTurnLoop`** 每次变更 transcript 时同步）；**`ToolUseContextMirror`**（**`AgentID`** / **`MainLoopModel`** / **`NonInteractive`** / **`QueryChainID`** / **`QueryDepth`** 占位）+ **`engine.Config.AgentID`**、**`NonInteractive`** → **`LoopDriver`**；**`resetLoopStateForRetryAttempt`** 保留 **`MessagesJSON`** 与 **`ToolUseContext`**；**`ApplyTransition`** 不修改二者（文档 + 单测）。
+- **迭代 19**：**`CompactExecutor`** 扩展为 **`(summary, nextTranscriptJSON, err)`**；可恢复错误路径上 **`RecoverStrategy`** 重试时若 **`nextTranscriptJSON` 非空** 则优先于 **drain-only** 作为 **`RunTurnLoopFromMessages`** 种子（**`compact.ExecuteStub`** / **`ExecuteStubWithMeta`** 返回 **`nil`** 第二值保持旧行为）。
+- **迭代 20（H6 headless 收口）**：**`ContinueReasonStopHookPrevented`**；**`Config.StopHooksAfterSuccessfulTurn`**（**`StopHookAfterTurnFunc`**：`preventContinuation` → **`EventKindDone`** + **`PhaseDetail`**，**`blockingContinue`** 对齐 **`stop_hook_blocking`**，顺序在 **`TokenBudgetContinueAfterTurn`** 之前）；**`ToolUseContextMirror`** 增 **`SessionID`**、**`Debug`**、**`AbortSignalAborted`**；**`engine.Config.SessionID`** / **`Debug`**；与 **`StopHookBlockingContinue`** 合并阻塞继续语义；**`RunTurnLoop`** 每轮开端重置 **`AbortSignalAborted`**，**`ctx` 已取消**时置 **`true`**（**`feat(phase5/h6)`** 单测覆盖）。
+- **非 H6（PARITY）**：TS **`ToolUseContext`** 全量（AppState、MCP、完整 **`abortController`** 等）与磁盘 **`stopHooks` / `handleStopHooks`** 工具执行链 — 见 **`PARITY_PHASE5_DEFERRED.md`** Follow-on。
+
+#### H1 进度（headless 子集；与 **README** § Headless engine、`feat(phase5/h6)` 前续提交一致）
+
+- **Env**（**`internal/features/rabbit_env.go`**）：**`RABBIT_CODE_PROMPT_CACHE_BREAK_DETECTION`**；**`RABBIT_CODE_PROMPT_CACHE_BREAK_TRIM_RESEND`**（默认开启 strip + 重试 **`AssistantTurn`** 一次，设 **`0`** 关闭）；**`RABBIT_CODE_PROMPT_CACHE_BREAK_AUTO_COMPACT`** 且 **`Config.CompactExecutor`** 返回 **`nextTranscriptJSON`** 时走 compact 恢复；与迭代 12 的 **`RABBIT_CODE_PROMPT_CACHE_BREAK_SUGGEST_COMPACT`**（post-loop suggest）正交。
+- **`query`**：**`assistantTurnWithPromptCacheBreakHandling`**、**`StripCacheControlFromMessagesJSON`**（**`internal/query/transcript_strip_cache.go`**）；**`ContinueReasonPromptCacheBreakTrimResend`** / **`ContinueReasonPromptCacheBreakCompactRetry`**；**`LoopDriver.PromptCacheBreakRecovery`**（**`engine`** 在 **`run_attempts.go`** 中注入 **`promptCacheBreakCompactRecovery`**）。
+- **`engine`**：**`EventKindPromptCacheBreakDetected`**（**`PhaseDetail`**: **`sse`**）；**`EventKindPromptCacheBreakRecovery`**（**`PhaseDetail`**: **`trim_resend`** / **`compact_retry`**）；**`query.LoopObservers.OnPromptCacheBreakRecovery`** → **`EngineEvent`** 总线。
+- **H1 仍相对 `src/` 全量的缺口（可后续迭代）**：多轮 SSE 细粒度对齐、与 **Messages** 非-Turn 路径的完全统一、上游 **promptCacheBreakDetection.ts** 的边角字符串与遥测字段 1:1 等 — 见 **PARITY** Follow-on。
+- **本迭代已补齐（单测覆盖）**：**strip** 遇非法 / 空 **`messages` JSON** 时**直接返回 strip 错误**（不再静默落入 compact）；**trim 重发后仍 cache break → compact 种子 → 第三次 `AssistantTurn` 成功** 全链（**`TestRunTurnLoop_promptCacheBreak_trimThenCompact_chain`**）；**`StripCacheControlFromMessagesJSON`** 空输入与非法 JSON（**`transcript_strip_cache_test.go`**）；**`tool_use` 块同级 `cache_control` 递归剔除**（**`TestStripCacheControlFromMessagesJSON_nestedInToolInput`**）；**同一 `AssistantTurn` 波次内至多两轮 compact 恢复**（**`maxPromptCacheBreakCompactRounds`**，**`TestRunTurnLoop_promptCacheBreak_secondCompactRound`**）；**SSE cache break 启发式扩展**（**`IsPromptCacheBreakStreamJSON`**，`prompt_cache_key` / `cached…block…invalid` / `ephemeral…cache…stale`）；**`AnthropicAssistant` 从 `ContextWithOnPromptCacheBreak` 注入 `readOpts`**（**`StreamAssistant`**：**`TestAnthropicAssistant_StreamAssistant_promptCacheBreakFromContext`**；**`AssistantTurn`**：**`TestAnthropicAssistant_AssistantTurn_promptCacheBreakFromContext`**）；**`engine` 双次 `compact_retry` 事件 + 双次 `CompactExecutor`**（**`TestEngine_promptCacheBreak_twoCompactRetry_events`**）。
+
+#### H2 / H3 / H4 进度（相对上表 **Headless** 行 3–5 的可测子集）
+
+| 代号 | 全量目标（`src/`） | 本轮 Go 增量 |
+|------|-------------------|-------------|
+| **H2** | **`analyzeContext` + auto/reactive compact 触发** | 上列 + **`query.ProactiveAutoCompactSuggested`** / **`query.EffectiveContextInputWindow`** / **`AutoCompactThresholdTokens`** / **`CalculateTokenWarningState`**（对照 **`autoCompact.ts`** 阈值与 **`calculateTokenWarningState`**）；**`features`**：**`IsAutoCompactEnabled`**、**`RABBIT_CODE_DISABLE_*` / `RABBIT_CODE_AUTO_COMPACT`**、**`RABBIT_CODE_CONTEXT_WINDOW_TOKENS`**、**`RABBIT_CODE_AUTO_COMPACT_WINDOW`**、**`RABBIT_CODE_SUPPRESS_PROACTIVE_AUTO_COMPACT`** 等；**`engine`** post-loop 在无 **`CompactAdvisor`** 时亦可因转录超阈触发 **`SuggestAutoCompact`**（**`TestEngine_ProactiveAutoCompact_suggestWithoutAdvisor`**）；**`compact.TranscriptProactiveAutoSuggest`** 封装；**`query.ReactiveCompactByTranscript`** 在 **`RABBIT_CODE_DISABLE_COMPACT`** 时为 false（对齐 **`autoCompactIfNeeded`** 入口早退）。 |
+| **H3** | **`services/compact/*` 全链路** | **`AfterSuccessfulCompactExecution`**；**`ExecutorPhaseAfterSchedule`**（pending→**`executing`**，传入 **`CompactExecutor`**）；**`ResultPhaseAfterCompactExecutor`**（成功→**`idle`**，失败保留 **executing**）；**`engine` / `run_attempts`** 的 **Suggest** 仍报 **pending**，**Result** 报 **idle/executing**（**`TestExecutorPhaseAfterSchedule`**、**`TestResultPhaseAfterCompactExecutor`**）；**`query.MirrorAutocompactConsecutiveFailures`**：**`Engine`** 跨 **Submit** 的 **`autoCompactConsecutiveFailures`** 在每次 proactive auto **executor** 结果后写入 **`LoopState.AutoCompactTracking.ConsecutiveFailures`**（对齐 **`autoCompact.ts`** `tracking`，便于会话/观测；断路器仍以 **Engine** 计数为准）。 |
+| **H4** | **Micro-compact / 请求体 beta 与上游一致** | **`EventKindCachedMicrocompactActive.PhaseDetail`** = **`BetaCachedMicrocompactBody`**；**httptest** 校验 POST JSON **`anthropic_beta`**（**`TestAnthropicAssistant_streamBody_anthropicBetaCachedMicrocompact`**）；**`TestCompactableToolNames_matchMicroCompactTS`** 防 **`COMPACTABLE_TOOLS`** 与 **`microCompact.ts`** 漂移。 |
+
+**H2/H3/H4 仍 defer**：TS **`analyzeContext.ts`** 全量（API tokenizer、MCP/Skills 分解、网格 UI）、**`microCompact.ts`** 全量、**`autoCompact.ts`** 内 **session memory 优先 / 电路条 / fork querySource** 等、非 headless UI、Bedrock extra-body 差异 — 见 **PARITY**。
+
+#### H5 功能列表（Phase 5 headless；逐项核对 `PARITY_PHASE5_DEFERRED`）
+
+| # | 项 | 说明 | 状态 |
+|---|----|------|------|
+| H5.1 | **提交文本 token 估计模式** | **`RABBIT_CODE_TOKEN_SUBMIT_ESTIMATE_MODE`**：`bytes4`（默认）或 **`structured`**（resolved 为 Messages JSON 数组时用 **`EstimateMessageTokensFromTranscriptJSON`**） | **[x]** `features.SubmitTokenEstimateMode`、`query.EstimateResolvedSubmitTextTokens` |
+| H5.2 | **附件原始字节计入 MAX_INPUT_TOKENS** | memdir 注入字节按 **⌈raw/4⌉** 与 resolved 文本估计**相加**后对比 **`RABBIT_CODE_TOKEN_BUDGET_MAX_INPUT_TOKENS`**（**`MAX_ATTACHMENT_BYTES`** 仍为独立硬上限） | **[x]** `query.EstimateSubmitTokenBudgetTotal`、`engine.runTurnLoop` |
+| H5.3 | **预算遥测事件** | **`EventKindSubmitTokenBudgetSnapshot`**：`PhaseAuxInt`=合计估计 token，`PhaseAuxInt2`=inject 原始字节，`PhaseDetail`=mode（供 T3 meter / 遥测） | **[x]** |
+| H5.4 | **Anthropic API tokenizer** | 请求前与上游一致的 **count_tokens**（或等价 SDK）；需密钥 / 网络 | **[ ]** defer |
+| H5.5 | **用户消息 token budget 解析 + continuation** | `utils/tokenBudget.ts` **`parseTokenBudget`**、`query/tokenBudget.ts` **`checkTokenBudget`**（+500k 续写、递减回报停）与引擎 **`TokenBudgetContinueAfterTurn`** 全量对齐 | **[ ]** defer（与 H6 continuation 交叉） |
+| H5.6 | **附件类型全量** | `utils/attachments.ts` 图片缩放、file_ref、MCP 资源等计入（非仅 memdir 原始字节） | **[ ]** defer |
+
+### TUI / REPL（在 Headless 主干之后）
+
+| 阶段 | 代号 | 内容 | 主要 `src/` 参考 |
+|------|------|------|------------------|
+| A | **T1** | **`thinking.ts`、系统块、`processUserInput`** 与展示/输入一致 | `utils/thinking.ts`、`utils/processUserInput` |
+| B | **T2** | **完整 REPL `context.ts` 类子命令**（在现有 **`context break-cache`** 上扩展） | `context.ts` 等 |
+| C | **T3** | **预算 meter、附件 UX**（消费引擎暴露的预算信号） | 同 F.1，偏 UI |
+
+**穿插**：**T4**（**session restore 协调与工具**，`sessionRestore.ts` / `query.ts`）与 **T5**（**job 分类、磁盘 stopHooks、模板与 REPL 集成**）在 **T1→T2→T3** 推进过程中按需插入（例如 T1 后与 session 恢复 UI 绑定时做 T4；模板/命令面扩展时做 T5），不强制严格串行，但 **不应早于** 对应 headless 能力就绪（避免 UI 空转）。
+
+---
+
+更新本表时同步 **PARITY_PHASE5_DEFERRED.md**、**PHASE05_SPEC_AND_ACCEPTANCE.md** §6，并与模块根 **README.md**（**`engine.Config` highlights / Phase 5 headless**）交叉核对。

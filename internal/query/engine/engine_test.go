@@ -381,6 +381,85 @@ budgetDone:
 	}
 }
 
+func TestEngine_TokenBudget_combinedTextAndInjectRawTokens(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "eight.txt")
+	if err := os.WriteFile(p, []byte("12345678"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(features.EnvTokenBudget, "true")
+	t.Setenv(features.EnvTokenBudgetMaxInputBytes, "999999")
+	t.Setenv(features.EnvTokenBudgetMaxAttachmentBytes, "999999")
+	t.Setenv(features.EnvTokenBudgetMaxInputTokens, "2")
+	e := New(context.Background(), &Config{
+		MemdirPaths: []string{p},
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "ok", nil
+			}),
+		},
+	})
+	e.Submit("x")
+	var saw error
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindError {
+				saw = ev.Err
+				goto combDone
+			}
+			if ev.Kind == EventKindAssistantText {
+				t.Fatal("assistant should not run")
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+combDone:
+	e.Wait()
+	if !errors.Is(saw, ErrTokenBudgetExceeded) {
+		t.Fatalf("want combined text+inject over cap, got %v", saw)
+	}
+}
+
+func TestEngine_TokenBudget_emitsSubmitSnapshot(t *testing.T) {
+	t.Setenv(features.EnvTokenBudget, "true")
+	t.Setenv(features.EnvTokenBudgetMaxInputBytes, "999999")
+	t.Setenv(features.EnvTokenBudgetMaxInputTokens, "999999")
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "ok", nil
+			}),
+		},
+	})
+	e.Submit("hi")
+	var sawSnap bool
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindSubmitTokenBudgetSnapshot {
+				sawSnap = true
+				if ev.PhaseAuxInt <= 0 {
+					t.Fatalf("expected positive PhaseAuxInt, got %d", ev.PhaseAuxInt)
+				}
+				if ev.PhaseDetail != "bytes4" && ev.PhaseDetail != "structured" {
+					t.Fatalf("mode %q", ev.PhaseDetail)
+				}
+			}
+			if ev.Kind == EventKindDone {
+				if !sawSnap {
+					t.Fatal("missing SubmitTokenBudgetSnapshot")
+				}
+				e.Wait()
+				return
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
 func TestEngine_TokenBudget_blocksByTokenEstimate(t *testing.T) {
 	t.Setenv(features.EnvTokenBudget, "true")
 	t.Setenv(features.EnvTokenBudgetMaxInputBytes, "999999")
