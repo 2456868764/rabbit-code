@@ -3,14 +3,12 @@ package engine
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/2456868764/rabbit-code/internal/anthropic"
 	"github.com/2456868764/rabbit-code/internal/compact"
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/memdir"
@@ -26,6 +24,15 @@ type RecoverStrategy func(ctx context.Context, st query.LoopState, err error) bo
 
 // CompactExecutor runs after a compact suggest when set (P5.2.1 stub / closure).
 type CompactExecutor func(ctx context.Context, phase compact.RunPhase, transcriptJSON []byte) (summary string, err error)
+
+// ContextCollapseDrain trims transcript on recoverable prompt_too_long when CONTEXT_COLLAPSE is on; committed feeds LoopContinue (H6).
+type ContextCollapseDrain func(ctx context.Context, st *query.LoopState, transcriptJSON json.RawMessage) (trimmed json.RawMessage, committed int, ok bool)
+
+// StopHookBlockingContinue returns true to run another RunTurnLoop after success (query.ts stop_hook_blocking).
+type StopHookBlockingContinue func(ctx context.Context, st query.LoopState) bool
+
+// TokenBudgetContinueAfterTurn returns true to run another RunTurnLoop when TOKEN_BUDGET is on (query.ts token_budget_continuation).
+type TokenBudgetContinueAfterTurn func(ctx context.Context, st query.LoopState, transcriptJSON json.RawMessage) bool
 
 // Config configures optional streaming backend (nil Assistant keeps stub behavior).
 type Config struct {
@@ -52,6 +59,12 @@ type Config struct {
 	OrphanPermissionAdvisor func(st query.LoopState) (orphanToolUseID string, ok bool)
 	// TemplateDir if set overrides RABBIT_CODE_TEMPLATE_DIR for loading <name>.md when TEMPLATES is on (P5.F.7).
 	TemplateDir string
+	// ContextCollapseDrain optional trim before compact on PTL when RABBIT_CODE_CONTEXT_COLLAPSE is on (H6).
+	ContextCollapseDrain ContextCollapseDrain
+	// StopHookBlockingContinue optional second RunTurnLoop after success (H6).
+	StopHookBlockingContinue StopHookBlockingContinue
+	// TokenBudgetContinueAfterTurn optional extra RunTurnLoop when RABBIT_CODE_TOKEN_BUDGET is on (H6).
+	TokenBudgetContinueAfterTurn TokenBudgetContinueAfterTurn
 }
 
 // Engine coordinates cancellable query turns (stub or real StreamAssistant / RunTurnLoop).
@@ -73,6 +86,9 @@ type Engine struct {
 	maxAssistantTurns                int
 	suggestCompactOnRecoverableError bool
 	templateDir                      string
+	contextCollapseDrain             ContextCollapseDrain
+	stopHookBlockingContinue         StopHookBlockingContinue
+	tokenBudgetContinueAfterTurn     TokenBudgetContinueAfterTurn
 	cacheBreakSeen                   int32 // atomic: prompt-cache break callback ran this Submit
 }
 
@@ -124,6 +140,9 @@ func New(parent context.Context, cfg *Config) *Engine {
 		}
 		e.suggestCompactOnRecoverableError = cfg.SuggestCompactOnRecoverableError
 		e.templateDir = strings.TrimSpace(cfg.TemplateDir)
+		e.contextCollapseDrain = cfg.ContextCollapseDrain
+		e.stopHookBlockingContinue = cfg.StopHookBlockingContinue
+		e.tokenBudgetContinueAfterTurn = cfg.TokenBudgetContinueAfterTurn
 	}
 	return e
 }
@@ -342,92 +361,26 @@ func (e *Engine) runTurnLoop(userText string) {
 
 	var msgs json.RawMessage
 	succeeded := false
-	for attempt := 0; attempt < maxAttempts; attempt++ {
-		if attempt == 0 {
-			if e.maxAssistantTurns > 0 {
-				st.MaxTurns = e.maxAssistantTurns
-			}
-		} else {
-			resetLoopStateForRetryAttempt(st)
-		}
-
-		d := query.LoopDriver{
-			Deps: querydeps.Deps{
-				Tools:     e.deps.Tools,
-				Assistant: e.deps.Assistant,
-				Turn:      e.deps.Turn,
-			},
-			Model:                e.model,
-			MaxTokens:            e.maxTokens,
-			Observe:              e.loopObservers(),
-			HistorySnipMaxBytes:  features.HistorySnipMaxBytes(),
-			HistorySnipMaxRounds: features.HistorySnipMaxRounds(),
-			SnipCompactMaxBytes:  features.SnipCompactMaxBytes(),
-			SnipCompactMaxRounds: features.SnipCompactMaxRounds(),
-		}
-
-		var runErr error
-		msgs, _, runErr = d.RunTurnLoop(ctxLoop, st, resolved)
-		if runErr == nil {
-			succeeded = true
-			loopErr = nil
-			break
-		}
-		loopErr = runErr
-		if errors.Is(runErr, context.Canceled) || errors.Is(e.ctx.Err(), context.Canceled) {
+	for round := 0; round < maxSubmitContinuationRounds; round++ {
+		var subErr error
+		msgs, succeeded, subErr = e.executeRunTurnLoopAttempts(ctxLoop, st, resolved, maxAttempts)
+		if !succeeded {
+			loopErr = subErr
 			return
 		}
-		st.HadStreamError = true
-		kind, rec := classifyAnthropicError(runErr)
-		st.LastAPIErrorKind = kind
-		if rec {
-			st.RecoveryAttempts++
-			if st.RecoveryPhase == query.RecoveryNone {
-				st.RecoveryPhase = query.RecoveryPendingCompact
-			}
-		}
-		if rec && e.suggestCompactOnRecoverableError {
-			ph := compact.RunIdle.Next(true, false)
-			e.trySend(EngineEvent{
-				Kind:               EventKindCompactSuggest,
-				CompactPhase:       ph.String(),
-				SuggestAutoCompact: true,
-			})
-			if e.compactExecutor != nil {
-				sum, exErr := e.compactExecutor(e.ctx, ph, msgs)
-				e.trySend(EngineEvent{
-					Kind:           EventKindCompactResult,
-					CompactPhase:   ph.String(),
-					CompactSummary: sum,
-					Err:            exErr,
-				})
-				if exErr == nil {
-					query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonReactiveCompactRetry})
-				}
-			}
-		}
-		willRetry := attempt+1 < maxAttempts && e.recoverStrategy != nil && e.recoverStrategy(e.ctx, *st, runErr)
-		if willRetry {
-			if kind == string(anthropic.KindMaxOutputTokens) {
-				st.MaxOutputTokensRecoveryCount++
-				query.RecordLoopContinue(st, query.LoopContinue{
-					Reason:  query.ContinueReasonMaxOutputTokensRecovery,
-					Attempt: st.MaxOutputTokensRecoveryCount,
-				})
-			} else {
-				query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonSubmitRecoverRetry})
-			}
+		loopErr = nil
+		if e.stopHookBlockingContinue != nil && e.stopHookBlockingContinue(e.ctx, *st) {
+			query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonStopHookBlocking})
+			PrepareLoopStateForStopHookBlockingContinuation(st)
 			continue
 		}
-		e.trySend(EngineEvent{
-			Kind:               EventKindError,
-			Err:                runErr,
-			APIErrorKind:       kind,
-			RecoverableCompact: rec,
-		})
-		return
+		if features.TokenBudgetEnabled() && e.tokenBudgetContinueAfterTurn != nil && e.tokenBudgetContinueAfterTurn(e.ctx, *st, msgs) {
+			query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonTokenBudgetContinuation})
+			PrepareLoopStateForTokenBudgetContinuation(st)
+			continue
+		}
+		break
 	}
-
 	if !succeeded {
 		return
 	}

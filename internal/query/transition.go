@@ -1,5 +1,7 @@
 package query
 
+import "fmt"
+
 // Transition names logical query loop edges (table-driven tests, AC5-1).
 type Transition string
 
@@ -27,6 +29,12 @@ func ApplyTransition(s LoopState, t Transition) LoopState {
 	case TranStartCompact:
 		out.InCompact = true
 		out.CompactCount++
+		// AutoCompactTracking mirrors autoCompact.ts bookkeeping on compact start (H6).
+		out.AutoCompactTracking = &AutoCompactTracking{
+			Compacted:   true,
+			TurnCounter: out.TurnCount,
+			TurnID:      fmt.Sprintf("autocompact:%d", out.CompactCount),
+		}
 	case TranFinishCompact:
 		out.InCompact = false
 	default:

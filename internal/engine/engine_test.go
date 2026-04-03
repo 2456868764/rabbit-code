@@ -681,6 +681,98 @@ func TestEngine_recoverableError_compactStub_recordsReactiveContinue(t *testing.
 	}
 }
 
+func TestEngine_StopHookBlockingContinue_runsSecondTurnLoop(t *testing.T) {
+	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+		{Text: "a"},
+		{Text: "b"},
+	}}
+	var nCont int
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{Turn: turns},
+		Model: "m", MaxTokens: 8,
+		StopHookBlockingContinue: func(context.Context, query.LoopState) bool {
+			nCont++
+			return nCont == 1
+		},
+	})
+	e.Submit("hi")
+	ch := e.Events()
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindDone {
+				if ev.LoopTurnCount != 2 {
+					t.Fatalf("want 2 turn counts across continuations, got %d", ev.LoopTurnCount)
+				}
+				if nCont != 2 {
+					t.Fatalf("StopHookBlockingContinue calls %d", nCont)
+				}
+				e.Wait()
+				return
+			}
+		case <-deadline:
+			t.Fatal("timeout")
+		}
+	}
+}
+
+func TestEngine_TokenBudgetContinueAfterTurn_secondLoop(t *testing.T) {
+	t.Setenv(features.EnvTokenBudget, "true")
+	t.Setenv(features.EnvTokenBudgetMaxInputBytes, "999999")
+	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+		{Text: "t1"},
+		{Text: "t2"},
+	}}
+	var nTok int
+	var captured query.LoopState
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{Turn: turns},
+		Model: "m", MaxTokens: 8,
+		TokenBudgetContinueAfterTurn: func(context.Context, query.LoopState, json.RawMessage) bool {
+			nTok++
+			return nTok == 1
+		},
+		StopHooks: []StopHookFunc{
+			func(_ context.Context, st query.LoopState, _ error) { captured = st },
+		},
+	})
+	e.Submit("hi")
+	drainUntilTerminal(t, e.Events())
+	e.Wait()
+	if captured.LoopContinue.Reason != query.ContinueReasonTokenBudgetContinuation {
+		t.Fatalf("want token_budget_continuation, got %+v", captured.LoopContinue)
+	}
+	if nTok != 2 {
+		t.Fatalf("TokenBudgetContinueAfterTurn calls %d", nTok)
+	}
+}
+
+func TestEngine_ContextCollapseDrain_recordsContinueOnPTL(t *testing.T) {
+	t.Setenv(features.EnvContextCollapse, "true")
+	var captured query.LoopState
+	apiErr := &anthropic.APIError{Kind: anthropic.KindPromptTooLong, Status: 400, Msg: "ptl"}
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "", fmt.Errorf("w: %w", apiErr)
+			}),
+		},
+		ContextCollapseDrain: func(_ context.Context, _ *query.LoopState, _ json.RawMessage) (json.RawMessage, int, bool) {
+			return json.RawMessage(`[]`), 2, true
+		},
+		StopHooks: []StopHookFunc{
+			func(_ context.Context, st query.LoopState, _ error) { captured = st },
+		},
+	})
+	e.Submit("x")
+	drainUntilTerminal(t, e.Events())
+	e.Wait()
+	if captured.LoopContinue.Reason != query.ContinueReasonCollapseDrainRetry || captured.LoopContinue.Committed != 2 {
+		t.Fatalf("got %+v", captured.LoopContinue)
+	}
+}
+
 func TestEngine_BashStubToolRunner(t *testing.T) {
 	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
 		{Text: "run", ToolUses: []querydeps.ToolUseCall{{ID: "t1", Name: "bash", Input: json.RawMessage(`{"cmd":"ls"}`)}}},

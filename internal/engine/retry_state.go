@@ -22,3 +22,28 @@ func resetLoopStateForRetryAttempt(st *query.LoopState) {
 	}
 	st.RecoveryPhase = query.RecoveryRetriedOnce
 }
+
+// PrepareLoopStateForStopHookBlockingContinuation mirrors query.ts carry-over after stop_hook_blocking (H6).
+func PrepareLoopStateForStopHookBlockingContinuation(st *query.LoopState) {
+	if st == nil {
+		return
+	}
+	st.MaxOutputTokensRecoveryCount = 0
+	st.MaxOutputTokensOverrideActive = false
+	st.MaxOutputTokensOverride = 0
+	st.PendingToolUseSummary = false
+	st.StopHookActive = true
+}
+
+// PrepareLoopStateForTokenBudgetContinuation mirrors query.ts carry-over after token_budget_continuation (H6).
+func PrepareLoopStateForTokenBudgetContinuation(st *query.LoopState) {
+	if st == nil {
+		return
+	}
+	st.MaxOutputTokensRecoveryCount = 0
+	st.HasAttemptedReactiveCompact = false
+	st.MaxOutputTokensOverrideActive = false
+	st.MaxOutputTokensOverride = 0
+	st.PendingToolUseSummary = false
+	st.StopHookActive = false
+}
