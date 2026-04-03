@@ -108,6 +108,10 @@ type Config struct {
 	PostCompactCleanup PostCompactCleanup
 	// MicrocompactEditBuffer optional; reset on successful compact and wired to AnthropicAssistant when possible (H4).
 	MicrocompactEditBuffer *compact.MicrocompactEditBuffer
+	// InitialAutocompactConsecutiveFailures seeds the autocompact circuit when restoring a session (autoCompact.ts tracking).
+	InitialAutocompactConsecutiveFailures int
+	// RestoredAutoCompactTracking optional; cloned into each Submit's LoopState and used to seed consecutive failure count.
+	RestoredAutoCompactTracking *query.AutoCompactTracking
 }
 
 // Engine coordinates cancellable query turns (stub or real StreamAssistant / RunTurnLoop).
@@ -146,6 +150,8 @@ type Engine struct {
 	// autoCompactConsecutiveFailures counts failed proactive auto compact executor runs across Submits (H3 / autoCompact.ts);
 	// mirrored onto st.AutoCompactTracking.ConsecutiveFailures when st != nil.
 	autoCompactConsecutiveFailures int
+	restoredAutoCompactTracking *query.AutoCompactTracking
+	lastAutoCompactTracking     *query.AutoCompactTracking // snapshot after last Submit for persistence
 }
 
 // NewEngine is equivalent to New(parent, nil) (stub assistant).
@@ -217,6 +223,11 @@ func New(parent context.Context, cfg *Config) *Engine {
 		if aa, ok := e.deps.Turn.(*querydeps.AnthropicAssistant); ok && cfg.MicrocompactEditBuffer != nil {
 			aa.MicrocompactBuffer = cfg.MicrocompactEditBuffer
 		}
+		e.autoCompactConsecutiveFailures = cfg.InitialAutocompactConsecutiveFailures
+		if t := cfg.RestoredAutoCompactTracking; t != nil && t.ConsecutiveFailures != nil {
+			e.autoCompactConsecutiveFailures = *t.ConsecutiveFailures
+		}
+		e.restoredAutoCompactTracking = query.CloneAutoCompactTracking(cfg.RestoredAutoCompactTracking)
 	}
 	return e
 }
@@ -356,8 +367,15 @@ func (e *Engine) loopObservers() *query.LoopObservers {
 
 func (e *Engine) runTurnLoop(userText string) {
 	st := &query.LoopState{}
+	if e.restoredAutoCompactTracking != nil {
+		st.AutoCompactTracking = query.CloneAutoCompactTracking(e.restoredAutoCompactTracking)
+	}
+	query.MirrorAutocompactConsecutiveFailures(st, e.autoCompactConsecutiveFailures)
 	var loopErr error
-	defer func() { e.invokeStopHooks(st, loopErr) }()
+	defer func() {
+		e.lastAutoCompactTracking = query.CloneAutoCompactTracking(st.AutoCompactTracking)
+		e.invokeStopHooks(st, loopErr)
+	}()
 
 	resolved, nFrag, injectRaw, err := e.applyMemdir(userText)
 	if err != nil {
@@ -647,6 +665,12 @@ func (e *Engine) trySend(ev EngineEvent) bool {
 	case e.ch <- ev:
 		return true
 	}
+}
+
+// AutoCompactTrackingForPersistence returns a deep copy of autocompact tracking after the last completed Submit
+// (for session save). Nil if no Submit has finished.
+func (e *Engine) AutoCompactTrackingForPersistence() *query.AutoCompactTracking {
+	return query.CloneAutoCompactTracking(e.lastAutoCompactTracking)
 }
 
 // Cancel stops in-flight Submit work (idempotent). In-flight HTTP streams should respect the same context when wired through RunTurnLoop.

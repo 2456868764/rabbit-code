@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 )
@@ -36,6 +37,8 @@ type LoopDriver struct {
 	PromptCacheBreakRecovery PromptCacheBreakRecovery
 	// QuerySource optional fork id for proactive autocompact gates (autoCompact.ts).
 	QuerySource string
+	// ContextWindowTokens if > 0 overrides env/model default for blocking-limit pre-check (query.ts).
+	ContextWindowTokens int
 }
 
 func (d *LoopDriver) streamer() querydeps.StreamAssistant {
@@ -153,12 +156,16 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 	}
 	model, max := d.modelAndMax()
 	var turn querydeps.TurnResult
+	skipBlockingDueToContinuation := len(seedMsgs) > 0
+	firstAssistant := true
+	var snipTokensFreed int
 	for {
 		if st != nil && st.MaxTurns > 0 && st.TurnCount >= st.MaxTurns {
 			st.SetMessagesJSON(msgs)
 			return msgs, lastAssistantText, ErrMaxTurnsExceeded
 		}
 		if d.HistorySnipMaxBytes > 0 && d.HistorySnipMaxRounds > 0 {
+			prevTok := EstimateTranscriptJSONTokens(msgs)
 			newMsgs, n, err := TrimTranscriptPrefixWhileOverBudget(msgs, d.HistorySnipMaxBytes, d.HistorySnipMaxRounds)
 			if err != nil {
 				st.SetMessagesJSON(msgs)
@@ -167,10 +174,16 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 			if n > 0 && d.Observe != nil && d.Observe.OnHistorySnip != nil {
 				d.Observe.OnHistorySnip(len(msgs), len(newMsgs), n)
 			}
+			if n > 0 {
+				if nt := EstimateTranscriptJSONTokens(newMsgs); prevTok > nt {
+					snipTokensFreed += prevTok - nt
+				}
+			}
 			msgs = newMsgs
 			st.SetMessagesJSON(msgs)
 		}
 		if d.SnipCompactMaxBytes > 0 && d.SnipCompactMaxRounds > 0 {
+			prevTok := EstimateTranscriptJSONTokens(msgs)
 			newMsgs, n, err := TrimTranscriptPrefixWhileOverBudget(msgs, d.SnipCompactMaxBytes, d.SnipCompactMaxRounds)
 			if err != nil {
 				st.SetMessagesJSON(msgs)
@@ -179,8 +192,29 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 			if n > 0 && d.Observe != nil && d.Observe.OnSnipCompact != nil {
 				d.Observe.OnSnipCompact(len(msgs), len(newMsgs), n)
 			}
+			if n > 0 {
+				if nt := EstimateTranscriptJSONTokens(newMsgs); prevTok > nt {
+					snipTokensFreed += prevTok - nt
+				}
+			}
 			msgs = newMsgs
 			st.SetMessagesJSON(msgs)
+		}
+		if firstAssistant {
+			qs := d.QuerySource
+			if st != nil {
+				if s := strings.TrimSpace(st.ToolUseContext.QuerySource); s != "" {
+					qs = s
+				}
+			}
+			cw := d.ContextWindowTokens
+			if err := CheckBlockingLimitPreAssistant(model, max, cw, msgs, snipTokensFreed, qs, skipBlockingDueToContinuation); err != nil {
+				if st != nil {
+					st.SetMessagesJSON(msgs)
+				}
+				return msgs, lastAssistantText, err
+			}
+			firstAssistant = false
 		}
 		turn, msgs, err = d.assistantTurnWithPromptCacheBreakHandling(ctx, st, model, max, msgs)
 		if err != nil {

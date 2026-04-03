@@ -3,6 +3,7 @@ package engine
 import (
 	"errors"
 
+	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/services/api"
 )
 
@@ -10,6 +11,9 @@ import (
 func classifyAnthropicError(err error) (kind string, recoverableCompact bool) {
 	if err == nil {
 		return "", false
+	}
+	if errors.Is(err, query.ErrBlockingLimit) {
+		return "blocking_limit", false
 	}
 	var api *anthropic.APIError
 	if errors.As(err, &api) {

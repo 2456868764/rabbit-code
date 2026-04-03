@@ -1829,6 +1829,89 @@ func TestEngine_promptCacheBreakSuggestCompact(t *testing.T) {
 	}
 }
 
+func TestEngine_blockingLimit_ErrBlockingLimit(t *testing.T) {
+	t.Setenv(features.EnvContextCollapse, "")
+	t.Setenv(features.EnvReactiveCompact, "")
+	t.Setenv(features.EnvDisableCompact, "")
+	t.Setenv(features.EnvDisableAutoCompact, "")
+	t.Setenv(features.EnvAutoCompact, "")
+	t.Setenv(features.EnvBlockingLimitOverride, "1")
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				t.Fatal("StreamAssistant must not run when blocking limit trips first")
+				return "", nil
+			}),
+		},
+		Model:               "m",
+		MaxTokens:           1024,
+		ContextWindowTokens: 50_000,
+	})
+	e.Submit(strings.Repeat("z", 800))
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindError && errors.Is(ev.Err, query.ErrBlockingLimit) {
+				e.Wait()
+				return
+			}
+			if ev.Kind == EventKindDone {
+				t.Fatal("unexpected Done before error")
+			}
+		case <-time.After(6 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
+func TestEngine_restoredAutoCompact_consecutiveFailuresAndSnapshot(t *testing.T) {
+	t.Setenv(features.EnvDisableCompact, "")
+	t.Setenv(features.EnvDisableAutoCompact, "")
+	t.Setenv(features.EnvAutoCompact, "")
+	cf := 2
+	e := New(context.Background(), &Config{
+		InitialAutocompactConsecutiveFailures: 99,
+		RestoredAutoCompactTracking: &query.AutoCompactTracking{
+			Compacted:           true,
+			TurnCounter:         5,
+			TurnID:              "autocompact:9",
+			ConsecutiveFailures: &cf,
+		},
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "ok", nil
+			}),
+		},
+		Model: "m", MaxTokens: 64,
+	})
+	e.Submit("hi")
+	drainEngineUntilDone(t, e.Events())
+	e.Wait()
+	if e.AutoCompactTrackingForPersistence() == nil {
+		t.Fatal("expected snapshot after Submit")
+	}
+	data, err := query.MarshalAutoCompactTrackingJSON(e.AutoCompactTrackingForPersistence())
+	if err != nil {
+		t.Fatal(err)
+	}
+	restored, err := query.UnmarshalAutoCompactTrackingJSON(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e2 := New(context.Background(), &Config{
+		RestoredAutoCompactTracking: restored,
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "ok", nil
+			}),
+		},
+		Model: "m", MaxTokens: 64,
+	})
+	if e2.autoCompactConsecutiveFailures != *restored.ConsecutiveFailures {
+		t.Fatalf("engine consecutive failures want %d got %d", *restored.ConsecutiveFailures, e2.autoCompactConsecutiveFailures)
+	}
+}
+
 func TestEngine_SubmitCancelRace(t *testing.T) {
 	for i := 0; i < 40; i++ {
 		e := NewEngine(context.Background())

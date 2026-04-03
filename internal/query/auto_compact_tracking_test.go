@@ -2,6 +2,26 @@ package query
 
 import "testing"
 
+func TestMarshalAutoCompactTrackingJSON_roundTrip(t *testing.T) {
+	v := 2
+	orig := &AutoCompactTracking{Compacted: true, TurnCounter: 3, TurnID: "autocompact:1", ConsecutiveFailures: &v}
+	data, err := MarshalAutoCompactTrackingJSON(orig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := UnmarshalAutoCompactTrackingJSON(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out == nil || !out.Compacted || out.TurnCounter != 3 || out.TurnID != "autocompact:1" ||
+		out.ConsecutiveFailures == nil || *out.ConsecutiveFailures != 2 {
+		t.Fatalf("%+v", out)
+	}
+	if _, err := UnmarshalAutoCompactTrackingJSON([]byte("  ")); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestCloneAutoCompactTracking_nil(t *testing.T) {
 	if CloneAutoCompactTracking(nil) != nil {
 		t.Fatal()
