@@ -933,6 +933,43 @@ doneLoadTrusted:
 	}
 }
 
+func TestEngine_Memdir_initialSettings_autoMemoryDisabled(t *testing.T) {
+	memDir := t.TempDir()
+	t.Setenv(features.EnvAutoMemdir, "")
+	md := filepath.Join(memDir, "note.md")
+	if err := os.WriteFile(md, []byte("everything about bananas"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var lastUser string
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+				lastUser = string(messagesJSON)
+				return "ok", nil
+			}),
+		},
+		MemdirTrustedAutoMemoryDirectory: memDir,
+		InitialSettings:                  map[string]interface{}{"autoMemoryEnabled": false},
+		MemdirRelevanceModeOverride:      "heuristic",
+	})
+	e.Submit("banana bread")
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindDone {
+				goto doneOff
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+doneOff:
+	e.Wait()
+	if strings.Contains(lastUser, "bananas") {
+		t.Fatalf("memdir should be off: %q", lastUser)
+	}
+}
+
 func TestEngine_CompactSuggest_afterLoop(t *testing.T) {
 	e := New(context.Background(), &Config{
 		Deps: querydeps.Deps{

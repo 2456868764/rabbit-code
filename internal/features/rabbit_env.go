@@ -205,7 +205,7 @@ const (
 	// EnvAutoMemdir when truthy, enables default layout resolution when Config.MemdirMemoryDir and EnvMemdirMemoryDir are unset (requires AutoMemoryEnabled).
 	// Config.MemdirTrustedAutoMemoryDirectory alone (from config.LoadTrustedAutoMemoryDirectory) can enable auto-resolve without this env.
 	EnvAutoMemdir = "RABBIT_CODE_AUTO_MEMDIR"
-	// Auto-memory gates (memdir/paths.ts isAutoMemoryEnabled; settings.json branch omitted in headless).
+	// Auto-memory gates (memdir/paths.ts isAutoMemoryEnabled); use AutoMemoryEnabledFromMerged with config.LoadMerged for autoMemoryEnabled.
 	EnvDisableAutoMemory       = "RABBIT_CODE_DISABLE_AUTO_MEMORY"
 	EnvClaudeDisableAutoMemory = "CLAUDE_CODE_DISABLE_AUTO_MEMORY"
 	EnvSimple                  = "RABBIT_CODE_SIMPLE"
@@ -271,8 +271,14 @@ func explicitFalsyEnv(s string) bool {
 	return false
 }
 
-// AutoMemoryEnabled mirrors paths.ts isAutoMemoryEnabled (no settings.json autoMemoryEnabled in headless).
+// AutoMemoryEnabled mirrors paths.ts isAutoMemoryEnabled without merged settings (same as AutoMemoryEnabledFromMerged(nil)).
 func AutoMemoryEnabled() bool {
+	return AutoMemoryEnabledFromMerged(nil)
+}
+
+// AutoMemoryEnabledFromMerged mirrors paths.ts isAutoMemoryEnabled when merged includes project settings (e.g. config.LoadMerged).
+// After env gates, if merged contains key autoMemoryEnabled and the value parses as a boolean, that result wins; otherwise default true.
+func AutoMemoryEnabledFromMerged(merged map[string]interface{}) bool {
 	v, ok := envDefinedDual(EnvDisableAutoMemory, EnvClaudeDisableAutoMemory)
 	if ok {
 		if truthy(v) {
@@ -291,7 +297,47 @@ func AutoMemoryEnabled() bool {
 			return false
 		}
 	}
+	if merged != nil {
+		raw, exists := merged["autoMemoryEnabled"]
+		if exists {
+			if b, ok := parseJSONBoolSetting(raw); ok {
+				return b
+			}
+		}
+	}
 	return true
+}
+
+func parseJSONBoolSetting(v interface{}) (bool, bool) {
+	if v == nil {
+		return false, false
+	}
+	switch x := v.(type) {
+	case bool:
+		return x, true
+	case float64:
+		if x == 0 {
+			return false, true
+		}
+		if x == 1 {
+			return true, true
+		}
+		return false, false
+	case string:
+		s := strings.TrimSpace(strings.ToLower(x))
+		switch s {
+		case "true", "1", "yes", "on":
+			return true, true
+		case "false", "0", "no", "off":
+			return false, true
+		}
+		if b, err := strconv.ParseBool(s); err == nil {
+			return b, true
+		}
+		return false, false
+	default:
+		return false, false
+	}
 }
 
 func TokenBudgetEnabled() bool { return truthy(os.Getenv(EnvTokenBudget)) }

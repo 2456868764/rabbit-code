@@ -73,6 +73,8 @@ type Config struct {
 	// MemdirTrustedAutoMemoryDirectory is autoMemoryDirectory from trusted settings only (policy / flag / local / user — not project).
 	// Populate via config.LoadTrustedAutoMemoryDirectory (paths.ts getAutoMemPathSetting).
 	MemdirTrustedAutoMemoryDirectory string
+	// InitialSettings optional merged settings (e.g. config.LoadMerged); gates auto memdir via autoMemoryEnabled like paths.ts getInitialSettings.
+	InitialSettings map[string]interface{}
 	// MemdirRecentTools is passed into LLM memdir selection (suppress tool-doc memories; H8).
 	MemdirRecentTools []string
 	// MemdirTextComplete optional override for LLM selection (tests); default uses Anthropic client when mode is llm.
@@ -335,6 +337,13 @@ func (e *Engine) Submit(userText string) {
 	}()
 }
 
+func engineAutoMemoryEnabled(cfg *Config) bool {
+	if cfg != nil && cfg.InitialSettings != nil {
+		return features.AutoMemoryEnabledFromMerged(cfg.InitialSettings)
+	}
+	return features.AutoMemoryEnabled()
+}
+
 func resolveEngineMemdirMemoryDir(cfg *Config) string {
 	if cfg == nil {
 		return ""
@@ -345,7 +354,7 @@ func resolveEngineMemdirMemoryDir(cfg *Config) string {
 	if s := features.MemdirMemoryDirFromEnv(); s != "" {
 		return s
 	}
-	if !features.AutoMemoryEnabled() {
+	if !engineAutoMemoryEnabled(cfg) {
 		return ""
 	}
 	trusted := strings.TrimSpace(cfg.MemdirTrustedAutoMemoryDirectory)

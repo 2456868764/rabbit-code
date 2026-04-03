@@ -227,6 +227,36 @@ func TestAutoMemoryEnabled(t *testing.T) {
 	}
 }
 
+func TestAutoMemoryEnabledFromMerged(t *testing.T) {
+	clear := func() {
+		for _, k := range []string{
+			EnvDisableAutoMemory, EnvClaudeDisableAutoMemory,
+			EnvSimple, EnvClaudeSimple,
+			EnvRemote, EnvClaudeRemote,
+			EnvRemoteMemoryDir, EnvClaudeRemoteMemoryDir,
+		} {
+			_ = os.Unsetenv(k)
+		}
+	}
+	clear()
+	if AutoMemoryEnabledFromMerged(map[string]interface{}{"autoMemoryEnabled": false}) {
+		t.Fatal("project opt-out")
+	}
+	if !AutoMemoryEnabledFromMerged(map[string]interface{}{"autoMemoryEnabled": true}) {
+		t.Fatal("project opt-in")
+	}
+	if !AutoMemoryEnabledFromMerged(map[string]interface{}{"autoMemoryEnabled": float64(1)}) {
+		t.Fatal("json number 1")
+	}
+	if AutoMemoryEnabledFromMerged(map[string]interface{}{"autoMemoryEnabled": float64(0)}) {
+		t.Fatal("json number 0")
+	}
+	t.Setenv(EnvDisableAutoMemory, "1")
+	if AutoMemoryEnabledFromMerged(map[string]interface{}{"autoMemoryEnabled": true}) {
+		t.Fatal("env disable wins over settings")
+	}
+}
+
 func TestTokenBudgetMaxAttachmentBytes_whenEnabled(t *testing.T) {
 	t.Setenv(EnvTokenBudget, "1")
 	if TokenBudgetMaxAttachmentBytes() != 0 {
