@@ -1,0 +1,92 @@
+package memdir
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+func TestScanMemoryFiles_skipsMemoryMd_andNonMd(t *testing.T) {
+	dir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(dir, "a.md"), []byte("x"), 0o600)
+	_ = os.WriteFile(filepath.Join(dir, "MEMORY.md"), []byte("root"), 0o600)
+	_ = os.WriteFile(filepath.Join(dir, "x.txt"), []byte("y"), 0o600)
+	got, err := ScanMemoryFiles(context.Background(), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Filename != "a.md" {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestScanMemoryFiles_frontmatterMeta(t *testing.T) {
+	dir := t.TempDir()
+	body := "---\ndescription: My desc\ntype: note\n---\nbody\n"
+	_ = os.WriteFile(filepath.Join(dir, "f.md"), []byte(body), 0o600)
+	got, err := ScanMemoryFiles(context.Background(), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Description != "My desc" || got[0].Type != "note" {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestScanMemoryFiles_recursive(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "nested")
+	if err := os.MkdirAll(sub, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(sub, "inner.md"), []byte("deep"), 0o600)
+	got, err := ScanMemoryFiles(context.Background(), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Filename != filepath.ToSlash("nested/inner.md") {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestScanMemoryFiles_contextCancel(t *testing.T) {
+	dir := t.TempDir()
+	for i := 0; i < 40; i++ {
+		_ = os.WriteFile(filepath.Join(dir, fmt.Sprintf("f%d.md", i)), []byte("x"), 0o600)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := ScanMemoryFiles(ctx, dir)
+	if err == nil {
+		t.Fatal("expected cancel error")
+	}
+}
+
+func TestScanMemoryFiles_sortedNewestFirst(t *testing.T) {
+	dir := t.TempDir()
+	pOld := filepath.Join(dir, "old.md")
+	pNew := filepath.Join(dir, "new.md")
+	oldT := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	newT := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	_ = os.WriteFile(pOld, []byte("a"), 0o600)
+	_ = os.WriteFile(pNew, []byte("b"), 0o600)
+	if err := os.Chtimes(pOld, oldT, oldT); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(pNew, newT, newT); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ScanMemoryFiles(context.Background(), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("len %d", len(got))
+	}
+	if got[0].Filename != "new.md" {
+		t.Fatalf("order %+v", got)
+	}
+}

@@ -131,6 +131,21 @@ func TestSubmitTokenEstimateMode(t *testing.T) {
 	}
 }
 
+func TestMemdirRelevanceMode(t *testing.T) {
+	t.Setenv(EnvMemdirRelevanceMode, "")
+	if MemdirRelevanceMode() != "heuristic" {
+		t.Fatalf("%q", MemdirRelevanceMode())
+	}
+	t.Setenv(EnvMemdirRelevanceMode, "llm")
+	if MemdirRelevanceMode() != "llm" {
+		t.Fatalf("%q", MemdirRelevanceMode())
+	}
+	t.Setenv(EnvMemdirRelevanceMode, "side_query")
+	if MemdirRelevanceMode() != "llm" {
+		t.Fatalf("%q", MemdirRelevanceMode())
+	}
+}
+
 func TestTokenBudgetMaxAttachmentBytes_whenEnabled(t *testing.T) {
 	t.Setenv(EnvTokenBudget, "1")
 	if TokenBudgetMaxAttachmentBytes() != 0 {

@@ -1,6 +1,7 @@
 package memdir
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,35 +11,42 @@ import (
 )
 
 // FindRelevantMemoryPaths returns up to limit memory file paths under memoryDir scored by simple token overlap with queryText (deterministic, no LLM — item 13).
+// Uses recursive ScanMemoryFiles (skips MEMORY.md) and scores filename + frontmatter meta + file head.
 func FindRelevantMemoryPaths(queryText, memoryDir string, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 5
+	}
+	memories, err := ScanMemoryFiles(context.Background(), memoryDir)
+	if err != nil {
+		return nil, err
+	}
+	return HeuristicMemoryPathsFromHeaders(context.Background(), memories, queryText, limit), nil
+}
+
+// HeuristicMemoryPathsFromHeaders scores memories by alphanumeric token overlap with query (newest-first tie-break).
+func HeuristicMemoryPathsFromHeaders(ctx context.Context, memories []MemoryHeader, queryText string, limit int) []string {
 	if limit <= 0 {
 		limit = 5
 	}
 	queryText = strings.ToLower(strings.TrimSpace(queryText))
 	tokens := tokenizeAlnum(queryText)
 	if len(tokens) == 0 {
-		return nil, nil
-	}
-	entries, err := os.ReadDir(memoryDir)
-	if err != nil {
-		return nil, err
+		return nil
 	}
 	type scored struct {
 		path  string
 		score int
+		mtime int64
 	}
 	var out []scored
-	for _, ent := range entries {
-		if ent.IsDir() {
-			continue
+	for _, m := range memories {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
 		}
-		name := ent.Name()
-		if !strings.HasSuffix(strings.ToLower(name), ".md") {
-			continue
-		}
-		p := filepath.Join(memoryDir, name)
-		header := readFileHead(p, 4096)
-		low := strings.ToLower(name + " " + header)
+		head := readFileHead(m.FilePath, 4096)
+		low := strings.ToLower(m.Filename + " " + m.Description + " " + head)
 		sc := 0
 		for _, tok := range tokens {
 			if len(tok) < 2 {
@@ -49,14 +57,14 @@ func FindRelevantMemoryPaths(queryText, memoryDir string, limit int) ([]string, 
 			}
 		}
 		if sc > 0 {
-			out = append(out, scored{path: p, score: sc})
+			out = append(out, scored{m.FilePath, sc, m.MtimeMs})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].score != out[j].score {
 			return out[i].score > out[j].score
 		}
-		return out[i].path < out[j].path
+		return out[i].mtime > out[j].mtime
 	})
 	var paths []string
 	for i := range out {
@@ -65,7 +73,7 @@ func FindRelevantMemoryPaths(queryText, memoryDir string, limit int) ([]string, 
 		}
 		paths = append(paths, out[i].path)
 	}
-	return paths, nil
+	return paths
 }
 
 func tokenizeAlnum(s string) []string {
@@ -103,4 +111,26 @@ func readFileHead(path string, max int) string {
 		return ""
 	}
 	return string(buf[:n])
+}
+
+// DedupePathsStable returns paths in first-seen order.
+func DedupePathsStable(paths []string) []string {
+	seen := make(map[string]struct{}, len(paths))
+	var out []string
+	for _, p := range paths {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		ap, err := filepath.Abs(p)
+		if err == nil {
+			p = ap
+		}
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		out = append(out, p)
+	}
+	return out
 }

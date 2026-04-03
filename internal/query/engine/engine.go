@@ -63,7 +63,17 @@ type Config struct {
 	Model       string
 	MaxTokens   int
 	StubDelay   time.Duration // for tests when Assistant is nil; zero uses default
-	MemdirPaths []string      // optional: prepend session fragments to each Submit user text (P5.4.1)
+	MemdirPaths []string      // optional: explicit paths prepended to each Submit (P5.4.1)
+	// MemdirMemoryDir when set triggers FindRelevantMemories per Submit (recursive scan + heuristic or LLM; H8).
+	MemdirMemoryDir string
+	// MemdirRecentTools is passed into LLM memdir selection (suppress tool-doc memories; H8).
+	MemdirRecentTools []string
+	// MemdirTextComplete optional override for LLM selection (tests); default uses Anthropic client when mode is llm.
+	MemdirTextComplete memdir.TextCompleteFunc
+	// MemdirRelevanceModeOverride when non-empty overrides RABBIT_CODE_MEMDIR_RELEVANCE_MODE ("heuristic"|"llm").
+	MemdirRelevanceModeOverride string
+	// MemdirAlreadySurfaced seeds paths excluded from repeated memdir selection in-session (H8).
+	MemdirAlreadySurfaced map[string]struct{}
 	// MaxAssistantTurns if > 0 sets query.LoopState.MaxTurns for each Submit (caps assistant API rounds).
 	MaxAssistantTurns int
 	// SuggestCompactOnRecoverableError emits EventKindCompactSuggest (auto) before EventKindError when the failure is RecoverableCompact (P5.1.3 hint).
@@ -126,7 +136,12 @@ type Engine struct {
 	model                            string
 	maxTokens                        int
 	stubDelay                        time.Duration
-	memdirPaths                      []string
+	memdirExplicitPaths              []string
+	memdirMemoryDir                  string
+	memdirRecentTools                []string
+	memdirTextComplete               memdir.TextCompleteFunc
+	memdirRelevanceMode              memdir.RelevanceMode
+	memdirSurfaced                   map[string]struct{}
 	compactAdvisor                   func(query.LoopState, []byte) (bool, bool)
 	compactExecutor                  CompactExecutor
 	stopHooks                        []StopHookFunc
@@ -170,12 +185,14 @@ func NewEngine(parent context.Context) *Engine {
 func New(parent context.Context, cfg *Config) *Engine {
 	ctx, cancel := context.WithCancel(parent)
 	e := &Engine{
-		ctx:       ctx,
-		cancel:    cancel,
-		ch:        make(chan EngineEvent, 64),
-		model:     "claude-3-5-haiku-20241022",
-		maxTokens: 1024,
-		stubDelay: 50 * time.Millisecond,
+		ctx:                 ctx,
+		cancel:              cancel,
+		ch:                  make(chan EngineEvent, 64),
+		model:               "claude-3-5-haiku-20241022",
+		maxTokens:           1024,
+		stubDelay:           50 * time.Millisecond,
+		memdirSurfaced:      make(map[string]struct{}),
+		memdirRelevanceMode: memdir.RelevanceModeHeuristic,
 	}
 	if cfg != nil {
 		deps := cfg.Deps
@@ -194,7 +211,14 @@ func New(parent context.Context, cfg *Config) *Engine {
 		if cfg.StubDelay > 0 {
 			e.stubDelay = cfg.StubDelay
 		}
-		e.memdirPaths = append([]string(nil), cfg.MemdirPaths...)
+		e.memdirExplicitPaths = append([]string(nil), cfg.MemdirPaths...)
+		e.memdirMemoryDir = strings.TrimSpace(cfg.MemdirMemoryDir)
+		e.memdirRecentTools = append([]string(nil), cfg.MemdirRecentTools...)
+		e.memdirTextComplete = cfg.MemdirTextComplete
+		e.memdirRelevanceMode = effectiveMemdirRelevanceMode(cfg.MemdirRelevanceModeOverride)
+		for k := range cfg.MemdirAlreadySurfaced {
+			e.memdirSurfaced[k] = struct{}{}
+		}
 		e.compactAdvisor = cfg.CompactAdvisor
 		e.compactExecutor = cfg.CompactExecutor
 		e.stopHooks = append([]StopHookFunc(nil), cfg.StopHooks...)
@@ -285,11 +309,83 @@ func (e *Engine) Submit(userText string) {
 	}()
 }
 
-func (e *Engine) applyMemdir(userText string) (resolved string, nFrag int, injectRawBytes int, err error) {
-	if len(e.memdirPaths) == 0 {
+func effectiveMemdirRelevanceMode(override string) memdir.RelevanceMode {
+	switch strings.ToLower(strings.TrimSpace(override)) {
+	case "llm":
+		return memdir.RelevanceModeLLM
+	case "heuristic":
+		return memdir.RelevanceModeHeuristic
+	case "":
+		if features.MemdirRelevanceMode() == "llm" {
+			return memdir.RelevanceModeLLM
+		}
+		return memdir.RelevanceModeHeuristic
+	default:
+		return memdir.RelevanceModeHeuristic
+	}
+}
+
+func (e *Engine) anthropicMemdirTextComplete() memdir.TextCompleteFunc {
+	return func(ctx context.Context, systemPrompt, userMessage string) (string, error) {
+		cl := e.anthropicClientPtr()
+		if cl == nil {
+			return "", fmt.Errorf("memdir: no anthropic client for LLM relevance")
+		}
+		combined := systemPrompt + "\n\n---\n\n" + userMessage
+		msgs, err := json.Marshal([]map[string]any{
+			{"role": "user", "content": []map[string]string{{"type": "text", "text": combined}}},
+		})
+		if err != nil {
+			return "", err
+		}
+		body := anthropic.MessagesStreamBody{
+			Model:     e.model,
+			MaxTokens: 1024,
+			Messages:  msgs,
+		}
+		pol := e.anthropicPolicy()
+		if pol.MaxAttempts == 0 {
+			pol = anthropic.DefaultPolicy()
+		}
+		text, _, err := cl.PostMessagesStreamReadAssistant(ctx, body, pol)
+		return text, err
+	}
+}
+
+func (e *Engine) memdirPathsForSubmit(userText string) ([]string, error) {
+	var parts [][]string
+	if e.memdirMemoryDir != "" {
+		mode := e.memdirRelevanceMode
+		tc := e.memdirTextComplete
+		if mode == memdir.RelevanceModeLLM && tc == nil {
+			tc = e.anthropicMemdirTextComplete()
+		}
+		opts := memdir.FindRelevantMemoriesOpts{
+			Mode:            mode,
+			Limit:           5,
+			RecentTools:     e.memdirRecentTools,
+			AlreadySurfaced: e.memdirSurfaced,
+			TextComplete:    tc,
+		}
+		rel, err := memdir.FindRelevantMemories(e.ctx, userText, e.memdirMemoryDir, opts)
+		if err != nil {
+			return nil, err
+		}
+		parts = append(parts, rel)
+	}
+	parts = append(parts, e.memdirExplicitPaths)
+	var flat []string
+	for _, p := range parts {
+		flat = append(flat, p...)
+	}
+	return memdir.DedupePathsStable(flat), nil
+}
+
+func (e *Engine) applyMemdirWithPaths(userText string, paths []string) (resolved string, nFrag int, injectRawBytes int, err error) {
+	if len(paths) == 0 {
 		return userText, 0, 0, nil
 	}
-	frags, injectRawBytes, err := memdir.SessionFragmentsFromPaths(e.memdirPaths)
+	frags, injectRawBytes, err := memdir.SessionFragmentsFromPaths(paths)
 	if err != nil {
 		return "", 0, 0, err
 	}
@@ -466,13 +562,24 @@ func (e *Engine) runTurnLoop(userText string) {
 
 	st.SnipRemovalLog = query.CloneSnipRemovalLog(e.restoredSnipRemovalLog)
 
-	resolved, nFrag, injectRaw, err := e.applyMemdir(userText)
+	paths, err := e.memdirPathsForSubmit(userText)
+	if err != nil {
+		loopErr = err
+		e.trySend(EngineEvent{Kind: EventKindError, Err: err})
+		return
+	}
+	resolved, nFrag, injectRaw, err := e.applyMemdirWithPaths(userText, paths)
 	if err != nil {
 		loopErr = err
 		e.trySend(EngineEvent{Kind: EventKindError, Err: err})
 		return
 	}
 	if nFrag > 0 {
+		for _, p := range paths {
+			if p != "" {
+				e.memdirSurfaced[p] = struct{}{}
+			}
+		}
 		if !e.trySend(EngineEvent{Kind: EventKindMemdirInject, MemdirFragmentCount: nFrag}) {
 			return
 		}

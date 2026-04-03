@@ -99,6 +99,13 @@
 
 **仍属 PARITY / 非本仓库 headless 范围**：TS **`sessionStorage.ts`** 的 **`Map<UUID, TranscriptMessage>`** 整表加载、**`parentUuid`** 自动重链、JSONL 追加存储与 **SnipTool** 运行时中区执行 — 需 **Phase 8 / 会话层**；Go 已提供 **前缀/索引/`removedUuids` 重放**、**侧车 JSON** 与 **H7.9 转录内 UUID** 对接点。
 
+#### H8 进度（memdir 全量 headless 子集）
+
+- **`memdir.ScanMemoryFiles`**：递归 **`.md`**、跳过 **`MEMORY.md`**、前 **30** 行 **`description:` / `type:`**、**`MaxMemoryFiles`**、按 **mtime** 新→旧。
+- **`FormatMemoryManifest`**、**`FindRelevantMemories`**：**`heuristic`**（与 **`FindRelevantMemoryPaths`** 同套 token 重叠）与 **`llm`**（侧向 **`TextComplete`** + **`ParseSelectedMemoriesJSON`**；失败回退启发式）；**`RecentTools`** / **`AlreadySurfaced`**。
+- **`RABBIT_CODE_MEMDIR_RELEVANCE_MODE`**（**`heuristic`** | **`llm`** / **`side_query`**）；**`engine.Config`**：**`MemdirMemoryDir`**、**`MemdirRecentTools`**、**`MemdirTextComplete`**、**`MemdirRelevanceModeOverride`**、**`MemdirAlreadySurfaced`**；每轮 **`memdirPathsForSubmit`**，注入成功后累积 **`memdirSurfaced`**；LLM 路径默认 **`PostMessagesStreamReadAssistant`**（system+user 合并为单条 user）。
+- **单测**：**`memory_scan_test`**、**`find_relevant_memories_test`**、**`select_llm_test`**、**`engine` MemdirMemoryDir + surfaced**。
+
 ### TUI / REPL（在 Headless 主干之后）
 
 | 阶段 | 代号 | 内容 | 主要 `src/` 参考 |

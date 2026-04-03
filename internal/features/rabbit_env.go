@@ -196,7 +196,20 @@ const (
 	EnvAutoCompactWindow            = "RABBIT_CODE_AUTO_COMPACT_WINDOW"
 	EnvAutocompactPctOverride       = "RABBIT_CODE_AUTOCOMPACT_PCT_OVERRIDE"
 	EnvBlockingLimitOverride        = "RABBIT_CODE_BLOCKING_LIMIT_OVERRIDE"
+	// EnvMemdirRelevanceMode selects memdir memory selection: "heuristic" (default) or "llm" (side-query, H8).
+	EnvMemdirRelevanceMode = "RABBIT_CODE_MEMDIR_RELEVANCE_MODE"
 )
+
+// MemdirRelevanceMode returns memdir.RelevanceMode values: "heuristic" or "llm".
+func MemdirRelevanceMode() string {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv(EnvMemdirRelevanceMode)))
+	switch v {
+	case "llm", "side_query", "side-query":
+		return "llm"
+	default:
+		return "heuristic"
+	}
+}
 
 func TokenBudgetEnabled() bool { return truthy(os.Getenv(EnvTokenBudget)) }
 

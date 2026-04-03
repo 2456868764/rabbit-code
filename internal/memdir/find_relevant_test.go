@@ -25,3 +25,19 @@ func TestFindRelevantMemoryPaths_emptyQuery(t *testing.T) {
 		t.Fatalf("%v %#v", err, p)
 	}
 }
+
+func TestFindRelevantMemoryPaths_recursive(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "sub")
+	if err := os.MkdirAll(sub, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(sub, "deep.md"), []byte("kiwi fruit salad"), 0o600)
+	paths, err := FindRelevantMemoryPaths("kiwi", dir, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 1 || filepath.Base(paths[0]) != "deep.md" {
+		t.Fatalf("%#v", paths)
+	}
+}

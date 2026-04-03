@@ -687,6 +687,55 @@ done:
 	}
 }
 
+func TestEngine_MemdirMemoryDir_heuristicAndSurfacedExcludesSecondSubmit(t *testing.T) {
+	memDir := t.TempDir()
+	md := filepath.Join(memDir, "note.md")
+	if err := os.WriteFile(md, []byte("everything about bananas"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var memdirCount int
+	var lastUser string
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+				lastUser = string(messagesJSON)
+				return "ok", nil
+			}),
+		},
+		MemdirMemoryDir:           memDir,
+		MemdirRelevanceModeOverride: "heuristic",
+	})
+	drain := func() {
+		for {
+			select {
+			case ev := <-e.Events():
+				if ev.Kind == EventKindMemdirInject {
+					memdirCount++
+				}
+				if ev.Kind == EventKindDone {
+					return
+				}
+			case <-time.After(3 * time.Second):
+				t.Fatal("timeout")
+			}
+		}
+	}
+	e.Submit("banana bread")
+	drain()
+	if memdirCount != 1 {
+		t.Fatalf("first submit memdir events %d", memdirCount)
+	}
+	if !strings.Contains(lastUser, "bananas") {
+		t.Fatalf("missing fragment: %q", lastUser)
+	}
+	e.Submit("banana bread again")
+	drain()
+	if memdirCount != 1 {
+		t.Fatalf("second submit should not inject again; total memdir events %d", memdirCount)
+	}
+	e.Wait()
+}
+
 func TestEngine_CompactSuggest_afterLoop(t *testing.T) {
 	e := New(context.Background(), &Config{
 		Deps: querydeps.Deps{
