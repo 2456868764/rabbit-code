@@ -68,8 +68,11 @@ type Config struct {
 	MemdirPaths []string      // optional: explicit paths prepended to each Submit (P5.4.1)
 	// MemdirMemoryDir when set triggers FindRelevantMemories per Submit (recursive scan + heuristic or LLM; H8).
 	MemdirMemoryDir string
-	// MemdirProjectRoot with RABBIT_CODE_AUTO_MEMDIR seeds memdir.ResolveAutoMemDir; empty uses cwd at engine init.
+	// MemdirProjectRoot seeds memdir.ResolveAutoMemDir; empty uses cwd at engine init.
 	MemdirProjectRoot string
+	// MemdirTrustedAutoMemoryDirectory is autoMemoryDirectory from trusted settings only (policy / flag / local / user — not project).
+	// Populate via config.LoadTrustedAutoMemoryDirectory (paths.ts getAutoMemPathSetting).
+	MemdirTrustedAutoMemoryDirectory string
 	// MemdirRecentTools is passed into LLM memdir selection (suppress tool-doc memories; H8).
 	MemdirRecentTools []string
 	// MemdirTextComplete optional override for LLM selection (tests); default uses Anthropic client when mode is llm.
@@ -342,7 +345,11 @@ func resolveEngineMemdirMemoryDir(cfg *Config) string {
 	if s := features.MemdirMemoryDirFromEnv(); s != "" {
 		return s
 	}
-	if !features.AutoMemdirFromProject() || !features.AutoMemoryEnabled() {
+	if !features.AutoMemoryEnabled() {
+		return ""
+	}
+	trusted := strings.TrimSpace(cfg.MemdirTrustedAutoMemoryDirectory)
+	if !features.AutoMemdirFromProject() && trusted == "" {
 		return ""
 	}
 	root := strings.TrimSpace(cfg.MemdirProjectRoot)
@@ -353,7 +360,9 @@ func resolveEngineMemdirMemoryDir(cfg *Config) string {
 		}
 		root = wd
 	}
-	dir, err := memdir.ResolveAutoMemDir(root)
+	dir, err := memdir.ResolveAutoMemDirWithOptions(root, memdir.AutoMemResolveOptions{
+		TrustedAutoMemoryDirectory: trusted,
+	})
 	if err != nil {
 		return ""
 	}

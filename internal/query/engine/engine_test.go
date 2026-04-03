@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/2456868764/rabbit-code/internal/config"
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/query/querydeps"
@@ -813,6 +814,121 @@ func TestEngine_MemdirMemoryDir_autoResolve_memoryPathOverride(t *testing.T) {
 doneAuto:
 	e.Wait()
 	if !strings.Contains(lastUser, "plums") {
+		t.Fatalf("missing fragment: %q", lastUser)
+	}
+}
+
+func TestResolveEngineMemdirMemoryDir_trustedWithoutAutoMemdirEnv(t *testing.T) {
+	t.Setenv(features.EnvAutoMemdir, "")
+	memDir := t.TempDir()
+	got := resolveEngineMemdirMemoryDir(&Config{MemdirTrustedAutoMemoryDirectory: memDir})
+	want, err := filepath.Abs(memDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotAbs, err := filepath.Abs(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Clean(gotAbs) != filepath.Clean(want) {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+func TestEngine_MemdirMemoryDir_trustedConfigOnly(t *testing.T) {
+	memDir := t.TempDir()
+	t.Setenv(features.EnvAutoMemdir, "")
+	md := filepath.Join(memDir, "note.md")
+	if err := os.WriteFile(md, []byte("everything about bananas"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var lastUser string
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+				lastUser = string(messagesJSON)
+				return "ok", nil
+			}),
+		},
+		MemdirTrustedAutoMemoryDirectory: memDir,
+		MemdirRelevanceModeOverride:      "heuristic",
+	})
+	e.Submit("banana bread")
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindDone {
+				goto doneTrustedOnly
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+doneTrustedOnly:
+	e.Wait()
+	if !strings.Contains(lastUser, "bananas") {
+		t.Fatalf("missing fragment: %q", lastUser)
+	}
+}
+
+func TestEngine_MemdirMemoryDir_fromLoadTrustedAutoMemoryDirectory(t *testing.T) {
+	root := t.TempDir()
+	global := t.TempDir()
+	memDir := t.TempDir()
+	user := filepath.Join(global, config.UserConfigFileName)
+	if err := os.WriteFile(user, []byte(fmt.Sprintf(`{"autoMemoryDirectory":%q}`, memDir)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	trusted, err := config.LoadTrustedAutoMemoryDirectory(config.Paths{
+		GlobalConfigDir: global,
+		ProjectRoot:     root,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if trusted != memDir {
+		t.Fatalf("trusted %q", trusted)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".rabbit-code.json"), []byte(fmt.Sprintf(`{"autoMemoryDirectory":%q}`, filepath.Join(root, "evil"))), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	trusted2, err := config.LoadTrustedAutoMemoryDirectory(config.Paths{
+		GlobalConfigDir: global,
+		ProjectRoot:     root,
+	})
+	if err != nil || trusted2 != memDir {
+		t.Fatalf("after project file trusted2=%q err=%v", trusted2, err)
+	}
+
+	md := filepath.Join(memDir, "note.md")
+	if err := os.WriteFile(md, []byte("everything about bananas"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var lastUser string
+	e := New(context.Background(), &Config{
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+				lastUser = string(messagesJSON)
+				return "ok", nil
+			}),
+		},
+		MemdirTrustedAutoMemoryDirectory: trusted,
+		MemdirRelevanceModeOverride:      "heuristic",
+	})
+	e.Submit("banana bread")
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindDone {
+				goto doneLoadTrusted
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+doneLoadTrusted:
+	e.Wait()
+	if !strings.Contains(lastUser, "bananas") {
 		t.Fatalf("missing fragment: %q", lastUser)
 	}
 }

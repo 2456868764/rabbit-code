@@ -31,6 +31,60 @@ func TestResolveAutoMemDir_override(t *testing.T) {
 	}
 }
 
+func TestResolveAutoMemDir_trustedSettings(t *testing.T) {
+	for _, k := range []string{
+		"RABBIT_CODE_MEMORY_PATH_OVERRIDE",
+		"CLAUDE_COWORK_MEMORY_PATH_OVERRIDE",
+	} {
+		t.Setenv(k, "")
+	}
+	mem := t.TempDir()
+	absMem, err := filepath.Abs(mem)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Clean(absMem) + string(filepath.Separator)
+	got, err := ResolveAutoMemDirWithOptions(t.TempDir(), AutoMemResolveOptions{
+		TrustedAutoMemoryDirectory: absMem,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+func TestResolveAutoMemDir_trustedTilde(t *testing.T) {
+	for _, k := range []string{
+		"RABBIT_CODE_MEMORY_PATH_OVERRIDE",
+		"CLAUDE_COWORK_MEMORY_PATH_OVERRIDE",
+	} {
+		t.Setenv(k, "")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	sub := filepath.Join(home, "memdir", "x")
+	if err := os.MkdirAll(sub, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	absWant, err := filepath.Abs(sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Clean(absWant) + string(filepath.Separator)
+	got, err := ResolveAutoMemDirWithOptions(t.TempDir(), AutoMemResolveOptions{
+		TrustedAutoMemoryDirectory: "~/memdir/x",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
 func TestResolveAutoMemDir_projectsLayout(t *testing.T) {
 	for _, k := range []string{
 		"RABBIT_CODE_MEMORY_PATH_OVERRIDE",

@@ -104,7 +104,8 @@
 - **`memdir.ScanMemoryFiles`**：递归 **`.md`**、跳过 **`MEMORY.md`**、前 **30** 行 **`description:` / `type:`**、**`MaxMemoryFiles`**、按 **mtime** 新→旧。
 - **`FormatMemoryManifest`**、**`FindRelevantMemories`**：**`heuristic`**（与 **`FindRelevantMemoryPaths`** 同套 token 重叠）与 **`llm`**（侧向 **`TextComplete`** + **`ParseSelectedMemoriesJSON`**；失败回退启发式）；**`RecentTools`** / **`AlreadySurfaced`**。
 - **`RABBIT_CODE_MEMDIR_RELEVANCE_MODE`**（**`heuristic`** | **`llm`** / **`side_query`**）；**`engine.Config`**：**`MemdirMemoryDir`**、**`MemdirRecentTools`**、**`MemdirTextComplete`**、**`MemdirRelevanceModeOverride`**、**`MemdirAlreadySurfaced`**；每轮 **`memdirPathsForSubmit`**，注入成功后累积 **`memdirSurfaced`**；LLM 路径默认 **`PostMessagesStreamReadAssistant`**（system+user 合并为单条 user）。
-- **单测**：**`memory_scan_test`**、**`find_relevant_memories_test`**、**`select_llm_test`**、**`engine` MemdirMemoryDir + surfaced**。
+- **`paths.ts` `autoMemoryDirectory`（可信来源）**：**`config.LoadTrustedAutoMemoryDirectory`**（policy → **`RABBIT_CODE_SETTINGS_JSON`** → **`.rabbit-code.local.json`** → **`config.json`**；**不读** project **`.rabbit-code.json`**）；**`memdir.ResolveAutoMemDirWithOptions`** 与 **`Config.MemdirTrustedAutoMemoryDirectory`**；**`RABBIT_CODE_AUTO_MEMDIR`** 与 trusted 二选一即可在 **`AutoMemoryEnabled`** 下走自动解析。
+- **单测**：**`memory_scan_test`**、**`find_relevant_memories_test`**、**`select_llm_test`**、**`engine` MemdirMemoryDir + surfaced**、**`auto_memory_settings_test`**、trusted-only memdir inject。
 
 ### TUI / REPL（在 Headless 主干之后）
 

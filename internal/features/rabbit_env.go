@@ -202,7 +202,8 @@ const (
 	EnvMemdirStrictLLM = "RABBIT_CODE_MEMDIR_STRICT_LLM"
 	// EnvMemdirMemoryDir sets the engine memory scan directory when Config.MemdirMemoryDir is empty (H8).
 	EnvMemdirMemoryDir = "RABBIT_CODE_MEMDIR_MEMORY_DIR"
-	// EnvAutoMemdir when truthy, resolves memdir via memdir.ResolveAutoMemDir when Config.MemdirMemoryDir and EnvMemdirMemoryDir are unset (requires AutoMemoryEnabled).
+	// EnvAutoMemdir when truthy, enables default layout resolution when Config.MemdirMemoryDir and EnvMemdirMemoryDir are unset (requires AutoMemoryEnabled).
+	// Config.MemdirTrustedAutoMemoryDirectory alone (from config.LoadTrustedAutoMemoryDirectory) can enable auto-resolve without this env.
 	EnvAutoMemdir = "RABBIT_CODE_AUTO_MEMDIR"
 	// Auto-memory gates (memdir/paths.ts isAutoMemoryEnabled; settings.json branch omitted in headless).
 	EnvDisableAutoMemory       = "RABBIT_CODE_DISABLE_AUTO_MEMORY"

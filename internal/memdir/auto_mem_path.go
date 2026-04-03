@@ -101,14 +101,31 @@ func HasAutoMemPathOverride() bool {
 	return ok
 }
 
-// ResolveAutoMemDir returns the auto-memory directory for a project (paths.ts getAutoMemPath, without settings.json override).
+// AutoMemResolveOptions mirrors optional inputs for paths.ts getAutoMemPath (layer 2: trusted autoMemoryDirectory).
+type AutoMemResolveOptions struct {
+	// TrustedAutoMemoryDirectory from settings (policy / flag JSON / local / user only — not project).
+	TrustedAutoMemoryDirectory string
+}
+
+// ResolveAutoMemDir returns the auto-memory directory for a project (paths.ts getAutoMemPath).
 // projectRoot should be the working tree root (e.g. cwd). Result always ends with a path separator.
 func ResolveAutoMemDir(projectRoot string) (string, error) {
+	return ResolveAutoMemDirWithOptions(projectRoot, AutoMemResolveOptions{})
+}
+
+// ResolveAutoMemDirWithOptions applies full resolution order: env full-path override, trusted
+// autoMemoryDirectory (expandTilde), then <memoryBase>/projects/<sanitized-root>/memory/.
+func ResolveAutoMemDirWithOptions(projectRoot string, opt AutoMemResolveOptions) (string, error) {
 	if strings.TrimSpace(projectRoot) == "" {
 		return "", os.ErrInvalid
 	}
 	if p, ok := autoMemPathOverride(); ok {
 		return p, nil
+	}
+	if s := strings.TrimSpace(opt.TrustedAutoMemoryDirectory); s != "" {
+		if p, ok := validateMemoryPath(s, true, ""); ok {
+			return p, nil
+		}
 	}
 	base := MemoryBaseDir()
 	keyRoot := projectRoot
@@ -127,7 +144,12 @@ func ResolveAutoMemDir(projectRoot string) (string, error) {
 
 // AutoMemEntrypointPath returns MEMORY.md inside the auto-memory dir.
 func AutoMemEntrypointPath(projectRoot string) (string, error) {
-	dir, err := ResolveAutoMemDir(projectRoot)
+	return AutoMemEntrypointPathWithOptions(projectRoot, AutoMemResolveOptions{})
+}
+
+// AutoMemEntrypointPathWithOptions is like AutoMemEntrypointPath but uses the same resolution options as ResolveAutoMemDirWithOptions.
+func AutoMemEntrypointPathWithOptions(projectRoot string, opt AutoMemResolveOptions) (string, error) {
+	dir, err := ResolveAutoMemDirWithOptions(projectRoot, opt)
 	if err != nil {
 		return "", err
 	}
@@ -136,7 +158,12 @@ func AutoMemEntrypointPath(projectRoot string) (string, error) {
 
 // AutoMemDailyLogPath returns <autoMem>/logs/YYYY/MM/YYYY-MM-DD.md (paths.ts getAutoMemDailyLogPath).
 func AutoMemDailyLogPath(projectRoot string, t time.Time) (string, error) {
-	dir, err := ResolveAutoMemDir(projectRoot)
+	return AutoMemDailyLogPathWithOptions(projectRoot, t, AutoMemResolveOptions{})
+}
+
+// AutoMemDailyLogPathWithOptions is like AutoMemDailyLogPath with explicit resolve options.
+func AutoMemDailyLogPathWithOptions(projectRoot string, t time.Time, opt AutoMemResolveOptions) (string, error) {
+	dir, err := ResolveAutoMemDirWithOptions(projectRoot, opt)
 	if err != nil {
 		return "", err
 	}
