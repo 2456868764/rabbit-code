@@ -6,14 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/2456868764/rabbit-code/internal/services/api"
-	"github.com/2456868764/rabbit-code/internal/services/compact"
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/query/querydeps"
+	"github.com/2456868764/rabbit-code/internal/services/api"
+	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
-const maxSubmitContinuationRounds = 8
+const maxSubmitContinuationRounds = 32
 
 func (e *Engine) loopDriver() query.LoopDriver {
 	d := query.LoopDriver{
@@ -22,15 +22,15 @@ func (e *Engine) loopDriver() query.LoopDriver {
 			Assistant: e.deps.Assistant,
 			Turn:      e.deps.Turn,
 		},
-		Model:            e.model,
-		MaxTokens:        e.maxTokens,
-		AgentID:          e.agentID,
-		NonInteractive:   e.nonInteractive,
-		SessionID:        e.sessionID,
-		Debug:            e.debug,
-		QuerySource:         e.querySource,
-		ContextWindowTokens: e.contextWindowTokens,
-		Observe:             e.loopObservers(),
+		Model:                e.model,
+		MaxTokens:            e.maxTokens,
+		AgentID:              e.agentID,
+		NonInteractive:       e.nonInteractive,
+		SessionID:            e.sessionID,
+		Debug:                e.debug,
+		QuerySource:          e.querySource,
+		ContextWindowTokens:  e.contextWindowTokens,
+		Observe:              e.loopObservers(),
 		HistorySnipMaxBytes:  features.HistorySnipMaxBytes(),
 		HistorySnipMaxRounds: features.HistorySnipMaxRounds(),
 		SnipCompactMaxBytes:  features.SnipCompactMaxBytes(),
@@ -59,9 +59,11 @@ func (e *Engine) promptCacheBreakCompactRecovery(ctx context.Context, msgs json.
 }
 
 // executeRunTurnLoopAttempts runs RunTurnLoop with optional RecoverStrategy second attempt (P5.1.3) and collapse-drain bookkeeping (H6).
-func (e *Engine) executeRunTurnLoopAttempts(ctxLoop context.Context, st *query.LoopState, resolved string, maxAttempts int) (msgs json.RawMessage, succeeded bool, loopErr error) {
+// initialSeed, when non-empty, is used for the first attempt instead of InitialUserMessagesJSON(resolved) (H5.5 token-budget continuation).
+func (e *Engine) executeRunTurnLoopAttempts(ctxLoop context.Context, st *query.LoopState, resolved string, initialSeed json.RawMessage, maxAttempts int) (msgs json.RawMessage, succeeded bool, loopErr error) {
 	d := e.loopDriver()
 	var retrySeedMsgs json.RawMessage
+	seedConsumed := false
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		if attempt == 0 {
 			if e.maxAssistantTurns > 0 {
@@ -77,6 +79,9 @@ func (e *Engine) executeRunTurnLoopAttempts(ctxLoop context.Context, st *query.L
 		if len(retrySeedMsgs) > 0 {
 			msgs, _, runErr = d.RunTurnLoopFromMessages(ctxLoop, st, retrySeedMsgs)
 			retrySeedMsgs = nil
+		} else if len(initialSeed) > 0 && !seedConsumed {
+			msgs, _, runErr = d.RunTurnLoopFromMessages(ctxLoop, st, initialSeed)
+			seedConsumed = true
 		} else {
 			msgs, _, runErr = d.RunTurnLoop(ctxLoop, st, resolved)
 		}

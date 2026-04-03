@@ -25,8 +25,8 @@ type LoopDriver struct {
 	// SessionID optional mirror for toolUseContext / session analytics (H6).
 	SessionID string
 	// Debug mirrors toolUseContext.options.debug (H6).
-	Debug bool
-	Observe   *LoopObservers
+	Debug   bool
+	Observe *LoopObservers
 	// HistorySnipMaxBytes / HistorySnipMaxRounds implement P5.F.10 when both > 0 (engine sets from features).
 	HistorySnipMaxBytes  int
 	HistorySnipMaxRounds int
@@ -171,8 +171,20 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 				st.SetMessagesJSON(msgs)
 				return msgs, lastAssistantText, err
 			}
-			if n > 0 && d.Observe != nil && d.Observe.OnHistorySnip != nil {
-				d.Observe.OnHistorySnip(len(msgs), len(newMsgs), n)
+			if n > 0 {
+				id := NewSnipRemovalID()
+				if st != nil {
+					st.SnipRemovalLog = append(st.SnipRemovalLog, SnipRemovalEntry{
+						ID:                  id,
+						Kind:                SnipRemovalKindHistorySnip,
+						RemovedMessageCount: n,
+						BytesBefore:         len(msgs),
+						BytesAfter:          len(newMsgs),
+					})
+				}
+				if d.Observe != nil && d.Observe.OnHistorySnip != nil {
+					d.Observe.OnHistorySnip(len(msgs), len(newMsgs), n, id)
+				}
 			}
 			if n > 0 {
 				if nt := EstimateTranscriptJSONTokens(newMsgs); prevTok > nt {
@@ -189,8 +201,20 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 				st.SetMessagesJSON(msgs)
 				return msgs, lastAssistantText, err
 			}
-			if n > 0 && d.Observe != nil && d.Observe.OnSnipCompact != nil {
-				d.Observe.OnSnipCompact(len(msgs), len(newMsgs), n)
+			if n > 0 {
+				id := NewSnipRemovalID()
+				if st != nil {
+					st.SnipRemovalLog = append(st.SnipRemovalLog, SnipRemovalEntry{
+						ID:                  id,
+						Kind:                SnipRemovalKindSnipCompact,
+						RemovedMessageCount: n,
+						BytesBefore:         len(msgs),
+						BytesAfter:          len(newMsgs),
+					})
+				}
+				if d.Observe != nil && d.Observe.OnSnipCompact != nil {
+					d.Observe.OnSnipCompact(len(msgs), len(newMsgs), n, id)
+				}
 			}
 			if n > 0 {
 				if nt := EstimateTranscriptJSONTokens(newMsgs); prevTok > nt {

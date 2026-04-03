@@ -25,6 +25,10 @@ const (
 	EventKindSnipCompactApplied
 	// EventKindSubmitTokenBudgetSnapshot reports combined heuristic submit tokens (H5): PhaseAuxInt=total, PhaseAuxInt2=inject raw bytes, PhaseDetail=mode.
 	EventKindSubmitTokenBudgetSnapshot
+	// EventKindTokenBudgetContinue reports an automatic token-budget nudge continuation (H5.5); PhaseDetail=nudge, PhaseAuxInt=pct, PhaseAuxInt2=continuationCount.
+	EventKindTokenBudgetContinue
+	// EventKindTokenBudgetCompleted reports stop after budget continuations or diminishing returns (H5.5); PhaseDetail holds key=value telemetry.
+	EventKindTokenBudgetCompleted
 )
 
 // EngineEvent is a single unit on the engine event channel.
@@ -59,4 +63,6 @@ type EngineEvent struct {
 	// PhaseAuxInt / PhaseAuxInt2 optional integers (e.g. history snip before/after bytes).
 	PhaseAuxInt  int
 	PhaseAuxInt2 int
+	// SnipID is set for EventKindHistorySnipApplied / EventKindSnipCompactApplied (H7 stable id).
+	SnipID string
 }

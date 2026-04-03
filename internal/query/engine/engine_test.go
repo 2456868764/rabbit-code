@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/2456868764/rabbit-code/internal/services/api"
-	"github.com/2456868764/rabbit-code/internal/services/compact"
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/query/querydeps"
+	"github.com/2456868764/rabbit-code/internal/services/api"
+	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
 func drainChFor(d time.Duration, ch <-chan EngineEvent) {
@@ -1037,7 +1037,7 @@ func TestEngine_StopHookBlockingContinue_runsSecondTurnLoop(t *testing.T) {
 	}}
 	var nCont int
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{Turn: turns},
+		Deps:  querydeps.Deps{Turn: turns},
 		Model: "m", MaxTokens: 8,
 		StopHookBlockingContinue: func(context.Context, query.LoopState) bool {
 			nCont++
@@ -1076,7 +1076,7 @@ func TestEngine_TokenBudgetContinueAfterTurn_secondLoop(t *testing.T) {
 	var nTok int
 	var captured query.LoopState
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{Turn: turns},
+		Deps:  querydeps.Deps{Turn: turns},
 		Model: "m", MaxTokens: 8,
 		TokenBudgetContinueAfterTurn: func(context.Context, query.LoopState, json.RawMessage) bool {
 			nTok++
@@ -1706,6 +1706,9 @@ func TestEngine_historySnipBetweenRounds(t *testing.T) {
 		case ev := <-ch:
 			if ev.Kind == EventKindHistorySnipApplied {
 				sawSnip = true
+				if ev.SnipID == "" {
+					t.Fatal("expected SnipID on history snip event")
+				}
 			}
 			if ev.Kind == EventKindDone {
 				if !sawSnip {
@@ -1717,6 +1720,25 @@ func TestEngine_historySnipBetweenRounds(t *testing.T) {
 		case <-time.After(3 * time.Second):
 			t.Fatal("timeout")
 		}
+	}
+}
+
+func TestEngine_SnipRemovalLogForPersistence_includesRestored(t *testing.T) {
+	prev := []query.SnipRemovalEntry{{ID: "r1", Kind: query.SnipRemovalKindSnipCompact, RemovedMessageCount: 2}}
+	e := New(context.Background(), &Config{
+		RestoredSnipRemovalLog: prev,
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "ok", nil
+			}),
+		},
+	})
+	e.Submit("x")
+	drainUntilTerminal(t, e.Events())
+	e.Wait()
+	got := e.SnipRemovalLogForPersistence()
+	if len(got) != 1 || got[0].ID != "r1" {
+		t.Fatalf("got %+v", got)
 	}
 }
 

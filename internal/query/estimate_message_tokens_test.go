@@ -27,3 +27,19 @@ func TestEstimateMessageTokensFromTranscriptJSON_invalid(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestEstimateMessageTokensFromTranscriptJSON_imageBase64Heuristic(t *testing.T) {
+	longB64 := make([]byte, 4000)
+	for i := range longB64 {
+		longB64[i] = 'A'
+	}
+	raw := []byte(`[{"role":"user","content":[{"type":"image","source":{"type":"base64","media_type":"image/png","data":"` + string(longB64) + `"}}]}]`)
+	n, err := EstimateMessageTokensFromTranscriptJSON(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Should exceed flat 2000-token image cap when base64 is large.
+	if n <= 2000 {
+		t.Fatalf("expected large base64 to raise estimate, got %d", n)
+	}
+}

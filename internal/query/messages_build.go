@@ -9,6 +9,12 @@ func AppendUserTextMessage(messagesJSON json.RawMessage, userText string) (json.
 	return appendTextRoleMessage(messagesJSON, "user", userText)
 }
 
+// AppendMetaUserTextMessage appends a user nudge for token-budget continuation (query.ts createUserMessage isMeta).
+// Wire format matches AppendUserTextMessage; isMeta is a TS UI concern.
+func AppendMetaUserTextMessage(messagesJSON json.RawMessage, text string) (json.RawMessage, error) {
+	return AppendUserTextMessage(messagesJSON, text)
+}
+
 // AppendAssistantTextMessage appends an assistant message with a single text block.
 func AppendAssistantTextMessage(messagesJSON json.RawMessage, assistantText string) (json.RawMessage, error) {
 	return appendTextRoleMessage(messagesJSON, "assistant", assistantText)

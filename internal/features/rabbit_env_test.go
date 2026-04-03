@@ -125,6 +125,10 @@ func TestSubmitTokenEstimateMode(t *testing.T) {
 	if SubmitTokenEstimateMode() != "structured" {
 		t.Fatal()
 	}
+	t.Setenv(EnvTokenSubmitEstimateMode, "api")
+	if SubmitTokenEstimateMode() != "api" {
+		t.Fatal()
+	}
 }
 
 func TestTokenBudgetMaxAttachmentBytes_whenEnabled(t *testing.T) {

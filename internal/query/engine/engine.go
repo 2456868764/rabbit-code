@@ -112,6 +112,8 @@ type Config struct {
 	InitialAutocompactConsecutiveFailures int
 	// RestoredAutoCompactTracking optional; cloned into each Submit's LoopState and used to seed consecutive failure count.
 	RestoredAutoCompactTracking *query.AutoCompactTracking
+	// RestoredSnipRemovalLog optional; prepended into each Submit's LoopState.SnipRemovalLog for session continuity (H7).
+	RestoredSnipRemovalLog []query.SnipRemovalEntry
 }
 
 // Engine coordinates cancellable query turns (stub or real StreamAssistant / RunTurnLoop).
@@ -150,8 +152,12 @@ type Engine struct {
 	// autoCompactConsecutiveFailures counts failed proactive auto compact executor runs across Submits (H3 / autoCompact.ts);
 	// mirrored onto st.AutoCompactTracking.ConsecutiveFailures when st != nil.
 	autoCompactConsecutiveFailures int
-	restoredAutoCompactTracking *query.AutoCompactTracking
-	lastAutoCompactTracking     *query.AutoCompactTracking // snapshot after last Submit for persistence
+	restoredAutoCompactTracking    *query.AutoCompactTracking
+	lastAutoCompactTracking        *query.AutoCompactTracking // snapshot after last Submit for persistence
+	lastSnipRemovalLog             []query.SnipRemovalEntry   // snapshot after last Submit (H7)
+	restoredSnipRemovalLog         []query.SnipRemovalEntry
+	// streamOutputTotal accumulates UsageDelta.OutputTokens via chained Anthropic OnStreamUsage (H5.5).
+	streamOutputTotal atomic.Int64
 }
 
 // NewEngine is equivalent to New(parent, nil) (stub assistant).
@@ -228,6 +234,7 @@ func New(parent context.Context, cfg *Config) *Engine {
 			e.autoCompactConsecutiveFailures = *t.ConsecutiveFailures
 		}
 		e.restoredAutoCompactTracking = query.CloneAutoCompactTracking(cfg.RestoredAutoCompactTracking)
+		e.restoredSnipRemovalLog = query.CloneSnipRemovalLog(cfg.RestoredSnipRemovalLog)
 	}
 	return e
 }
@@ -343,20 +350,22 @@ func (e *Engine) loopObservers() *query.LoopObservers {
 				})
 			}
 		},
-		OnHistorySnip: func(before, after, rounds int) {
+		OnHistorySnip: func(before, after, rounds int, snipID string) {
 			e.trySend(EngineEvent{
 				Kind:         EventKindHistorySnipApplied,
 				PhaseDetail:  fmt.Sprintf("rounds=%d", rounds),
 				PhaseAuxInt:  before,
 				PhaseAuxInt2: after,
+				SnipID:       snipID,
 			})
 		},
-		OnSnipCompact: func(before, after, rounds int) {
+		OnSnipCompact: func(before, after, rounds int, snipID string) {
 			e.trySend(EngineEvent{
 				Kind:         EventKindSnipCompactApplied,
 				PhaseDetail:  fmt.Sprintf("rounds=%d", rounds),
 				PhaseAuxInt:  before,
 				PhaseAuxInt2: after,
+				SnipID:       snipID,
 			})
 		},
 		OnPromptCacheBreakRecovery: func(phase string) {
@@ -365,7 +374,84 @@ func (e *Engine) loopObservers() *query.LoopObservers {
 	}
 }
 
+func (e *Engine) anthropicClientPtr() *anthropic.Client {
+	if a, ok := e.deps.Turn.(*querydeps.AnthropicAssistant); ok && a != nil && a.Client != nil {
+		return a.Client
+	}
+	if a, ok := e.deps.Assistant.(*querydeps.AnthropicAssistant); ok && a != nil && a.Client != nil {
+		return a.Client
+	}
+	return nil
+}
+
+func (e *Engine) anthropicPolicy() anthropic.Policy {
+	if a, ok := e.deps.Turn.(*querydeps.AnthropicAssistant); ok && a != nil && a.Policy.MaxAttempts != 0 {
+		return a.Policy
+	}
+	if a, ok := e.deps.Assistant.(*querydeps.AnthropicAssistant); ok && a != nil && a.Policy.MaxAttempts != 0 {
+		return a.Policy
+	}
+	if a, ok := e.deps.Turn.(*querydeps.AnthropicAssistant); ok && a != nil {
+		return a.Policy
+	}
+	if a, ok := e.deps.Assistant.(*querydeps.AnthropicAssistant); ok && a != nil {
+		return a.Policy
+	}
+	return anthropic.Policy{}
+}
+
+// chainStreamUsage wraps Anthropic Client.OnStreamUsage to accumulate OutputTokens for H5.5 turn budget tracking.
+func (e *Engine) chainStreamUsage() (restore func()) {
+	c := e.anthropicClientPtr()
+	if c == nil {
+		return func() {}
+	}
+	prev := c.OnStreamUsage
+	c.OnStreamUsage = func(u anthropic.UsageDelta) {
+		e.streamOutputTotal.Add(u.OutputTokens)
+		if prev != nil {
+			prev(u)
+		}
+	}
+	return func() { c.OnStreamUsage = prev }
+}
+
+func (e *Engine) submitTokenEstimate(ctx context.Context, mode, resolved string, injectRaw int) (total int, detail string) {
+	detail = mode
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "api":
+		cl := e.anthropicClientPtr()
+		if cl != nil {
+			msgsJSON, err := query.InitialUserMessagesJSON(resolved)
+			if err == nil {
+				pol := e.anthropicPolicy()
+				if pol.MaxAttempts == 0 {
+					pol = anthropic.DefaultPolicy()
+				}
+				n, err := cl.CountMessagesInputTokens(ctx, e.model, msgsJSON, pol)
+				if err == nil {
+					return n + query.EstimateAttachmentRawBytesAsTokens(injectRaw), "api"
+				}
+			}
+		}
+		fb := query.EstimateSubmitTokenBudgetTotal("bytes4", resolved, injectRaw)
+		return fb, "api+fallback"
+	default:
+		return query.EstimateSubmitTokenBudgetTotal(mode, resolved, injectRaw), mode
+	}
+}
+
 func (e *Engine) runTurnLoop(userText string) {
+	restoreUsage := e.chainStreamUsage()
+	defer restoreUsage()
+	turnOutputBaseline := e.streamOutputTotal.Load()
+	budgetTracker := query.NewBudgetTracker()
+	parsedOutputBudget, haveOutputBudget := query.ParseTokenBudget(userText)
+	if !haveOutputBudget || parsedOutputBudget <= 0 {
+		parsedOutputBudget = 0
+		haveOutputBudget = false
+	}
+
 	st := &query.LoopState{}
 	if e.restoredAutoCompactTracking != nil {
 		st.AutoCompactTracking = query.CloneAutoCompactTracking(e.restoredAutoCompactTracking)
@@ -374,8 +460,11 @@ func (e *Engine) runTurnLoop(userText string) {
 	var loopErr error
 	defer func() {
 		e.lastAutoCompactTracking = query.CloneAutoCompactTracking(st.AutoCompactTracking)
+		e.lastSnipRemovalLog = query.CloneSnipRemovalLog(st.SnipRemovalLog)
 		e.invokeStopHooks(st, loopErr)
 	}()
+
+	st.SnipRemovalLog = query.CloneSnipRemovalLog(e.restoredSnipRemovalLog)
 
 	resolved, nFrag, injectRaw, err := e.applyMemdir(userText)
 	if err != nil {
@@ -406,12 +495,12 @@ func (e *Engine) runTurnLoop(userText string) {
 
 	if features.TokenBudgetEnabled() {
 		mode := features.SubmitTokenEstimateMode()
-		totalTok := query.EstimateSubmitTokenBudgetTotal(mode, resolved, injectRaw)
+		totalTok, modeDetail := e.submitTokenEstimate(e.ctx, mode, resolved, injectRaw)
 		e.trySend(EngineEvent{
 			Kind:         EventKindSubmitTokenBudgetSnapshot,
 			PhaseAuxInt:  totalTok,
 			PhaseAuxInt2: injectRaw,
-			PhaseDetail:  mode,
+			PhaseDetail:  modeDetail,
 		})
 	}
 
@@ -427,7 +516,8 @@ func (e *Engine) runTurnLoop(userText string) {
 	}
 	if maxT := features.TokenBudgetMaxInputTokens(); maxT > 0 {
 		mode := features.SubmitTokenEstimateMode()
-		if query.EstimateSubmitTokenBudgetTotal(mode, resolved, injectRaw) > maxT {
+		totalTok, _ := e.submitTokenEstimate(e.ctx, mode, resolved, injectRaw)
+		if totalTok > maxT {
 			loopErr = ErrTokenBudgetExceeded
 			e.trySend(EngineEvent{Kind: EventKindError, Err: loopErr})
 			return
@@ -470,9 +560,11 @@ func (e *Engine) runTurnLoop(userText string) {
 
 	var msgs json.RawMessage
 	succeeded := false
+	var continuationSeed json.RawMessage
 	for round := 0; round < maxSubmitContinuationRounds; round++ {
 		var subErr error
-		msgs, succeeded, subErr = e.executeRunTurnLoopAttempts(ctxLoop, st, resolved, maxAttempts)
+		msgs, succeeded, subErr = e.executeRunTurnLoopAttempts(ctxLoop, st, resolved, continuationSeed, maxAttempts)
+		continuationSeed = nil
 		if !succeeded {
 			loopErr = subErr
 			return
@@ -509,6 +601,39 @@ func (e *Engine) runTurnLoop(userText string) {
 			PrepareLoopStateForStopHookBlockingContinuation(st)
 			continue
 		}
+
+		if features.TokenBudgetEnabled() && haveOutputBudget && e.anthropicClientPtr() != nil && strings.TrimSpace(e.agentID) == "" {
+			turnOut := int(e.streamOutputTotal.Load() - turnOutputBaseline)
+			decision := query.CheckTokenBudget(&budgetTracker, e.agentID, parsedOutputBudget, turnOut)
+			if decision.Action == query.BudgetActionContinue {
+				next, aerr := query.AppendMetaUserTextMessage(msgs, decision.NudgeMessage)
+				if aerr != nil {
+					loopErr = aerr
+					e.trySend(EngineEvent{Kind: EventKindError, Err: loopErr})
+					return
+				}
+				continuationSeed = next
+				query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonTokenBudgetContinuation})
+				PrepareLoopStateForTokenBudgetContinuation(st)
+				e.trySend(EngineEvent{
+					Kind:         EventKindTokenBudgetContinue,
+					PhaseDetail:  decision.NudgeMessage,
+					PhaseAuxInt:  decision.Pct,
+					PhaseAuxInt2: decision.ContinuationCount,
+				})
+				continue
+			}
+			if decision.Completion != nil {
+				c := decision.Completion
+				e.trySend(EngineEvent{
+					Kind: EventKindTokenBudgetCompleted,
+					PhaseDetail: fmt.Sprintf("continuations=%d pct=%d turn=%d budget=%d diminishing=%t durMs=%d",
+						c.ContinuationCount, c.Pct, c.TurnTokens, c.Budget, c.DiminishingReturns, c.DurationMs),
+				})
+			}
+			break
+		}
+
 		if features.TokenBudgetEnabled() && e.tokenBudgetContinueAfterTurn != nil && e.tokenBudgetContinueAfterTurn(e.ctx, *st, msgs) {
 			query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonTokenBudgetContinuation})
 			PrepareLoopStateForTokenBudgetContinuation(st)
@@ -685,6 +810,11 @@ func (e *Engine) trySend(ev EngineEvent) bool {
 // (for session save). Nil if no Submit has finished.
 func (e *Engine) AutoCompactTrackingForPersistence() *query.AutoCompactTracking {
 	return query.CloneAutoCompactTracking(e.lastAutoCompactTracking)
+}
+
+// SnipRemovalLogForPersistence returns a deep copy of the snip removal log after the last completed Submit (H7 session sidecar).
+func (e *Engine) SnipRemovalLogForPersistence() []query.SnipRemovalEntry {
+	return query.CloneSnipRemovalLog(e.lastSnipRemovalLog)
 }
 
 // Cancel stops in-flight Submit work (idempotent). In-flight HTTP streams should respect the same context when wired through RunTurnLoop.

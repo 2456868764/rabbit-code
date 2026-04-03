@@ -27,14 +27,14 @@ const (
 	// EnvAntiDistillationFakeTools when truthy with ANTI_DISTILLATION_CC adds JSON anti_distillation: ["fake_tools"] (claude.ts getExtraBodyParams).
 	EnvAntiDistillationFakeTools = "RABBIT_CODE_ANTI_DISTILLATION_FAKE_TOOLS"
 	// EnvOAuthBetaAppend is a comma-separated list of extra anthropic-beta names for OAuth sessions (constants/oauth.ts OAUTH_BETA_HEADER patterns).
-	EnvOAuthBetaAppend = "RABBIT_CODE_OAUTH_BETA_APPEND"
+	EnvOAuthBetaAppend   = "RABBIT_CODE_OAUTH_BETA_APPEND"
 	EnvNativeAttestation = "RABBIT_CODE_NATIVE_CLIENT_ATTESTATION"
 	// EnvNativeAttestationHeader overrides the HTTP header name when native attestation is on.
 	EnvNativeAttestationHeader = "RABBIT_CODE_NATIVE_ATTESTATION_HEADER"
 	// EnvNativeAttestationValue sets the header value (default 1).
 	EnvNativeAttestationValue = "RABBIT_CODE_NATIVE_ATTESTATION_VALUE"
-	EnvPromptCacheBreak = "RABBIT_CODE_PROMPT_CACHE_BREAK_DETECTION"
-	EnvE2EMockAPI       = "RABBIT_CODE_E2E_MOCK_API"
+	EnvPromptCacheBreak       = "RABBIT_CODE_PROMPT_CACHE_BREAK_DETECTION"
+	EnvE2EMockAPI             = "RABBIT_CODE_E2E_MOCK_API"
 	// EnvOAuthBaseURL overrides console base for usage.ts fetchUtilization (default https://console.anthropic.com).
 	EnvOAuthBaseURL = "RABBIT_CODE_OAUTH_BASE_URL"
 	// EnvHTTPUserAgent overrides default User-Agent for API HTTP clients (utils/http.ts).
@@ -157,45 +157,45 @@ func AttributionHeaderPromptEnabled() bool {
 // --- Headless query / engine env (SOURCE_FEATURE_FLAGS.md P5.F.*; defaults off) ---
 
 const (
-	EnvTokenBudget                 = "RABBIT_CODE_TOKEN_BUDGET"
-	EnvTokenBudgetMaxInputBytes    = "RABBIT_CODE_TOKEN_BUDGET_MAX_INPUT_BYTES"
-	EnvTokenBudgetMaxInputTokens   = "RABBIT_CODE_TOKEN_BUDGET_MAX_INPUT_TOKENS"
+	EnvTokenBudget                   = "RABBIT_CODE_TOKEN_BUDGET"
+	EnvTokenBudgetMaxInputBytes      = "RABBIT_CODE_TOKEN_BUDGET_MAX_INPUT_BYTES"
+	EnvTokenBudgetMaxInputTokens     = "RABBIT_CODE_TOKEN_BUDGET_MAX_INPUT_TOKENS"
 	EnvTokenBudgetMaxAttachmentBytes = "RABBIT_CODE_TOKEN_BUDGET_MAX_ATTACHMENT_BYTES"
-	// EnvTokenSubmitEstimateMode selects how resolved Submit text is tokenized for MAX_INPUT_TOKENS (H5): "bytes4" (default) or "structured" (Messages JSON array).
+	// EnvTokenSubmitEstimateMode selects how resolved Submit text is tokenized for MAX_INPUT_TOKENS (H5): "bytes4" (default), "structured" (Messages JSON array), or "api" (Anthropic count_tokens with heuristic fallback).
 	EnvTokenSubmitEstimateMode = "RABBIT_CODE_TOKEN_SUBMIT_ESTIMATE_MODE"
-	EnvReactiveCompact             = "RABBIT_CODE_REACTIVE_COMPACT"
+	EnvReactiveCompact         = "RABBIT_CODE_REACTIVE_COMPACT"
 	// EnvTenguCobaltRaccoon mirrors GrowthBook tengu_cobalt_raccoon (reactive-only mode under REACTIVE_COMPACT).
-	EnvTenguCobaltRaccoon = "RABBIT_CODE_TENGU_COBALT_RACCOON"
-	EnvContextCollapse             = "RABBIT_CODE_CONTEXT_COLLAPSE"
-	EnvSessionRestore              = "RABBIT_CODE_SESSION_RESTORE"
-	EnvUltrathink                  = "RABBIT_CODE_ULTRATHINK"
-	EnvUltraplan                   = "RABBIT_CODE_ULTRAPLAN"
-	EnvBreakCacheCommand           = "RABBIT_CODE_BREAK_CACHE_COMMAND"
-	EnvTemplates                   = "RABBIT_CODE_TEMPLATES"
-	EnvCachedMicrocompact          = "RABBIT_CODE_CACHED_MICROCOMPACT"
-	EnvHistorySnip                 = "RABBIT_CODE_HISTORY_SNIP"
-	EnvBashExec                    = "RABBIT_CODE_BASH_EXEC"
-	EnvSnipCompact                 = "RABBIT_CODE_SNIP_COMPACT"
-	EnvSnipCompactMaxBytes         = "RABBIT_CODE_SNIP_COMPACT_MAX_BYTES"
-	EnvSnipCompactMaxRounds        = "RABBIT_CODE_SNIP_COMPACT_MAX_ROUNDS"
-	EnvReactiveCompactMinBytes     = "RABBIT_CODE_REACTIVE_COMPACT_MIN_BYTES"
-	EnvReactiveCompactMinTokens    = "RABBIT_CODE_REACTIVE_COMPACT_MIN_TOKENS"
-	EnvHistorySnipMaxBytes         = "RABBIT_CODE_HISTORY_SNIP_MAX_BYTES"
-	EnvHistorySnipMaxRounds        = "RABBIT_CODE_HISTORY_SNIP_MAX_ROUNDS"
-	EnvTemplateNames               = "RABBIT_CODE_TEMPLATE_NAMES"
-	EnvTemplateDir                 = "RABBIT_CODE_TEMPLATE_DIR"
+	EnvTenguCobaltRaccoon             = "RABBIT_CODE_TENGU_COBALT_RACCOON"
+	EnvContextCollapse                = "RABBIT_CODE_CONTEXT_COLLAPSE"
+	EnvSessionRestore                 = "RABBIT_CODE_SESSION_RESTORE"
+	EnvUltrathink                     = "RABBIT_CODE_ULTRATHINK"
+	EnvUltraplan                      = "RABBIT_CODE_ULTRAPLAN"
+	EnvBreakCacheCommand              = "RABBIT_CODE_BREAK_CACHE_COMMAND"
+	EnvTemplates                      = "RABBIT_CODE_TEMPLATES"
+	EnvCachedMicrocompact             = "RABBIT_CODE_CACHED_MICROCOMPACT"
+	EnvHistorySnip                    = "RABBIT_CODE_HISTORY_SNIP"
+	EnvBashExec                       = "RABBIT_CODE_BASH_EXEC"
+	EnvSnipCompact                    = "RABBIT_CODE_SNIP_COMPACT"
+	EnvSnipCompactMaxBytes            = "RABBIT_CODE_SNIP_COMPACT_MAX_BYTES"
+	EnvSnipCompactMaxRounds           = "RABBIT_CODE_SNIP_COMPACT_MAX_ROUNDS"
+	EnvReactiveCompactMinBytes        = "RABBIT_CODE_REACTIVE_COMPACT_MIN_BYTES"
+	EnvReactiveCompactMinTokens       = "RABBIT_CODE_REACTIVE_COMPACT_MIN_TOKENS"
+	EnvHistorySnipMaxBytes            = "RABBIT_CODE_HISTORY_SNIP_MAX_BYTES"
+	EnvHistorySnipMaxRounds           = "RABBIT_CODE_HISTORY_SNIP_MAX_ROUNDS"
+	EnvTemplateNames                  = "RABBIT_CODE_TEMPLATE_NAMES"
+	EnvTemplateDir                    = "RABBIT_CODE_TEMPLATE_DIR"
 	EnvPromptCacheBreakSuggestCompact = "RABBIT_CODE_PROMPT_CACHE_BREAK_SUGGEST_COMPACT"
-	EnvPromptCacheBreakTrimResend  = "RABBIT_CODE_PROMPT_CACHE_BREAK_TRIM_RESEND"
-	EnvPromptCacheBreakAutoCompact = "RABBIT_CODE_PROMPT_CACHE_BREAK_AUTO_COMPACT"
+	EnvPromptCacheBreakTrimResend     = "RABBIT_CODE_PROMPT_CACHE_BREAK_TRIM_RESEND"
+	EnvPromptCacheBreakAutoCompact    = "RABBIT_CODE_PROMPT_CACHE_BREAK_AUTO_COMPACT"
 	// Autocompact / proactive compact (autoCompact.ts + isAutoCompactEnabled; rabbit-code prefixed).
-	EnvDisableCompact                 = "RABBIT_CODE_DISABLE_COMPACT"
-	EnvDisableAutoCompact             = "RABBIT_CODE_DISABLE_AUTO_COMPACT"
-	EnvAutoCompact                    = "RABBIT_CODE_AUTO_COMPACT" // unset = on; "0"/"false" = user off
-	EnvSuppressProactiveAutoCompact   = "RABBIT_CODE_SUPPRESS_PROACTIVE_AUTO_COMPACT"
-	EnvContextWindowTokens            = "RABBIT_CODE_CONTEXT_WINDOW_TOKENS"
-	EnvAutoCompactWindow              = "RABBIT_CODE_AUTO_COMPACT_WINDOW"
-	EnvAutocompactPctOverride         = "RABBIT_CODE_AUTOCOMPACT_PCT_OVERRIDE"
-	EnvBlockingLimitOverride          = "RABBIT_CODE_BLOCKING_LIMIT_OVERRIDE"
+	EnvDisableCompact               = "RABBIT_CODE_DISABLE_COMPACT"
+	EnvDisableAutoCompact           = "RABBIT_CODE_DISABLE_AUTO_COMPACT"
+	EnvAutoCompact                  = "RABBIT_CODE_AUTO_COMPACT" // unset = on; "0"/"false" = user off
+	EnvSuppressProactiveAutoCompact = "RABBIT_CODE_SUPPRESS_PROACTIVE_AUTO_COMPACT"
+	EnvContextWindowTokens          = "RABBIT_CODE_CONTEXT_WINDOW_TOKENS"
+	EnvAutoCompactWindow            = "RABBIT_CODE_AUTO_COMPACT_WINDOW"
+	EnvAutocompactPctOverride       = "RABBIT_CODE_AUTOCOMPACT_PCT_OVERRIDE"
+	EnvBlockingLimitOverride        = "RABBIT_CODE_BLOCKING_LIMIT_OVERRIDE"
 )
 
 func TokenBudgetEnabled() bool { return truthy(os.Getenv(EnvTokenBudget)) }
@@ -246,25 +246,27 @@ func TokenBudgetMaxAttachmentBytes() int {
 	return v
 }
 
-// SubmitTokenEstimateMode returns "structured" or "bytes4" for query.EstimateResolvedSubmitTextTokens (only meaningful when TOKEN_BUDGET is on).
+// SubmitTokenEstimateMode returns "structured", "api", or "bytes4" for submit input token estimates (only meaningful when TOKEN_BUDGET is on).
 func SubmitTokenEstimateMode() string {
 	if !TokenBudgetEnabled() {
 		return "bytes4"
 	}
 	s := strings.ToLower(strings.TrimSpace(os.Getenv(EnvTokenSubmitEstimateMode)))
-	if s == "structured" {
-		return "structured"
+	switch s {
+	case "structured", "api":
+		return s
+	default:
+		return "bytes4"
 	}
-	return "bytes4"
 }
 
-func ReactiveCompactEnabled() bool      { return truthy(os.Getenv(EnvReactiveCompact)) }
+func ReactiveCompactEnabled() bool { return truthy(os.Getenv(EnvReactiveCompact)) }
 
 // TenguCobaltRaccoon is headless stand-in for getFeatureValue_CACHED_MAY_BE_STALE('tengu_cobalt_raccoon').
 // When ReactiveCompactEnabled and this is true, shouldAutoCompact suppresses proactive autocompact (autoCompact.ts).
 func TenguCobaltRaccoon() bool { return truthy(os.Getenv(EnvTenguCobaltRaccoon)) }
 
-func ContextCollapseEnabled() bool      { return truthy(os.Getenv(EnvContextCollapse)) }
+func ContextCollapseEnabled() bool { return truthy(os.Getenv(EnvContextCollapse)) }
 
 // DisableCompact mirrors DISABLE_COMPACT (blocks autocompact entry in autoCompact.ts).
 func DisableCompact() bool { return truthy(os.Getenv(EnvDisableCompact)) }
@@ -368,15 +370,15 @@ func BlockingLimitOverrideTokens() int {
 	}
 	return v
 }
-func SessionRestoreEnabled() bool       { return truthy(os.Getenv(EnvSessionRestore)) }
-func UltrathinkEnabled() bool           { return truthy(os.Getenv(EnvUltrathink)) }
-func UltraplanEnabled() bool            { return truthy(os.Getenv(EnvUltraplan)) }
-func BreakCacheCommandEnabled() bool    { return truthy(os.Getenv(EnvBreakCacheCommand)) }
-func TemplatesEnabled() bool            { return truthy(os.Getenv(EnvTemplates)) }
-func CachedMicrocompactEnabled() bool   { return truthy(os.Getenv(EnvCachedMicrocompact)) }
-func HistorySnipEnabled() bool          { return truthy(os.Getenv(EnvHistorySnip)) }
-func SnipCompactEnabled() bool          { return truthy(os.Getenv(EnvSnipCompact)) }
-func BashExecEnabled() bool             { return truthy(os.Getenv(EnvBashExec)) }
+func SessionRestoreEnabled() bool     { return truthy(os.Getenv(EnvSessionRestore)) }
+func UltrathinkEnabled() bool         { return truthy(os.Getenv(EnvUltrathink)) }
+func UltraplanEnabled() bool          { return truthy(os.Getenv(EnvUltraplan)) }
+func BreakCacheCommandEnabled() bool  { return truthy(os.Getenv(EnvBreakCacheCommand)) }
+func TemplatesEnabled() bool          { return truthy(os.Getenv(EnvTemplates)) }
+func CachedMicrocompactEnabled() bool { return truthy(os.Getenv(EnvCachedMicrocompact)) }
+func HistorySnipEnabled() bool        { return truthy(os.Getenv(EnvHistorySnip)) }
+func SnipCompactEnabled() bool        { return truthy(os.Getenv(EnvSnipCompact)) }
+func BashExecEnabled() bool           { return truthy(os.Getenv(EnvBashExec)) }
 
 func SnipCompactMaxBytes() int {
 	if !SnipCompactEnabled() {

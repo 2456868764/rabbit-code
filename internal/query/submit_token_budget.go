@@ -26,6 +26,10 @@ func EstimateResolvedSubmitTextTokens(mode, resolved string) int {
 }
 
 // EstimateSubmitTokenBudgetTotal is resolved-text estimate plus attachment pseudo-tokens (H5: attachments count toward same token cap when set).
+// Mode "api" is not counted here; the engine uses Anthropic count_tokens and falls back to bytes4+inject.
 func EstimateSubmitTokenBudgetTotal(mode, resolved string, injectRawBytes int) int {
+	if strings.ToLower(strings.TrimSpace(mode)) == "api" {
+		return EstimateUTF8BytesAsTokens(resolved) + EstimateAttachmentRawBytesAsTokens(injectRawBytes)
+	}
 	return EstimateResolvedSubmitTextTokens(mode, resolved) + EstimateAttachmentRawBytesAsTokens(injectRawBytes)
 }

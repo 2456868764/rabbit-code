@@ -26,6 +26,9 @@ func TestResetLoopStateForRetryAttempt_preservesH6Fields(t *testing.T) {
 		StopHookActive:                true,
 		TurnCount:                     9,
 		PendingTools:                  3,
+		SnipRemovalLog: []query.SnipRemovalEntry{
+			{ID: "s1", Kind: query.SnipRemovalKindHistorySnip, RemovedMessageCount: 1},
+		},
 	}
 	resetLoopStateForRetryAttempt(st)
 	if st.TurnCount != 0 || st.PendingTools != 0 {
@@ -42,5 +45,8 @@ func TestResetLoopStateForRetryAttempt_preservesH6Fields(t *testing.T) {
 	}
 	if string(st.MessagesJSON) != `[1]` || st.ToolUseContext.AgentID != "x" {
 		t.Fatalf("messages/tool ctx: %+v", st)
+	}
+	if len(st.SnipRemovalLog) != 1 || st.SnipRemovalLog[0].ID != "s1" {
+		t.Fatalf("snip log: %+v", st.SnipRemovalLog)
 	}
 }

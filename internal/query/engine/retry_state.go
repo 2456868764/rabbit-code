@@ -25,6 +25,7 @@ func resetLoopStateForRetryAttempt(st *query.LoopState) {
 		MaxOutputTokensOverride:       p.MaxOutputTokensOverride,
 		PendingToolUseSummary:         p.PendingToolUseSummary,
 		StopHookActive:                p.StopHookActive,
+		SnipRemovalLog:                query.CloneSnipRemovalLog(p.SnipRemovalLog),
 	}
 	st.RecoveryPhase = query.RecoveryRetriedOnce
 }

@@ -35,7 +35,7 @@
 | 4 | **H3** | **`services/compact/*` 全链路**（与 H2 强相关） | `services/compact/*` |
 | 5 | **H4** | **Micro-compact / cache 请求体**（正式 beta、字段与上游一致） | `services/compact/microCompact.ts`、`query.ts` |
 | 6 | **H5** | **Token / 附件预算全量**（API tokenizer、附件计入；引擎侧先落地） | `query.ts`、`utils/attachments.ts`；进度见下 **§H5** |
-| 7 | **H7** | **Snip 元数据与持久化**（UUID map、会话往返） | snip / session 相关 |
+| 7 | **H7** | **Snip 元数据与持久化**（UUID map、会话往返） | **headless 子集已落地**（见下 **§H7**）；JSONL Map+parentUuid 全量仍 PARITY |
 | 8 | **H8** | **memdir 全量**（含 LLM 选记忆等） | `memdir/*`、`findRelevantMemories.ts` |
 | 9 | **H9** | **Bash / 权限真实栈**（Phase 6 工具层） | bash / permissions 与上游工具栈 |
 
@@ -77,9 +77,21 @@
 | H5.1 | **提交文本 token 估计模式** | **`RABBIT_CODE_TOKEN_SUBMIT_ESTIMATE_MODE`**：`bytes4`（默认）或 **`structured`**（resolved 为 Messages JSON 数组时用 **`EstimateMessageTokensFromTranscriptJSON`**） | **[x]** `features.SubmitTokenEstimateMode`、`query.EstimateResolvedSubmitTextTokens` |
 | H5.2 | **附件原始字节计入 MAX_INPUT_TOKENS** | memdir 注入字节按 **⌈raw/4⌉** 与 resolved 文本估计**相加**后对比 **`RABBIT_CODE_TOKEN_BUDGET_MAX_INPUT_TOKENS`**（**`MAX_ATTACHMENT_BYTES`** 仍为独立硬上限） | **[x]** `query.EstimateSubmitTokenBudgetTotal`、`engine.runTurnLoop` |
 | H5.3 | **预算遥测事件** | **`EventKindSubmitTokenBudgetSnapshot`**：`PhaseAuxInt`=合计估计 token，`PhaseAuxInt2`=inject 原始字节，`PhaseDetail`=mode（供 T3 meter / 遥测） | **[x]** |
-| H5.4 | **Anthropic API tokenizer** | 请求前与上游一致的 **count_tokens**（或等价 SDK）；需密钥 / 网络 | **[ ]** defer |
-| H5.5 | **用户消息 token budget 解析 + continuation** | `utils/tokenBudget.ts` **`parseTokenBudget`**、`query/tokenBudget.ts` **`checkTokenBudget`**（+500k 续写、递减回报停）与引擎 **`TokenBudgetContinueAfterTurn`** 全量对齐 | **[ ]** defer（与 H6 continuation 交叉） |
-| H5.6 | **附件类型全量** | `utils/attachments.ts` 图片缩放、file_ref、MCP 资源等计入（非仅 memdir 原始字节） | **[ ]** defer |
+| H5.4 | **Anthropic API tokenizer** | 请求前与上游一致的 **count_tokens**（或等价 SDK）；需密钥 / 网络 | **[x]** `RABBIT_CODE_TOKEN_SUBMIT_ESTIMATE_MODE=api` + `CountMessagesInputTokens` + fallback |
+| H5.5 | **用户消息 token budget 解析 + continuation** | `utils/tokenBudget.ts` **`parseTokenBudget`**、`query/tokenBudget.ts` **`checkTokenBudget`**（+500k 续写、递减回报停）与引擎 **`TokenBudgetContinueAfterTurn`** 全量对齐 | **[x]** headless：`ParseTokenBudget` / `CheckTokenBudget`、内置续跑 + 事件；无预算时仍可用回调 |
+| H5.6 | **附件类型全量** | `utils/attachments.ts` 图片缩放、file_ref、MCP 资源等计入（非仅 memdir 原始字节） | **[x]** 子集：`EstimateMessageTokensFromTranscriptJSON` 对 image/document base64 启发式加强 |
+
+#### H7 功能列表（Snip 元数据与持久化；Messages 数组 headless 模型）
+
+| # | 项 | 说明 | 状态 |
+|---|----|------|------|
+| H7.1 | **稳定 Snip ID** | 每次 history_snip / snip_compact 前缀裁剪生成 **`NewSnipRemovalID`**（32 hex） | **[x]** |
+| H7.2 | **结构化元数据** | **`query.SnipRemovalEntry`**（kind、removedMessageCount、bytesBefore/After）追加到 **`LoopState.SnipRemovalLog`** | **[x]** |
+| H7.3 | **侧车 JSON** | **`MarshalSnipRemovalLogJSON` / `UnmarshalSnipRemovalLogJSON`** 供会话保存 | **[x]** |
+| H7.4 | **重放往返** | **`ReplaySnipRemovals`**：对「完整前缀」转录按序执行 **`SnipDropFirstMessages`**，与运行时裁剪一致 | **[x]** |
+| H7.5 | **引擎与事件** | **`EventKindHistorySnipApplied` / `SnipCompactApplied`** 填 **`EngineEvent.SnipID`**；**`Engine.SnipRemovalLogForPersistence`**；**`Config.RestoredSnipRemovalLog`** 注入下一轮 **`LoopState`** | **[x]** |
+
+**相对 `sessionStorage.ts` 全量**：TS 为 `Map<UUID, TranscriptMessage>` 中区删除 + **parentUuid** 重链；Go 为 **线性 Messages API 数组** 的前缀裁剪日志，语义对齐「前缀 snip」路径，不覆盖中区 snip / JSONL 专有条目。
 
 ### TUI / REPL（在 Headless 主干之后）
 

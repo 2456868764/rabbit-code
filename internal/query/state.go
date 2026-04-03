@@ -55,6 +55,8 @@ type LoopState struct {
 	HadStreamError   bool
 	// LastAPIErrorKind is the anthropic.APIError kind string after a failed assistant call (P5.1.3).
 	LastAPIErrorKind string
+	// SnipRemovalLog records automatic prefix trims (H7); marshal with query.MarshalSnipRemovalLogJSON for session sidecars.
+	SnipRemovalLog []SnipRemovalEntry
 }
 
 // SetMessagesJSON replaces MessagesJSON with a copy of msgs (query.ts state.messages mirror, H6).
