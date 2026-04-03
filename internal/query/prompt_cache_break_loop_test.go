@@ -8,7 +8,7 @@ import (
 
 	"github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/features"
-	"github.com/2456868764/rabbit-code/internal/querydeps"
+	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 )
 
 type stripVerifyTurnAssistant struct {

@@ -10,7 +10,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query"
-	"github.com/2456868764/rabbit-code/internal/querydeps"
+	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 )
 
 const maxSubmitContinuationRounds = 8

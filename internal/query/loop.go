@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/2456868764/rabbit-code/internal/querydeps"
+	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 )
 
 // ErrMaxTurnsExceeded is returned when LoopState.MaxTurns > 0 and the cap is hit before another assistant call.

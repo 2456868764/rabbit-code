@@ -14,7 +14,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/memdir"
 	"github.com/2456868764/rabbit-code/internal/query"
-	"github.com/2456868764/rabbit-code/internal/querydeps"
+	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 )
 
 // StopHookFunc runs after each Submit’s RunTurnLoop attempt finishes (success or failure). Hooks run in slice order; legacy StopHook is appended after StopHooks (P5.1.4).

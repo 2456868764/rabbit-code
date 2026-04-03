@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/2456868764/rabbit-code/internal/querydeps"
+	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 )
 
 func TestLoopDriver_RunTurnLoop_toolThenText_AC5_3(t *testing.T) {

@@ -19,7 +19,7 @@ test-phase4:
 	go test ./internal/cost/... ./internal/services/... ./internal/features/... ./internal/app/... ./internal/messages/... -race -count=1
 
 test-phase5:
-	go test ./internal/query/... ./internal/querydeps/... ./internal/services/... ./internal/engine/... ./internal/memdir/... ./internal/messages/... ./internal/features/... ./internal/commands/... -race -count=1
+	go test ./internal/query/... ./internal/services/... ./internal/engine/... ./internal/memdir/... ./internal/messages/... ./internal/features/... ./internal/commands/... -race -count=1
 
 test-race:
 	go test $(MODULE) -race -count=1

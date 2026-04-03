@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/2456868764/rabbit-code/internal/querydeps"
+	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 )
 
 func TestLoopContinue_recordAndClear(t *testing.T) {
