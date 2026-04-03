@@ -89,6 +89,38 @@ func TestAnthropicAssistant_StreamAssistant_promptCacheBreakFromContext(t *testi
 	}
 }
 
+func TestAnthropicAssistant_AssistantTurn_promptCacheBreakFromContext(t *testing.T) {
+	t.Setenv(features.EnvPromptCacheBreak, "1")
+	var hookCalls int
+	ctx := ContextWithOnPromptCacheBreak(context.Background(), func() { hookCalls++ })
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "data: {\"type\":\"error\",\"message\":\"cache_break\"}\n\n")
+	}))
+	defer srv.Close()
+
+	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl.BaseURL = srv.URL
+	cl.Provider = anthropic.ProviderAnthropic
+
+	a := &AnthropicAssistant{
+		Client:           cl,
+		DefaultModel:     "m",
+		DefaultMaxTokens: 8,
+		Policy:           anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+	}
+	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
+	_, err := a.AssistantTurn(ctx, "", 0, msgs)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if hookCalls != 1 {
+		t.Fatalf("prompt cache break hook (AssistantTurn path): want 1 call, got %d", hookCalls)
+	}
+}
+
 func TestStreamAssistantFunc(t *testing.T) {
 	var f StreamAssistantFunc = func(ctx context.Context, model string, maxTokens int, messagesJSON []byte) (string, error) {
 		return fmt.Sprintf("%s:%d:%s", model, maxTokens, string(messagesJSON)), nil
