@@ -9,8 +9,39 @@ import (
 	"strings"
 )
 
-// FormatTeammateMailboxMessagesForAPI optionally wires TS getTeammateMailbox().formatTeammateMessages(messages).
+// FormatTeammateMailboxMessagesForAPI optionally overrides DefaultFormatTeammateMailboxMessagesForAPI.
 var FormatTeammateMailboxMessagesForAPI func(messages []any) string
+
+const teammateMessageXMLTag = "teammate-message"
+
+// DefaultFormatTeammateMailboxMessagesForAPI mirrors TS formatTeammateMessages (utils/teammateMailbox.ts).
+func DefaultFormatTeammateMailboxMessagesForAPI(messages []any) string {
+	if len(messages) == 0 {
+		return ""
+	}
+	var parts []string
+	for _, raw := range messages {
+		m, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		from := strField(m, "from")
+		text := strField(m, "text")
+		color := strField(m, "color")
+		summary := strField(m, "summary")
+		var colorAttr, summaryAttr string
+		if color != "" {
+			colorAttr = fmt.Sprintf(` color="%s"`, color)
+		}
+		if summary != "" {
+			summaryAttr = fmt.Sprintf(` summary="%s"`, summary)
+		}
+		parts = append(parts, fmt.Sprintf(`<%s teammate_id="%s"%s%s>
+%s
+</%s>`, teammateMessageXMLTag, from, colorAttr, summaryAttr, text, teammateMessageXMLTag))
+	}
+	return strings.Join(parts, "\n\n")
+}
 
 // LogNormalizeAttachmentUnknownType mirrors TS logAntError for unknown attachment types; if nil and RABBIT_ATTACHMENT_UNKNOWN_LOG=1, uses log.Printf.
 var LogNormalizeAttachmentUnknownType func(attachmentType string, attachment map[string]any)
@@ -26,14 +57,17 @@ func NormalizeAttachmentForAPI(attachment map[string]any) ([]TSMsg, error) {
 			var body string
 			if FormatTeammateMailboxMessagesForAPI != nil {
 				body = FormatTeammateMailboxMessagesForAPI(raw)
+			} else {
+				body = DefaultFormatTeammateMailboxMessagesForAPI(raw)
 			}
-			if strings.TrimSpace(body) == "" && len(raw) > 0 {
-				// No TS mailbox module: still surface payload for debugging / host parity tests.
-				body = fmt.Sprintf("Teammate mailbox (%d message(s); wire FormatTeammateMailboxMessagesForAPI for Claude Code formatting):\n%s",
+			body = strings.TrimSpace(body)
+			if body == "" && len(raw) > 0 {
+				// Malformed entries: surface raw JSON for debugging (TS formatTeammateMessages skips non-objects).
+				body = fmt.Sprintf("Teammate mailbox (%d message(s); unparseable or empty fields):\n%s",
 					len(raw), tsJSONString(raw))
 			}
-			if strings.TrimSpace(body) == "" {
-				body = "[teammate_mailbox] empty messages; set messages.FormatTeammateMailboxMessagesForAPI for formatted output"
+			if body == "" {
+				body = "[teammate_mailbox] empty messages"
 			}
 			return []TSMsg{CreateUserMessage(CreateUserMessageOpts{
 				Content: body,

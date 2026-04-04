@@ -595,3 +595,36 @@ func TestNotebookReadToolResultMessage_textOnlyUsesJSONArrayWrapper(t *testing.T
 		t.Fatalf("expected json-serialized blocks in body: %q", s)
 	}
 }
+
+func TestDefaultFormatTeammateMailboxMessagesForAPI(t *testing.T) {
+	s := DefaultFormatTeammateMailboxMessagesForAPI([]any{
+		map[string]any{"from": "alice", "text": "hello", "color": "blue", "summary": "hi"},
+	})
+	if !strings.Contains(s, `<teammate-message teammate_id="alice" color="blue" summary="hi">`) {
+		t.Fatalf("unexpected xml: %q", s)
+	}
+	if !strings.Contains(s, "hello") {
+		t.Fatalf("missing body: %q", s)
+	}
+}
+
+func TestNormalizeAttachmentForAPI_teammateMailbox_defaultFormat(t *testing.T) {
+	t.Setenv("RABBIT_AGENT_SWARMS", "1")
+	msgs, err := NormalizeAttachmentForAPI(map[string]any{
+		"type": "teammate_mailbox",
+		"messages": []any{
+			map[string]any{"from": "bob", "text": "ping"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("got %d msgs", len(msgs))
+	}
+	mm, _ := msgs[0]["message"].(map[string]any)
+	body, _ := mm["content"].(string)
+	if !strings.Contains(body, `teammate_id="bob"`) || !strings.Contains(body, "ping") {
+		t.Fatalf("unexpected content: %q", body)
+	}
+}
