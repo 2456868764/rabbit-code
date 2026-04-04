@@ -133,8 +133,12 @@ func bashAttachmentSource(att map[string]any) map[string]any {
 
 // bashPlaintextToolResultBody mirrors BashTool.mapToolResultToToolResultBlockParam string-join segment
 // (stdout normalize, persisted preview, stderr, background path) — no structured / isImage branches.
-func bashPlaintextToolResultBody(src, att map[string]any) string {
-	stdout := bashResolvedStdout(src, att)
+// If primaryStdout is empty, uses bashResolvedStdout.
+func bashPlaintextToolResultBody(src, att map[string]any, primaryStdout string) string {
+	stdout := primaryStdout
+	if strings.TrimSpace(stdout) == "" {
+		stdout = bashResolvedStdout(src, att)
+	}
 	processed := bashToolStdoutNormalize(stdout)
 
 	if path := strings.TrimSpace(strField(src, "persistedOutputPath")); path != "" {
@@ -208,14 +212,14 @@ func BashAttachmentToolResultContentString(att map[string]any) string {
 		}
 	}
 
-	stdout := bashResolvedStdout(src, att)
-	if truthy(src["isImage"]) && strings.TrimSpace(stdout) != "" {
+	stdout, effImg := bashEffectiveImageStdout(src, att)
+	if effImg && strings.TrimSpace(stdout) != "" {
 		if _, _, ok := bashParseDataURI(stdout); ok {
 			return "[Image output from Bash — omitted in attachment string preview; full API uses image content blocks]"
 		}
 	}
 
-	return bashPlaintextToolResultBody(src, att)
+	return bashPlaintextToolResultBody(src, att, stdout)
 }
 
 // BashToolResultMetaMessage mirrors TS createToolResultMessage(BashTool, toolUseResult) for attachment expansion:
@@ -249,8 +253,8 @@ func BashToolResultMetaMessage(toolName string, att map[string]any) (msg TSMsg) 
 		}
 	}
 
-	stdout := bashResolvedStdout(src, att)
-	if truthy(src["isImage"]) && strings.TrimSpace(stdout) != "" {
+	stdout, effImg := bashEffectiveImageStdout(src, att)
+	if effImg && strings.TrimSpace(stdout) != "" {
 		if im, ok := bashImageBlockFromStdout(stdout); ok {
 			return CreateUserMessage(CreateUserMessageOpts{
 				Content: []any{im},
@@ -259,7 +263,7 @@ func BashToolResultMetaMessage(toolName string, att map[string]any) (msg TSMsg) 
 		}
 	}
 
-	body := bashPlaintextToolResultBody(src, att)
+	body := bashPlaintextToolResultBody(src, att, stdout)
 	return CreateUserMessage(CreateUserMessageOpts{
 		Content: fmt.Sprintf("Result of calling the %s tool:\n%s", toolName, body),
 		IsMeta:  true,
