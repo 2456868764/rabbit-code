@@ -1,7 +1,12 @@
 package memdir
 
+// Corresponds to restored-src/src/memdir/memoryAge.ts and attachment-header / session-fragment helpers.
+
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -70,4 +75,65 @@ func MemoryFreshnessNoteAt(mtimeMs int64, now time.Time) string {
 // MemoryFreshnessNote uses time.Now().
 func MemoryFreshnessNote(mtimeMs int64) string {
 	return MemoryFreshnessNoteAt(mtimeMs, time.Now())
+}
+
+// MemoryAttachmentHeaderAt mirrors attachments.ts memoryHeader(path, mtimeMs).
+func MemoryAttachmentHeaderAt(path string, mtimeMs int64, now time.Time) string {
+	staleness := MemoryFreshnessTextAt(mtimeMs, now)
+	if staleness != "" {
+		return fmt.Sprintf("%s\n\nMemory: %s:", staleness, path)
+	}
+	return fmt.Sprintf("Memory (saved %s): %s:", MemoryAgeAt(mtimeMs, now), path)
+}
+
+// MemoryAttachmentHeader uses time.Now().
+func MemoryAttachmentHeader(path string, mtimeMs int64) string {
+	return MemoryAttachmentHeaderAt(path, mtimeMs, time.Now())
+}
+
+// SessionFragmentsFromPaths reads each path and returns trimmed text fragments plus total raw byte length.
+func SessionFragmentsFromPaths(paths []string) ([]string, int, error) {
+	var frags []string
+	var raw int
+	for _, p := range paths {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return nil, 0, err
+		}
+		raw += len(b)
+		frags = append(frags, strings.TrimSpace(string(b)))
+	}
+	return frags, raw, nil
+}
+
+// SessionFragmentsFromPathsWithAttachmentHeadersAt wraps each file with MemoryAttachmentHeaderAt(absPath, mtime, now).
+func SessionFragmentsFromPathsWithAttachmentHeadersAt(paths []string, now time.Time) ([]string, int, error) {
+	var frags []string
+	var totalRaw int
+	for _, p := range paths {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return nil, 0, err
+		}
+		fi, err := os.Stat(p)
+		if err != nil {
+			return nil, 0, err
+		}
+		abs := p
+		if ap, err := filepath.Abs(p); err == nil {
+			abs = ap
+		}
+		mtime := fi.ModTime().UnixMilli()
+		header := MemoryAttachmentHeaderAt(abs, mtime, now)
+		body := strings.TrimSpace(string(b))
+		frag := header + "\n\n" + body
+		frags = append(frags, frag)
+		totalRaw += len(frag)
+	}
+	return frags, totalRaw, nil
+}
+
+// SessionFragmentsFromPathsWithAttachmentHeaders uses time.Now() for freshness text.
+func SessionFragmentsFromPathsWithAttachmentHeaders(paths []string) ([]string, int, error) {
+	return SessionFragmentsFromPathsWithAttachmentHeadersAt(paths, time.Now())
 }

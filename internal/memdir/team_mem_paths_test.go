@@ -7,37 +7,44 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/2456868764/rabbit-code/internal/features"
 )
 
-func TestLoadMemorySystemPrompt_gates(t *testing.T) {
-	t.Setenv(features.EnvDisableAutoMemory, "")
-	t.Setenv(features.EnvMemorySystemPrompt, "0")
-	_, ok := LoadMemorySystemPrompt(MemorySystemPromptInput{
-		MemoryDir: "/tmp/mem",
-		Merged:    map[string]interface{}{"autoMemoryEnabled": true},
-	})
-	if ok {
-		t.Fatal("expected off when MEMORY_SYSTEM_PROMPT falsy")
+func TestTeamMemDirFromAutoMemDir(t *testing.T) {
+	auto := filepath.Clean("/home/u/.claude/projects/foo/memory") + string(filepath.Separator)
+	got := TeamMemDirFromAutoMemDir(auto)
+	want := filepath.Join(filepath.Clean("/home/u/.claude/projects/foo/memory"), "team") + string(filepath.Separator)
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	if p := TeamMemEntrypointFromAutoMemDir(auto); filepath.Base(p) != EntrypointName || !strings.Contains(p, TeamMemSubdir) {
+		t.Fatalf("entrypoint %q", p)
 	}
 }
 
-func TestLoadMemorySystemPrompt_autoOnlyShape(t *testing.T) {
-	t.Setenv(features.EnvDisableAutoMemory, "")
-	t.Setenv(features.EnvMemorySystemPrompt, "1")
-	t.Setenv(features.EnvTeamMem, "")
-	t.Setenv(features.EnvKairosDailyLogMemory, "")
-	t.Setenv(features.EnvKairosActive, "")
-	t.Setenv(features.EnvMemorySearchPastContext, "")
-	dir := t.TempDir()
-	s, ok := LoadMemorySystemPrompt(MemorySystemPromptInput{
-		MemoryDir:   dir,
-		ProjectRoot: dir,
-		Merged:      map[string]interface{}{"autoMemoryEnabled": true},
-	})
-	if !ok || !strings.Contains(s, "# auto memory") {
-		t.Fatalf("ok=%v head=%q", ok, truncate(s, 80))
+func TestIsTeamMemPathUnderAutoMem(t *testing.T) {
+	auto := filepath.Clean("/m/proj/memory") + string(filepath.Separator)
+	teamFile := filepath.Join(filepath.Clean("/m/proj/memory"), "team", "x.md")
+	if !IsTeamMemPathUnderAutoMem(teamFile, auto) {
+		t.Fatal("expected under team")
+	}
+	priv := filepath.Join(filepath.Clean("/m/proj/memory"), "user.md")
+	if IsTeamMemPathUnderAutoMem(priv, auto) {
+		t.Fatal("private root file is not team")
+	}
+}
+
+func TestSanitizeTeamMemPathKey(t *testing.T) {
+	if err := SanitizeTeamMemPathKey("notes/foo.md"); err != nil {
+		t.Fatal(err)
+	}
+	if SanitizeTeamMemPathKey("/abs") == nil {
+		t.Fatal("want error")
+	}
+	if SanitizeTeamMemPathKey(`a\b`) == nil {
+		t.Fatal("want error")
+	}
+	if SanitizeTeamMemPathKey("%2e%2e%2ffoo") == nil {
+		t.Fatal("want error")
 	}
 }
 

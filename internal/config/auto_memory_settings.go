@@ -8,8 +8,22 @@ import (
 )
 
 // LoadTrustedAutoMemoryDirectory returns autoMemoryDirectory from trusted settings layers only,
-// matching paths.ts getAutoMemPathSetting (policy → flag → local → user). Project settings
-// (.rabbit-code.json) are never read so a repo cannot redirect auto-memory via this key.
+// matching paths.ts getAutoMemPathSetting. Resolution order (first non-empty wins):
+//
+//  1. policySettings  → LoadPolicySettings(GlobalConfigDir): managed-settings.json (+ drop-ins),
+//     RABBIT_CODE_POLICY_MDM_JSON, RABBIT_CODE_POLICY_REMOTE_JSON (see managed.go).
+//  2. flagSettings    → p.FlagJSON, else env RABBIT_CODE_SETTINGS_JSON (same as merged config flag layer).
+//  3. localSettings   → project-root LocalConfigFileName (.rabbit-code.local.json), gitignored;
+//     Claude Code analogue: .claude/settings.local.json (not read here — rabbit paths only).
+//  4. userSettings    → filepath.Join(GlobalConfigDir, UserConfigFileName) (config.json).
+//
+// projectSettings / .rabbit-code.json in the repo are intentionally NOT consulted — same security
+// as TS excluding getSettingsForSource('projectSettings') for this key.
+//
+// The returned string is raw from JSON (trimmed). paths.validateMemoryPath(expandTilde: true) runs
+// later in memdir.ResolveAutoMemDirWithOptions; invalid values are ignored and resolution falls
+// through to the default projects/<sanitized-root>/memory/ layout, matching TS when
+// getAutoMemPathSetting returns undefined.
 func LoadTrustedAutoMemoryDirectory(p Paths) (string, error) {
 	pol, err := LoadPolicySettings(p.GlobalConfigDir)
 	if err != nil {

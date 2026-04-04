@@ -1,5 +1,7 @@
 package memdir
 
+// Corresponds to restored-src/src/memdir/teamMemPrompts.ts.
+
 import (
 	"fmt"
 	"strings"

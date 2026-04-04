@@ -106,48 +106,50 @@
 - **`RABBIT_CODE_MEMDIR_RELEVANCE_MODE`**（**`heuristic`** | **`llm`** / **`side_query`**）；**`engine.Config`**：**`MemdirMemoryDir`**、**`MemdirRecentTools`**、**`MemdirTextComplete`**、**`MemdirRelevanceModeOverride`**、**`MemdirAlreadySurfaced`**；每轮 **`memdirPathsForSubmit`**，注入成功后累积 **`memdirSurfaced`**；LLM 路径默认 **`PostMessagesStreamReadAssistant`**（system+user 合并为单条 user）。
 - **`paths.ts` `autoMemoryDirectory`（可信来源）**：**`config.LoadTrustedAutoMemoryDirectory`**（policy → **`RABBIT_CODE_SETTINGS_JSON`** → **`.rabbit-code.local.json`** → **`config.json`**；**不读** project **`.rabbit-code.json`**）；**`memdir.ResolveAutoMemDirWithOptions`** 与 **`Config.MemdirTrustedAutoMemoryDirectory`**；**`RABBIT_CODE_AUTO_MEMDIR`** 与 trusted 二选一即可在 **`AutoMemoryEnabled`** 下走自动解析。
 - **单测**：**`memory_scan_test`**、**`find_relevant_memories_test`**、**`select_llm_test`**、**`engine` MemdirMemoryDir + surfaced**、**`auto_memory_settings_test`**、trusted-only memdir inject。
-- **H8 续（prompt / TEAMMEM / extract fork）**：**`promptdata/*.txt` + `promptembed.go`**；**`BuildCombinedMemoryPrompt`**、**`BuildSearchingPastContextSection`**（**`RABBIT_CODE_MEMORY_SEARCH_PAST_CONTEXT`**）；**`BuildExtractAutoOnlyPrompt` / `BuildExtractCombinedPrompt`**；**`RABBIT_CODE_TEAMMEM`**、**`TeamMemoryEnabledFromMerged`**、**`team_mem.go`**（**`team/`** 路径、**`SanitizeTeamMemPathKey`** 子集）；**`ExtractController` + `RunForkedExtractMemory`**、**`AutoMemToolRunner`**、transcript 上 **`HasMemoryWritesSince` / `CountModelVisibleMessagesSince`**；**`query.QuerySourceExtractMemories`**；引擎 **stop hook 异步 extract**、**`DrainExtractMemories`**、可选 **`Config.ExtractMemoriesSaved`**；相关 env：**`RABBIT_CODE_EXTRACT_MEMORIES`**、**`_NON_INTERACTIVE`**、**`_INTERVAL`**、**`_SKIP_INDEX`**。
+- **H8 续（prompt / TEAMMEM / extract fork）**：**`promptdata/*.txt` + `promptembed.go`**；**`BuildCombinedMemoryPrompt`**、**`BuildSearchingPastContextSection`**（**`RABBIT_CODE_MEMORY_SEARCH_PAST_CONTEXT`**）；**`BuildExtractAutoOnlyPrompt` / `BuildExtractCombinedPrompt`**；**`RABBIT_CODE_TEAMMEM`**、**`TeamMemoryEnabledFromMerged`**、**`team_mem.go`**（**`team/`** 路径、**`SanitizeTeamMemPathKey`**）；**`ExtractController` + `RunForkedExtractMemory`**、**`AutoMemToolRunner`**、transcript 上 **`HasMemoryWritesSince` / `CountModelVisibleMessagesSince`**；**`query.QuerySourceExtractMemories`**；引擎 **stop hook 异步 extract**、**`DrainExtractMemories`**、可选 **`Config.ExtractMemoriesSaved`**；相关 env：**`RABBIT_CODE_EXTRACT_MEMORIES`**、**`_NON_INTERACTIVE`**、**`_INTERVAL`**、**`_SKIP_INDEX`**。
+- **H8 续二（系统块 / 守卫 / fork 对齐，Go 已落地）**：
+  - **`LoadMemorySystemPrompt`**（**`memdir.ts` `loadMemoryPrompt`**  analogue）：**auto-only / TEAMMEM 合并 / KAIROS daily-log** 分支（**`KairosDailyLogMemoryEnabled`** 优先于 team）；**`AppendClaudeMdStyleMemoryEntrypoints`**（私享 + team **MEMORY.md** 截断正文）；**`RABBIT_CODE_MEMORY_SYSTEM_PROMPT`** 关闭注入；**`CoworkMemoryExtraGuidelineLines`**（**`RABBIT_CODE_` / `CLAUDE_COWORK_MEMORY_EXTRA_GUIDELINES`**）。
+  - **引擎**：每轮 **`runTurnLoop`** 开头 **`refreshMemorySystemPromptForAssistant`** → **`AnthropicAssistant.SystemPrompt`**；**`MemdirProjectRoot`**（**`engineMemdirProjectRoot`**）供 prompt 内项目根；**`MessagesStreamBody.system`**（**`internal/services/api/client.go`** + **`querydeps/anthropic_assistant.go`**）。
+  - **TEAMMEM**：**`SanitizeTeamMemPathKey` + Unicode NFKC**（**`golang.org/x/text/unicode/norm`**）；**`ValidateTeamMemWritePath`**（目标文件可不存在时对 **父目录** **`EvalSymlinks`**，缓解 macOS **`/var` vs `/private/var`**）；**`TeamMemSecretGuardRunner` + `ScanTeamMemorySecrets`**（gitleaks 式规则 **子集**）：**`Engine.New`** 在 **TEAMMEM + memdir 已解析** 时包裹 **`Deps.Tools`**；**`RunForkedExtractMemory`** 在 team 开启时在 **`AutoMemToolRunner` 内层** 再包裹同一守卫。
+  - **Extract**：**`AutoMemToolRunner`** 放行 **`REPL`**；只读 **bash** 扩展 **`git`** 子命令子集（仍拒管道/重定向等）；**`IsExtractReadOnlyBash`** 仍为 **保守子集**（非 TS 全量 **`readOnlyValidation`**）。
+  - **类型**：**`internal/types/memory.go`**：**`MemoryFileKindPrivate` / `MemoryFileKindTeam`** 常量（非 **`memory/types.ts`** 完整模型）。
 
-##### H8 仍待实现（对照 `restored-src`；与 TS 全量之差）
+##### H8 仍待实现 / PARITY 缺口（对照 `restored-src`）
 
-下列为 **尚未对齐或仅部分对齐** 的项，实施时以 **`claude-code-sourcemap/restored-src/src/`** 下对应模块为准。
+下列为 **与 TS 全量仍有差距** 或 **未接线** 的项；实施时以 **`claude-code-sourcemap/restored-src/src/`** 为准。
 
 **系统提示与上下文装载**
 
-- 主线程 **system** 中完整 **`# Memory` / `buildCombinedMemoryPrompt` 拼装与注入**：Go 已有 builder，但引擎主路径仍以 **用户侧 memdir 片段**（**`FindRelevantMemories`** + attachment 头）为主；与 **`memdir.ts` / `claudemd.ts`** 将 **MEMORY.md（及 team 索引）当系统块装载** 的粒度、顺序未必一致。
-- **`claudemd` 式多入口安全读**（**`safelyReadMemoryFileAsync`**、team 入口等）：未做同等「启动/每轮系统拼装」管线。
+- **system 块**与 **用户消息侧 memdir 片段**（**`FindRelevantMemories`** + attachment 头）的 **顺序、去重、是否重复装载** 与 **`memdir.ts` / `claudemd.ts`** 未必 1:1。
+- **`claudemd` 式安全读**（**`safelyReadMemoryFileAsync`**、错误重试、team 双入口）：未做同等 **异步读管线**。
 
 **TEAMMEM（团队记忆）**
 
-- **`validateTeamMemWritePath` / `validateTeamMemKey`** 与 **`realpathDeepestExisting`**、symlink containment（**`teamMemPaths.ts`**）：Go 仅有字符串 **`IsTeamMemPathUnderAutoMem`** 与 **`SanitizeTeamMemPathKey`** 子集，无 realpath 链路与悬空 symlink 检测。
-- **`sanitizePathKey` 全量**（含 **NFKC** 等）：未实现。
-- **`teamMemorySync` watcher**、会话开始同步、远程侧行为：未实现。
-- **`teamMemSecretGuard`**（**`checkTeamMemSecrets`**）接到 **Write/Edit** 路径：未接到 headless 通用工具层。
-- **折叠/摘要中的 team 读写统计**（**`teamMemoryOps` / `collapseReadSearch`** 等）：未实现。
-- **配置 `team_mem_path`（向导）** 与 **TS 固定 `…/memory/team/`** 布局的产品一致性需单独对齐说明。
+- **`teamMemPaths.ts` 全量**：**`realpathDeepestExisting`**、悬空 symlink、**`validateTeamMemKey` 全量** 等；Go 为 **子集**（已有 **`ValidateTeamMemWritePath` + `IsTeamMemPathUnderAutoMem`**，非整条 TS 链路）。
+- **`teamMemorySync`**：**watcher**（如 **fsnotify**）、会话开始同步、**远程 push/pull**：未实现。
+- **折叠/摘要中的 team 统计**（**`teamMemoryOps` / `collapseReadSearch`** 等）：未实现。
+- **配置 `team_mem_path`（向导）** 与 **固定 `…/memory/team/`** 布局的 **产品说明 / 行为对齐**：待文档与实现交叉核对。
 
 **工具层与类型**
 
-- **主会话** Write/Edit 的 team 密钥守卫与 TS **FileWriteTool / FileEditTool** 行为：extract 子循环外未统一。
-- 消息/附件类型中的 **`TeamMem`** 等（**`memory/types.ts`**）：Go 无对等枚举与分支。
+- **密钥守卫**：经 **`Engine`** 装配的 **`Deps.Tools`** 已包裹；**不经该路径的自定义 ToolRunner** 与 TS「凡 Write/Edit 必经 **File*Tool** 校验」**未必一致**。
+- **`memory/types.ts` 中 `TeamMem` 等**：Go 仅有 **常量**；**消息/附件 Content 分支** 未对等扩展。
 
 **Extract 子代理（`extractMemories.ts` / `forkedAgent.ts`）**
 
-- **`REPL`** 工具在 **canUseTool** 中放行并由内层再鉴权：Go **AutoMemToolRunner** 未放行 REPL。
-- **Bash `isReadOnly`**：Go 为 **`IsExtractReadOnlyBash`** 保守子集，非 **`readOnlyValidation.ts` / `checkReadOnlyConstraints`** 全量。
-- **Prompt cache 位对齐**：无 TS 层 **`cacheSafeParams` / `skipCacheWrite`** 等与父请求 **1:1** 的 HTTP 约定；仅用同一 **Turn + 父 transcript JSON 前缀** 近似。
-- **Analytics**：无 **`tengu_extract_memories_*`**、**`tengu_fork_agent_query`** 等事件与用量汇总字段。
-- **GrowthBook 开关**：已用 **env** 映射（如 **`RABBIT_CODE_EXTRACT_MEMORIES`**），非动态 GB。
+- **Bash `isReadOnly`**：非 **`readOnlyValidation.ts` / `checkReadOnlyConstraints`** 全量。
+- **HTTP / cache**：无 **`cacheSafeParams` / `skipCacheWrite`** 等与父请求 **1:1**；仍为 **同 Turn + 父 transcript** 近似。
+- **Analytics**：无 **`tengu_extract_memories_*`**、**`tengu_fork_agent_query`** 等。
+- **GrowthBook**：仍为 **env** 映射（如 **`RABBIT_CODE_EXTRACT_MEMORIES`**），非动态 GB。
 
 **引擎 / 产品接线**
 
 - **进程退出前 drain**：**`Engine.DrainExtractMemories`** 已有；**`cmd/rabbit-code` / 长会话 REPL** 未默认在 flush 后调用（对照 **`print.ts` `drainPendingExtraction`**）。
-- **KAIROS daily-log 优先于 TEAMMEM**（**`memdir.ts`** 分支优先级）：未实现。
 
 **其它**
 
-- **子 agent**：主线程 **`agentId` 非空跳过 extract** 已与 TS 一致；多 agent 场景下各子会话 extract 策略未单独设计。
-- **测试隔离**：TS **`initExtractMemories()`** 每测一闭包；Go 为 **每 Engine 一个 `ExtractController`**，隔离方式不同。
+- **多 agent**：各子会话 **extract 策略** 未单独设计。
+- **测试隔离**：TS **`initExtractMemories()`** 每测一闭包；Go **每 Engine 一个 `ExtractController`**，**隔离语义不同**（非功能缺口，parity 测试需注意）。
 
 ### TUI / REPL（在 Headless 主干之后）
 

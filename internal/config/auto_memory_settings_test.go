@@ -1,5 +1,9 @@
 package config
 
+// Tests assert the same precedence as claude-code paths.ts getAutoMemPathSetting:
+// policy → flag (RABBIT_CODE_SETTINGS_JSON) → local (.rabbit-code.local.json) → user (config.json),
+// never project .rabbit-code.json.
+
 import (
 	"os"
 	"path/filepath"

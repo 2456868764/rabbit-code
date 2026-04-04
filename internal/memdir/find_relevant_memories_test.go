@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
+	"reflect"
 	"testing"
 )
 
@@ -87,15 +87,6 @@ func TestFindRelevantMemories_alreadySurfaced(t *testing.T) {
 	}
 	if len(paths) != 0 {
 		t.Fatalf("%#v", paths)
-	}
-}
-
-func TestFormatMemoryManifest(t *testing.T) {
-	s := FormatMemoryManifest([]MemoryHeader{
-		{Filename: "a.md", MtimeMs: 0, Description: "d1", Type: "reference"},
-	})
-	if s == "" || !strings.Contains(s, "a.md") || !strings.Contains(s, "d1") || !strings.Contains(s, "[reference]") {
-		t.Fatalf("%q", s)
 	}
 }
 
@@ -182,5 +173,72 @@ func TestFindRelevantMemories_OnRecallShape(t *testing.T) {
 	}
 	if cand != 1 || sel != 0 {
 		t.Fatalf("cand=%d sel=%d", cand, sel)
+	}
+}
+
+func TestFindRelevantMemoryPaths(t *testing.T) {
+	dir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(dir, "alpha-notes.md"), []byte("discussion about bananas"), 0o600)
+	_ = os.WriteFile(filepath.Join(dir, "other.txt"), []byte("bananas"), 0o600)
+	paths, err := FindRelevantMemoryPaths("banana bread", dir, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 1 || filepath.Base(paths[0]) != "alpha-notes.md" {
+		t.Fatalf("%#v", paths)
+	}
+}
+
+func TestFindRelevantMemoryPaths_emptyQuery(t *testing.T) {
+	p, err := FindRelevantMemoryPaths("   ", t.TempDir(), 5)
+	if err != nil || len(p) != 0 {
+		t.Fatalf("%v %#v", err, p)
+	}
+}
+
+func TestFindRelevantMemoryPaths_recursive(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "sub")
+	if err := os.MkdirAll(sub, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(sub, "deep.md"), []byte("kiwi fruit salad"), 0o600)
+	paths, err := FindRelevantMemoryPaths("kiwi", dir, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 1 || filepath.Base(paths[0]) != "deep.md" {
+		t.Fatalf("%#v", paths)
+	}
+}
+
+func TestParseSelectedMemoriesJSON_plain(t *testing.T) {
+	got, err := ParseSelectedMemoriesJSON(`{"selected_memories":["a.md","b.md"]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, []string{"a.md", "b.md"}) {
+		t.Fatalf("%v", got)
+	}
+}
+
+func TestParseSelectedMemoriesJSON_fenced(t *testing.T) {
+	raw := "```json\n{\"selected_memories\":[\"x.md\"]}\n```"
+	got, err := ParseSelectedMemoriesJSON(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, []string{"x.md"}) {
+		t.Fatalf("%v", got)
+	}
+}
+
+func TestParseSelectedMemoriesJSON_emptyArray(t *testing.T) {
+	got, err := ParseSelectedMemoriesJSON(`{"selected_memories":[]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("%v", got)
 	}
 }

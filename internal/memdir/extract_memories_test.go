@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 )
@@ -111,5 +113,24 @@ func TestRunForkedExtractMemory_writesUnderMemdir(t *testing.T) {
 	}
 	if len(res.MemoryFilePaths) != 1 || res.MemoryFilePaths[0] != target {
 		t.Fatalf("paths %+v", res.MemoryFilePaths)
+	}
+}
+
+func TestBuildExtractCombinedPrompt_fallsBackWhenTeamOff(t *testing.T) {
+	t.Setenv(features.EnvTeamMem, "")
+	t.Setenv(features.EnvDisableAutoMemory, "")
+	auto := BuildExtractAutoOnlyPrompt(8, "", false)
+	combo := BuildExtractCombinedPrompt(8, "", false, nil)
+	if auto != combo {
+		t.Fatal("expected same prompt when team memory off")
+	}
+}
+
+func TestBuildExtractCombinedPrompt_teamSections(t *testing.T) {
+	t.Setenv(features.EnvDisableAutoMemory, "")
+	t.Setenv(features.EnvTeamMem, "1")
+	p := BuildExtractCombinedPrompt(3, "x", false, nil)
+	if !strings.Contains(p, "<scope>") || !strings.Contains(p, "team memories") {
+		t.Fatalf("missing combined sections: %q…", truncateTestString(p, 120))
 	}
 }

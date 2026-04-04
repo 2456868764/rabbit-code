@@ -70,8 +70,8 @@ type Config struct {
 	MemdirMemoryDir string
 	// MemdirProjectRoot seeds memdir.ResolveAutoMemDir; empty uses cwd at engine init.
 	MemdirProjectRoot string
-	// MemdirTrustedAutoMemoryDirectory is autoMemoryDirectory from trusted settings only (policy / flag / local / user — not project).
-	// Populate via config.LoadTrustedAutoMemoryDirectory (paths.ts getAutoMemPathSetting).
+	// MemdirTrustedAutoMemoryDirectory is autoMemoryDirectory from trusted settings only — same layers as
+	// paths.ts getAutoMemPathSetting (see config.LoadTrustedAutoMemoryDirectory doc). Never from project JSON.
 	MemdirTrustedAutoMemoryDirectory string
 	// InitialSettings optional merged settings (e.g. config.LoadMerged); gates auto memdir via autoMemoryEnabled like paths.ts getInitialSettings.
 	InitialSettings map[string]interface{}

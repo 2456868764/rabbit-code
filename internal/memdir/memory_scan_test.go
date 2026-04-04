@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -59,9 +60,22 @@ func TestScanMemoryFiles_contextCancel(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := ScanMemoryFiles(ctx, dir)
-	if err == nil {
-		t.Fatal("expected cancel error")
+	got, err := ScanMemoryFiles(ctx, dir)
+	if err != nil {
+		t.Fatalf("scanMemoryFiles.ts swallows errors: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("cancelled scan should yield empty list like TS catch, got %d", len(got))
+	}
+}
+
+func TestScanMemoryFiles_missingDirReturnsEmpty(t *testing.T) {
+	got, err := ScanMemoryFiles(context.Background(), filepath.Join(t.TempDir(), "nope"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != nil && len(got) != 0 {
+		t.Fatalf("got %#v", got)
 	}
 }
 
@@ -88,5 +102,14 @@ func TestScanMemoryFiles_sortedNewestFirst(t *testing.T) {
 	}
 	if got[0].Filename != "new.md" {
 		t.Fatalf("order %+v", got)
+	}
+}
+
+func TestFormatMemoryManifest(t *testing.T) {
+	s := FormatMemoryManifest([]MemoryHeader{
+		{Filename: "a.md", MtimeMs: 0, Description: "d1", Type: "reference"},
+	})
+	if s == "" || !strings.Contains(s, "a.md") || !strings.Contains(s, "d1") || !strings.Contains(s, "[reference]") {
+		t.Fatalf("%q", s)
 	}
 }
