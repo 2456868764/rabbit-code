@@ -55,6 +55,28 @@ func EvaluateTimeBasedTrigger(messages []TimeBasedCCMessage, querySource string,
 	return &TimeBasedTriggerEval{GapMinutes: gapMinutes, Config: cfg}
 }
 
+// EvaluateTimeBasedTriggerFromWallClock applies the same gates as EvaluateTimeBasedTrigger but uses the
+// wall-clock time of the last assistant turn. Use this for Messages API transcripts (role/content), which
+// omit per-message timestamps; the caller tracks lastAssistantAt (e.g. LoopState + engine session carry-over).
+func EvaluateTimeBasedTriggerFromWallClock(querySource string, now, lastAssistantAt time.Time) *TimeBasedTriggerEval {
+	cfg := GetTimeBasedMCConfig()
+	qs := strings.TrimSpace(querySource)
+	if !cfg.Enabled || qs == "" || !IsMainThreadQuerySource(qs) {
+		return nil
+	}
+	if lastAssistantAt.IsZero() {
+		return nil
+	}
+	gapMinutes := now.Sub(lastAssistantAt).Minutes()
+	if math.IsNaN(gapMinutes) || math.IsInf(gapMinutes, 0) {
+		return nil
+	}
+	if gapMinutes < float64(cfg.GapThresholdMinutes) {
+		return nil
+	}
+	return &TimeBasedTriggerEval{GapMinutes: gapMinutes, Config: cfg}
+}
+
 func parseAssistantTimestamp(s string) (time.Time, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {

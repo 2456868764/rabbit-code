@@ -68,6 +68,64 @@ func RunMaybeTimeBasedMicrocompactJSON(messagesJSON []byte, querySource string, 
 	return out, tokensSaved, changed, nil
 }
 
+// MaybeTimeBasedMicrocompactAPIJSON is like MaybeTimeBasedMicrocompactJSON for Anthropic Messages API arrays:
+// [{ "role":"user"|"assistant", "content":[...] }, ...].
+func MaybeTimeBasedMicrocompactAPIJSON(messagesJSON []byte, querySource string, now, lastAssistantAt time.Time) (out []byte, tokensSaved int, changed bool, err error) {
+	var arr []interface{}
+	if err := json.Unmarshal(messagesJSON, &arr); err != nil {
+		return nil, 0, false, err
+	}
+	ev := EvaluateTimeBasedTriggerFromWallClock(querySource, now, lastAssistantAt)
+	if ev == nil {
+		return append([]byte(nil), messagesJSON...), 0, false, nil
+	}
+	ids := collectCompactableToolUseIDsFromAPIArray(arr)
+	if len(ids) == 0 {
+		return append([]byte(nil), messagesJSON...), 0, false, nil
+	}
+	keepN := ev.Config.KeepRecent
+	if keepN < 1 {
+		keepN = 1
+	}
+	keep := make(map[string]struct{})
+	start := len(ids) - keepN
+	if start < 0 {
+		start = 0
+	}
+	for i := start; i < len(ids); i++ {
+		keep[ids[i]] = struct{}{}
+	}
+	clearSet := make(map[string]struct{})
+	for _, id := range ids {
+		if _, ok := keep[id]; !ok {
+			clearSet[id] = struct{}{}
+		}
+	}
+	if len(clearSet) == 0 {
+		return append([]byte(nil), messagesJSON...), 0, false, nil
+	}
+	tokensSaved = mutateUserToolResultsInAPIArray(arr, clearSet)
+	if tokensSaved == 0 {
+		return append([]byte(nil), messagesJSON...), 0, false, nil
+	}
+	out, err = json.Marshal(arr)
+	if err != nil {
+		return nil, 0, false, err
+	}
+	return out, tokensSaved, true, nil
+}
+
+// RunMaybeTimeBasedMicrocompactAPIJSON runs MaybeTimeBasedMicrocompactAPIJSON and applies suppress + microcompact buffer reset on success.
+func RunMaybeTimeBasedMicrocompactAPIJSON(messagesJSON []byte, querySource string, now, lastAssistantAt time.Time, buf *MicrocompactEditBuffer) (out []byte, tokensSaved int, changed bool, err error) {
+	out, tokensSaved, changed, err = MaybeTimeBasedMicrocompactAPIJSON(messagesJSON, querySource, now, lastAssistantAt)
+	if err != nil || !changed || tokensSaved <= 0 {
+		return out, tokensSaved, changed, err
+	}
+	SuppressCompactWarning()
+	ResetMicrocompactStateIfAny(buf)
+	return out, tokensSaved, changed, nil
+}
+
 func ccMessagesTriggerView(arr []interface{}) []TimeBasedCCMessage {
 	var out []TimeBasedCCMessage
 	for _, e := range arr {
@@ -217,4 +275,90 @@ func roughTokenEstimation(s string) int {
 		return 0
 	}
 	return (len(s) + 3) / 4
+}
+
+func collectCompactableToolUseIDsFromAPIArray(arr []interface{}) []string {
+	var ids []string
+	for _, e := range arr {
+		m, ok := e.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		role, _ := m["role"].(string)
+		if role != "assistant" {
+			continue
+		}
+		raw, ok := m["content"]
+		if !ok {
+			continue
+		}
+		blocks, ok := raw.([]interface{})
+		if !ok {
+			continue
+		}
+		for _, b := range blocks {
+			bm, ok := b.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			bt, _ := bm["type"].(string)
+			if bt != "tool_use" {
+				continue
+			}
+			id, _ := bm["id"].(string)
+			name, _ := bm["name"].(string)
+			if id == "" || !IsCompactableToolName(name) {
+				continue
+			}
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+func mutateUserToolResultsInAPIArray(arr []interface{}, clearSet map[string]struct{}) int {
+	tokensSaved := 0
+	for _, e := range arr {
+		m, ok := e.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		role, _ := m["role"].(string)
+		if role != "user" {
+			continue
+		}
+		raw, ok := m["content"]
+		if !ok {
+			continue
+		}
+		blocks, ok := raw.([]interface{})
+		if !ok {
+			continue
+		}
+		for i, b := range blocks {
+			bm, ok := b.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			bt, _ := bm["type"].(string)
+			if bt != "tool_result" {
+				continue
+			}
+			tuid, _ := bm["tool_use_id"].(string)
+			if tuid == "" {
+				continue
+			}
+			if _, want := clearSet[tuid]; !want {
+				continue
+			}
+			if s, ok := bm["content"].(string); ok && s == TimeBasedMCClearedMessage {
+				continue
+			}
+			tokensSaved += toolResultContentTokens(bm["content"])
+			bm["content"] = TimeBasedMCClearedMessage
+			blocks[i] = bm
+		}
+		m["content"] = blocks
+	}
+	return tokensSaved
 }

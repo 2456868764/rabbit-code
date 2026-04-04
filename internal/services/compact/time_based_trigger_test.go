@@ -48,3 +48,20 @@ func TestEvaluateTimeBasedTrigger_unixSeconds(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+func TestEvaluateTimeBasedTriggerFromWallClock(t *testing.T) {
+	t.Setenv("RABBIT_CODE_TIME_BASED_MICROCOMPACT", "1")
+	t.Setenv("RABBIT_CODE_TIME_BASED_MC_GAP_MINUTES", "30")
+	now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+	last := now.Add(-90 * time.Minute)
+	if EvaluateTimeBasedTriggerFromWallClock("", now, last) != nil {
+		t.Fatal("empty querySource")
+	}
+	if EvaluateTimeBasedTriggerFromWallClock("repl_main_thread", now, time.Time{}) != nil {
+		t.Fatal("zero lastAssistant")
+	}
+	ev := EvaluateTimeBasedTriggerFromWallClock("repl_main_thread", now, last)
+	if ev == nil || ev.GapMinutes < 89 || ev.GapMinutes > 91 {
+		t.Fatalf("%+v", ev)
+	}
+}

@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 	"github.com/2456868764/rabbit-code/internal/services/api"
+	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
 // ErrMaxTurnsExceeded is returned when LoopState.MaxTurns > 0 and the cap is hit before another assistant call.
@@ -41,6 +43,10 @@ type LoopDriver struct {
 	QuerySource string
 	// ContextWindowTokens if > 0 overrides env/model default for blocking-limit pre-check (query.ts).
 	ContextWindowTokens int
+	// InitialLastAssistantAt seeds LoopState.LastAssistantAt for cross-Submit time-based microcompact (engine session).
+	InitialLastAssistantAt time.Time
+	// MicrocompactEditBuffer optional; reset when time-based microcompact clears tool results (microCompact.ts).
+	MicrocompactEditBuffer *compact.MicrocompactEditBuffer
 }
 
 func (d *LoopDriver) streamer() querydeps.StreamAssistant {
@@ -151,6 +157,9 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 		st.ToolUseContext.SessionID = d.SessionID
 		st.ToolUseContext.Debug = d.Debug
 		st.ToolUseContext.QuerySource = d.QuerySource
+		if st.LastAssistantAt.IsZero() && !d.InitialLastAssistantAt.IsZero() {
+			st.LastAssistantAt = d.InitialLastAssistantAt
+		}
 		if errors.Is(ctx.Err(), context.Canceled) {
 			st.ToolUseContext.AbortSignalAborted = true
 		}
@@ -242,6 +251,21 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 			}
 			firstAssistant = false
 		}
+		if st != nil {
+			qs := d.QuerySource
+			if s := strings.TrimSpace(st.ToolUseContext.QuerySource); s != "" {
+				qs = s
+			}
+			out, _, mcChanged, mcErr := compact.RunMaybeTimeBasedMicrocompactAPIJSON(msgs, qs, time.Now(), st.LastAssistantAt, d.MicrocompactEditBuffer)
+			if mcErr != nil {
+				st.SetMessagesJSON(msgs)
+				return msgs, lastAssistantText, mcErr
+			}
+			if mcChanged {
+				msgs = json.RawMessage(out)
+				st.SetMessagesJSON(msgs)
+			}
+		}
 		turn, msgs, err = d.assistantTurnWithPromptCacheBreakHandling(ctx, st, model, max, msgs)
 		if err != nil {
 			if st != nil && errors.Is(err, context.Canceled) {
@@ -262,6 +286,7 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 		if st != nil {
 			*st = ApplyTransition(*st, TranReceiveAssistant)
 			st.LastStopReason = turn.StopReason
+			st.LastAssistantAt = time.Now()
 		}
 		lastAssistantText = turn.Text
 		if o := d.Observe; o != nil && o.OnAssistantText != nil && turn.Text != "" {

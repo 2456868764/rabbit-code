@@ -3,6 +3,7 @@ package engine
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
@@ -30,6 +31,7 @@ func TestResetLoopStateForRetryAttempt_preservesH6Fields(t *testing.T) {
 		SnipRemovalLog: []query.SnipRemovalEntry{
 			{ID: "s1", Kind: query.SnipRemovalKindHistorySnip, RemovedMessageCount: 1},
 		},
+		LastAssistantAt: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
 	}
 	resetLoopStateForRetryAttempt(st)
 	if st.TurnCount != 0 || st.PendingTools != 0 {
@@ -49,5 +51,8 @@ func TestResetLoopStateForRetryAttempt_preservesH6Fields(t *testing.T) {
 	}
 	if len(st.SnipRemovalLog) != 1 || st.SnipRemovalLog[0].ID != "s1" {
 		t.Fatalf("snip log: %+v", st.SnipRemovalLog)
+	}
+	if !st.LastAssistantAt.Equal(time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)) {
+		t.Fatalf("LastAssistantAt: %v", st.LastAssistantAt)
 	}
 }

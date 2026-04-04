@@ -27,6 +27,7 @@ func resetLoopStateForRetryAttempt(st *query.LoopState) {
 		PendingToolUseSummary:         p.PendingToolUseSummary,
 		StopHookActive:                p.StopHookActive,
 		SnipRemovalLog:                query.CloneSnipRemovalLog(p.SnipRemovalLog),
+		LastAssistantAt:               p.LastAssistantAt,
 	}
 	st.RecoveryPhase = query.RecoveryRetriedOnce
 }

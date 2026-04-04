@@ -184,13 +184,14 @@ type Engine struct {
 	sessionMemoryCompact             SessionMemoryCompact
 	postCompactCleanup               PostCompactCleanup
 	microcompactEditBuffer           *compact.MicrocompactEditBuffer
-	cacheBreakSeen                   int32 // atomic: prompt-cache break callback ran this Submit
+	sessionLastAssistantAt           time.Time // wall clock of last model assistant (cross-Submit time-based MC)
+	cacheBreakSeen                   int32     // atomic: prompt-cache break callback ran this Submit
 	// autoCompactConsecutiveFailures counts failed proactive auto compact executor runs across Submits (H3 / autoCompact.ts);
 	// mirrored onto st.AutoCompactTracking.ConsecutiveFailures when st != nil.
 	autoCompactConsecutiveFailures int
 	restoredAutoCompactTracking    *compact.AutoCompactTracking
 	lastAutoCompactTracking        *compact.AutoCompactTracking // snapshot after last Submit for persistence
-	lastSnipRemovalLog             []query.SnipRemovalEntry   // snapshot after last Submit (H7)
+	lastSnipRemovalLog             []query.SnipRemovalEntry     // snapshot after last Submit (H7)
 	restoredSnipRemovalLog         []query.SnipRemovalEntry
 	// streamOutputTotal accumulates UsageDelta.OutputTokens via chained Anthropic OnStreamUsage (H5.5).
 	streamOutputTotal atomic.Int64
@@ -808,6 +809,7 @@ func (e *Engine) runTurnLoop(userText string) {
 				stopReason = query.ContinueReasonStopHookPrevented
 			}
 			query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonStopHookPrevented})
+			e.persistSessionLastAssistantAt(st)
 			e.trySend(EngineEvent{Kind: EventKindDone, LoopTurnCount: st.TurnCount, PhaseDetail: stopReason})
 			return
 		}
@@ -976,6 +978,7 @@ func (e *Engine) runTurnLoop(userText string) {
 		}
 	}
 
+	e.persistSessionLastAssistantAt(st)
 	e.trySend(EngineEvent{Kind: EventKindDone, LoopTurnCount: st.TurnCount})
 }
 
@@ -986,6 +989,13 @@ func (e *Engine) effectiveQuerySource(st *query.LoopState) string {
 		}
 	}
 	return e.querySource
+}
+
+func (e *Engine) persistSessionLastAssistantAt(st *query.LoopState) {
+	if st == nil || st.LastAssistantAt.IsZero() {
+		return
+	}
+	e.sessionLastAssistantAt = st.LastAssistantAt
 }
 
 func (e *Engine) afterCompactSuccess(st *query.LoopState) {

@@ -3,6 +3,7 @@ package query
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
@@ -71,6 +72,8 @@ type LoopState struct {
 	LastAPIErrorKind string
 	// SnipRemovalLog records automatic prefix trims (H7); marshal with query.MarshalSnipRemovalLogJSON for session sidecars.
 	SnipRemovalLog []SnipRemovalEntry
+	// LastAssistantAt is wall-clock time of the last appended model assistant message (time-based microcompact; carried across Submits via engine).
+	LastAssistantAt time.Time
 }
 
 // SetMessagesJSON replaces MessagesJSON with a copy of msgs (query.ts state.messages mirror, H6).

@@ -58,6 +58,45 @@ func TestMaybeTimeBasedMicrocompactJSON_clearsOlderToolResults(t *testing.T) {
 	}
 }
 
+func TestMaybeTimeBasedMicrocompactAPIJSON_clearsOlderToolResults(t *testing.T) {
+	t.Setenv("RABBIT_CODE_TIME_BASED_MICROCOMPACT", "1")
+	t.Setenv("RABBIT_CODE_TIME_BASED_MC_GAP_MINUTES", "1")
+	t.Setenv("RABBIT_CODE_TIME_BASED_MC_KEEP_RECENT", "1")
+	raw := []byte(`[
+	  {"role":"assistant","content":[
+	    {"type":"tool_use","id":"tool_a","name":"Read","input":{}},
+	    {"type":"tool_use","id":"tool_b","name":"Read","input":{}}
+	  ]},
+	  {"role":"user","content":[
+	    {"type":"tool_result","tool_use_id":"tool_a","content":"aaaaaaaaaaaaaaaa"},
+	    {"type":"tool_result","tool_use_id":"tool_b","content":"bbbbbbbbbbbbbbbb"}
+	  ]}
+	]`)
+	lastAssist := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	out, tok, ch, err := MaybeTimeBasedMicrocompactAPIJSON(raw, "repl_main_thread", now, lastAssist)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ch || tok <= 0 {
+		t.Fatalf("expected change and tokens, got ch=%v tok=%d", ch, tok)
+	}
+	var arr []map[string]interface{}
+	if err := json.Unmarshal(out, &arr); err != nil {
+		t.Fatal(err)
+	}
+	user := arr[1]
+	blocks := user["content"].([]interface{})
+	a := blocks[0].(map[string]interface{})
+	b := blocks[1].(map[string]interface{})
+	if a["content"] != TimeBasedMCClearedMessage {
+		t.Fatalf("tool_a should be cleared, got %v", a["content"])
+	}
+	if b["content"] != "bbbbbbbbbbbbbbbb" {
+		t.Fatalf("tool_b should be kept, got %v", b["content"])
+	}
+}
+
 func TestRunMaybeTimeBasedMicrocompactJSON_resetsBuffer(t *testing.T) {
 	t.Setenv("RABBIT_CODE_TIME_BASED_MICROCOMPACT", "1")
 	t.Setenv("RABBIT_CODE_TIME_BASED_MC_GAP_MINUTES", "1")
