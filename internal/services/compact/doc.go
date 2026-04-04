@@ -25,4 +25,7 @@
 //
 // Tool names for COMPACTABLE_TOOLS: internal/tools/* (mirrors src/tools/*/prompt.ts|constants.ts) and
 // internal/utils/shell.ShellToolNames (mirrors src/utils/shell/shellToolUtils.ts).
+//
+// Parity checklist: COMPACT_TS_PARITY.md (diff matrix, completed execution list, appendices).
+// Streaming compact / partial: internal/query/querydeps (anthropic_compact.go, compact_executor.go).
 package compact
