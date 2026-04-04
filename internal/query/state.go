@@ -72,6 +72,9 @@ type LoopState struct {
 	LastAPIErrorKind string
 	// SnipRemovalLog records automatic prefix trims (H7); marshal with query.MarshalSnipRemovalLogJSON for session sidecars.
 	SnipRemovalLog []SnipRemovalEntry
+	// SnipTokensFreedAccum is the sum of (pre-trim − post-trim) transcript token estimates for history/snip-compact
+	// prefix trims during the current LoopDriver.runTurnLoop invocation; reset at each RunTurnLoop entry (autoCompact.ts snip-aware usage).
+	SnipTokensFreedAccum int
 	// LastAssistantAt is wall-clock time of the last appended model assistant message (time-based microcompact; carried across Submits via engine).
 	LastAssistantAt time.Time
 }

@@ -8,6 +8,27 @@ import (
 	"github.com/2456868764/rabbit-code/internal/features"
 )
 
+func TestDEFAULT_SM_COMPACT_CONFIG(t *testing.T) {
+	if DEFAULT_SM_COMPACT_CONFIG.MinTokens != DefaultSessionMemoryCompactConfig.MinTokens {
+		t.Fatal()
+	}
+}
+
+func TestHasTextBlocks(t *testing.T) {
+	asst := []byte(`{"role":"assistant","content":[{"type":"text","text":"hi"}]}`)
+	if !HasTextBlocks(asst) {
+		t.Fatal("assistant text")
+	}
+	userStr := []byte(`{"role":"user","content":"plain"}`)
+	if !HasTextBlocks(userStr) {
+		t.Fatal("user string")
+	}
+	empty := []byte(`{"role":"assistant","content":[{"type":"tool_use","id":"1","name":"Read","input":{}}]}`)
+	if HasTextBlocks(empty) {
+		t.Fatal("no text blocks")
+	}
+}
+
 func TestTruncateSessionMemoryForCompact(t *testing.T) {
 	longBody := stringsRepeatLine("x", 9000)
 	content := "# A\n" + longBody + "\n# B\nshort"

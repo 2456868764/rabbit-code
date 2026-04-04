@@ -25,6 +25,9 @@ var DefaultSessionMemoryCompactConfig = SessionMemoryCompactConfig{
 	MaxTokens:            40_000,
 }
 
+// DEFAULT_SM_COMPACT_CONFIG mirrors the sessionMemoryCompact.ts export name (same struct as DefaultSessionMemoryCompactConfig).
+var DEFAULT_SM_COMPACT_CONFIG = DefaultSessionMemoryCompactConfig
+
 var smCfgMu sync.RWMutex
 var smCfgOverride *SessionMemoryCompactConfig
 
@@ -346,6 +349,15 @@ func indexOfTopLevelUUID(lines []json.RawMessage, uuid string) int {
 	return -1
 }
 
+// HasTextBlocks mirrors sessionMemoryCompact.ts hasTextBlocks for one top-level Messages-API message JSON object.
+func HasTextBlocks(messageJSON json.RawMessage) bool {
+	var m map[string]interface{}
+	if json.Unmarshal(messageJSON, &m) != nil {
+		return false
+	}
+	return HasTextBlocksTranscriptLine(m)
+}
+
 // HasTextBlocksTranscriptLine mirrors hasTextBlocks for one decoded transcript element (user/assistant).
 func HasTextBlocksTranscriptLine(m map[string]interface{}) bool {
 	if m == nil {
@@ -498,6 +510,11 @@ func assistantMessageIDsInLine(m map[string]interface{}) string {
 		return id
 	}
 	return ""
+}
+
+// AdjustIndexToPreserveAPIInvariants mirrors sessionMemoryCompact.ts adjustIndexToPreserveAPIInvariants (transcript as []json.RawMessage lines).
+func AdjustIndexToPreserveAPIInvariants(lines []json.RawMessage, startIndex int) (int, error) {
+	return AdjustStartIndexToPreserveAPIInvariants(lines, startIndex)
 }
 
 // AdjustStartIndexToPreserveAPIInvariants mirrors adjustIndexToPreserveAPIInvariants (tool pairs + shared assistant id).
@@ -678,6 +695,11 @@ func CalculateSessionMemoryKeepStartIndex(lines []json.RawMessage, lastSummarize
 		}
 	}
 	return AdjustStartIndexToPreserveAPIInvariants(lines, start)
+}
+
+// CalculateMessagesToKeepIndex mirrors sessionMemoryCompact.ts calculateMessagesToKeepIndex.
+func CalculateMessagesToKeepIndex(lines []json.RawMessage, lastSummarizedIndex int) (int, error) {
+	return CalculateSessionMemoryKeepStartIndex(lines, lastSummarizedIndex)
 }
 
 func jsonLinesArray(lines []json.RawMessage) []byte {

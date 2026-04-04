@@ -402,6 +402,29 @@ func AppendTranscriptMessagesJSON(transcript []byte, extra ...json.RawMessage) (
 	return json.Marshal(arr)
 }
 
+// BuildPartialCompactStreamRequestMessagesJSON mirrors partialCompactConversation stream request prefix:
+// SelectPartialCompactAPIMessagesTranscriptJSON → stripImages → stripReinjectedAttachments → GetPartialCompactPrompt user.
+func BuildPartialCompactStreamRequestMessagesJSON(fullTranscript []byte, pivot int, direction PartialCompactDirection, customInstructions string) ([]byte, error) {
+	part, err := SelectPartialCompactAPIMessagesTranscriptJSON(fullTranscript, pivot, direction)
+	if err != nil {
+		return nil, err
+	}
+	tail, err := StripImagesFromAPIMessagesJSON(part)
+	if err != nil {
+		return nil, err
+	}
+	tail, err = StripReinjectedAttachmentsFromTranscriptJSON(tail)
+	if err != nil {
+		return nil, err
+	}
+	prompt := GetPartialCompactPrompt(customInstructions, direction)
+	sum, err := CreateUserTextMessageJSON(prompt)
+	if err != nil {
+		return nil, err
+	}
+	return AppendTranscriptMessagesJSON(tail, sum)
+}
+
 // BuildCompactStreamRequestMessagesJSON mirrors streamCompactSummary normalize path prefix:
 // getMessagesAfterCompactBoundary → stripImages → stripReinjectedAttachments → append summary user (Messages API JSON).
 func BuildCompactStreamRequestMessagesJSON(transcript []byte, boundaryOpt AfterCompactBoundaryOptions, summaryPromptPlain string) ([]byte, error) {

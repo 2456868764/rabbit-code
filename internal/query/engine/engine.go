@@ -33,6 +33,9 @@ type CompactExecutor func(ctx context.Context, phase compact.RunPhase, transcrip
 // If ok and replacement is non-empty, the engine emits compact suggest/result and skips the legacy auto executor for that wave.
 type SessionMemoryCompact func(ctx context.Context, agentID, model string, autoCompactThreshold int, transcriptJSON json.RawMessage) (replacement json.RawMessage, ok bool, err error)
 
+// AfterSessionMemoryCompactSuccess runs when session-memory compaction successfully replaces the transcript, before compact suggest/result events (autoCompact.ts notifyCompaction / setLastSummarizedMessageId analogue).
+type AfterSessionMemoryCompactSuccess func(ctx context.Context, querySource, agentID string)
+
 // PostCompactCleanup optional extra hook after compact (postCompactCleanup.ts); runs after compact.RunPostCompactCleanup when both are set.
 // mainThreadCompact matches isMainThreadCompact.
 type PostCompactCleanup func(ctx context.Context, querySource, agentID string, mainThreadCompact bool)
@@ -129,6 +132,8 @@ type Config struct {
 	StopHooksAfterSuccessfulTurn []StopHookAfterTurnFunc
 	// SessionMemoryCompact optional first step before legacy auto compact (H3 / autoCompact.ts).
 	SessionMemoryCompact SessionMemoryCompact
+	// AfterSessionMemoryCompactSuccess optional notify/mark when SM compaction applies (H3 / autoCompact.ts).
+	AfterSessionMemoryCompactSuccess AfterSessionMemoryCompactSuccess
 	// PostCompactCleanup optional hook after any successful compact executor / session-memory compact (H3).
 	PostCompactCleanup PostCompactCleanup
 	// PostCompactCleanupHooks optional TS-ordered steps (postCompactCleanup.ts); runs before PostCompactCleanup when both set.
@@ -186,6 +191,7 @@ type Engine struct {
 	querySource                      string
 	stopHooksAfterSuccessfulTurn     []StopHookAfterTurnFunc
 	sessionMemoryCompact             SessionMemoryCompact
+	afterSessionMemoryCompactSuccess AfterSessionMemoryCompactSuccess
 	postCompactCleanup               PostCompactCleanup
 	postCompactHooks                 *compact.PostCompactCleanupHooks
 	microcompactEditBuffer           *compact.MicrocompactEditBuffer
@@ -307,6 +313,7 @@ func New(parent context.Context, cfg *Config) *Engine {
 		e.querySource = strings.TrimSpace(cfg.QuerySource)
 		e.stopHooksAfterSuccessfulTurn = append([]StopHookAfterTurnFunc(nil), cfg.StopHooksAfterSuccessfulTurn...)
 		e.sessionMemoryCompact = cfg.SessionMemoryCompact
+		e.afterSessionMemoryCompactSuccess = cfg.AfterSessionMemoryCompactSuccess
 		if e.sessionMemoryCompact == nil && features.SessionMemoryCompactionEnabled() {
 			if md := resolveEngineMemdirMemoryDir(cfg); md != "" {
 				hooks := memdir.SessionMemoryCompactHooksForMemoryDir(md)

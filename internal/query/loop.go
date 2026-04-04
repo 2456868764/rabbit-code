@@ -138,6 +138,9 @@ func (d *LoopDriver) RunTurnLoopFromMessages(ctx context.Context, st *LoopState,
 }
 
 func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText string, seedMsgs json.RawMessage) (msgs json.RawMessage, lastAssistantText string, err error) {
+	if st != nil {
+		st.SnipTokensFreedAccum = 0
+	}
 	if len(seedMsgs) > 0 {
 		buf := make([]byte, len(seedMsgs))
 		copy(buf, seedMsgs)
@@ -199,7 +202,11 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 			}
 			if n > 0 {
 				if nt := EstimateTranscriptJSONTokens(newMsgs); prevTok > nt {
-					snipTokensFreed += prevTok - nt
+					delta := prevTok - nt
+					snipTokensFreed += delta
+					if st != nil {
+						st.SnipTokensFreedAccum += delta
+					}
 				}
 			}
 			msgs = newMsgs
@@ -229,7 +236,11 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 			}
 			if n > 0 {
 				if nt := EstimateTranscriptJSONTokens(newMsgs); prevTok > nt {
-					snipTokensFreed += prevTok - nt
+					delta := prevTok - nt
+					snipTokensFreed += delta
+					if st != nil {
+						st.SnipTokensFreedAccum += delta
+					}
 				}
 			}
 			msgs = newMsgs

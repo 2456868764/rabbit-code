@@ -122,6 +122,22 @@ func TestEstimateMessageTokensFromAPIMessagesJSON_largeBase64Image(t *testing.T)
 	}
 }
 
+func TestConsumePendingCacheEdits_packageFunc(t *testing.T) {
+	var buf MicrocompactEditBuffer
+	raw := json.RawMessage(`{"x":1}`)
+	buf.SetPendingCacheEdits(raw)
+	got := ConsumePendingCacheEdits(&buf)
+	if string(got) != string(raw) {
+		t.Fatalf("%s", got)
+	}
+	if ConsumePendingCacheEdits(&buf) != nil {
+		t.Fatal("second consume")
+	}
+	if ConsumePendingCacheEdits(nil) != nil {
+		t.Fatal("nil buf")
+	}
+}
+
 func TestIsMainThreadQuerySource(t *testing.T) {
 	if !IsMainThreadQuerySource("") || !IsMainThreadQuerySource("repl_main_thread") ||
 		!IsMainThreadQuerySource("repl_main_thread:outputStyle:foo") {

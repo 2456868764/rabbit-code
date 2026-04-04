@@ -7,6 +7,7 @@ import (
 
 // ApplyEngineMemdirFromRuntime fills cfg.InitialSettings and cfg.MemdirTrustedAutoMemoryDirectory from rt
 // (after LoadAndApplyMergedConfig). Safe when rt or cfg is nil.
+// For compact fork bridge on the Anthropic assistant, call ApplyEngineCompactIntegration(rt, cfg, aa) before engine.New.
 func ApplyEngineMemdirFromRuntime(rt *Runtime, cfg *engine.Config) error {
 	if rt == nil || cfg == nil {
 		return nil

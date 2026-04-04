@@ -116,6 +116,96 @@ func (a *AnthropicAssistant) StreamCompactSummaryDetailed(ctx context.Context, t
 	}
 }
 
+// StreamPartialCompactSummaryDetailed mirrors compact.ts partialCompactConversation streaming summary path
+// (pivot + direction slice via BuildPartialCompactStreamRequestMessagesJSON; PTL retries truncate the built request).
+func (a *AnthropicAssistant) StreamPartialCompactSummaryDetailed(ctx context.Context, fullTranscriptJSON []byte, pivot int, direction compact.PartialCompactDirection, customInstructions string) (CompactSummaryStreamResult, error) {
+	var zero CompactSummaryStreamResult
+	if a == nil || a.Client == nil {
+		return zero, ErrNilAnthropicClient
+	}
+	stopKeepAlive := a.startCompactKeepAlive(ctx)
+	defer stopKeepAlive()
+	rawIn := bytes.TrimSpace(fullTranscriptJSON)
+	if len(rawIn) == 0 || string(rawIn) == "null" || string(rawIn) == "[]" {
+		return zero, errors.New(compact.ErrorMessageNotEnoughMessages)
+	}
+	if _, err := compact.SelectPartialCompactAPIMessagesTranscriptJSON(fullTranscriptJSON, pivot, direction); err != nil {
+		return zero, err
+	}
+	model := strings.TrimSpace(a.DefaultModel)
+	if model == "" {
+		model = "claude-3-5-haiku-20241022"
+	}
+	maxTok := compact.EffectiveCompactSummaryMaxTokens(a.DefaultMaxTokens)
+	pol := a.Policy
+	if pol.MaxAttempts == 0 {
+		pol = anthropic.DefaultPolicy()
+	}
+	customInst := customInstructions
+
+	requestMsgs, err := compact.BuildPartialCompactStreamRequestMessagesJSON(fullTranscriptJSON, pivot, direction, customInst)
+	if err != nil {
+		return zero, err
+	}
+
+	if features.CompactCachePrefixEnabled() && a.ForkPartialCompactSummary != nil {
+		if raw, err := a.ForkPartialCompactSummary(ctx, requestMsgs); err == nil && strings.TrimSpace(raw) != "" {
+			if validCompactAssistantText(raw) {
+				return CompactSummaryStreamResult{
+					Formatted: compact.FormatCompactSummary(raw),
+					Raw:       raw,
+				}, nil
+			}
+		}
+	}
+
+	for ptlAttempts := 0; ; {
+		maxStreamAttempts := 1
+		if features.CompactStreamingRetryEnabled() {
+			maxStreamAttempts = compact.MaxCompactStreamingRetries
+		}
+		var text string
+		for attempt := 1; attempt <= maxStreamAttempts; attempt++ {
+			text, err = a.streamCompactSummaryFromMessages(ctx, model, maxTok, requestMsgs, pol)
+			if err != nil {
+				return zero, err
+			}
+			if strings.TrimSpace(text) != "" {
+				break
+			}
+			if attempt == maxStreamAttempts {
+				return zero, errors.New(compact.ErrorMessageIncompleteResponse)
+			}
+		}
+
+		if !compact.CompactSummaryLooksLikePromptTooLong(text) {
+			if strings.TrimSpace(text) == "" {
+				return zero, errors.New(compact.ErrorMessageNoCompactSummary)
+			}
+			if compact.StartsWithAPIErrorPrefix(text) {
+				return zero, fmt.Errorf("%s", text)
+			}
+			if strings.TrimSpace(text) == compact.ErrorMessageUserAbort || strings.Contains(text, "Request was aborted") {
+				return zero, errors.New(compact.ErrorMessageUserAbort)
+			}
+			return CompactSummaryStreamResult{
+				Formatted: compact.FormatCompactSummary(text),
+				Raw:       text,
+			}, nil
+		}
+		ptlAttempts++
+		if ptlAttempts > compact.MaxPTLRetries {
+			return zero, errors.New(compact.ErrorMessagePromptTooLong)
+		}
+		asst := assistantTextMessageJSONRaw(text)
+		next, ok := compact.TruncateHeadForPTLRetryTranscriptJSON(requestMsgs, asst)
+		if !ok {
+			return zero, errors.New(compact.ErrorMessagePromptTooLong)
+		}
+		requestMsgs = next
+	}
+}
+
 // startCompactKeepAlive mirrors compact.ts streamCompactSummary setInterval(sessionActivity) when callback + env gate are set.
 func (a *AnthropicAssistant) startCompactKeepAlive(ctx context.Context) func() {
 	if a == nil || a.SessionActivityPing == nil || !features.RemoteSendKeepalivesEnabled() {
@@ -168,15 +258,19 @@ func assistantTextMessageJSONRaw(text string) []byte {
 	return b
 }
 
+func (a *AnthropicAssistant) streamCompactSummaryFromMessages(ctx context.Context, model string, maxTokens int, messagesJSON []byte, pol anthropic.Policy) (string, error) {
+	body := a.compactSummaryStreamBody(model, maxTokens, messagesJSON)
+	text, _, err := a.Client.PostMessagesStreamReadAssistant(ctx, body, pol, a.readOpts(ctx)...)
+	return text, err
+}
+
 func (a *AnthropicAssistant) streamCompactSummaryOnce(ctx context.Context, model string, maxTokens int, transcriptJSON []byte, customInstructions string, pol anthropic.Policy) (string, error) {
 	prompt := compact.GetCompactPrompt(customInstructions)
 	msgs, err := compact.BuildCompactStreamRequestMessagesJSON(transcriptJSON, compact.AfterCompactBoundaryOptions{}, prompt)
 	if err != nil {
 		return "", err
 	}
-	body := a.compactSummaryStreamBody(model, maxTokens, msgs)
-	text, _, err := a.Client.PostMessagesStreamReadAssistant(ctx, body, pol, a.readOpts(ctx)...)
-	return text, err
+	return a.streamCompactSummaryFromMessages(ctx, model, maxTokens, msgs, pol)
 }
 
 func (a *AnthropicAssistant) compactSummaryStreamBody(model string, maxTokens int, messagesJSON []byte) anthropic.MessagesStreamBody {

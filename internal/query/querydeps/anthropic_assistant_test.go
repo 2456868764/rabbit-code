@@ -442,6 +442,46 @@ func TestAnthropicAssistant_StreamCompactSummary_forkPath(t *testing.T) {
 	}
 }
 
+func TestAnthropicAssistant_StreamPartialCompactSummaryDetailed_forkPath(t *testing.T) {
+	t.Setenv(features.EnvUseBedrock, "")
+	t.Setenv(features.EnvUseVertex, "")
+	t.Setenv(features.EnvUseFoundry, "")
+	t.Setenv(features.EnvCompactCachePrefix, "1")
+
+	var forked bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("streaming should not be called when partial fork succeeds")
+	}))
+	defer srv.Close()
+
+	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl.BaseURL = srv.URL
+	cl.Provider = anthropic.ProviderAnthropic
+
+	a := &AnthropicAssistant{
+		Client:           cl,
+		DefaultModel:     "m",
+		DefaultMaxTokens: 256,
+		Policy:           anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		ForkPartialCompactSummary: func(ctx context.Context, messagesJSON []byte) (string, error) {
+			_ = messagesJSON
+			forked = true
+			return "<summary>partial-fork</summary>", nil
+		},
+	}
+	tr := []byte(`[{"role":"user","content":[{"type":"text","text":"a"}]},{"role":"assistant","content":[{"type":"text","text":"b"}]}]`)
+	r, err := a.StreamPartialCompactSummaryDetailed(context.Background(), tr, 0, compact.PartialCompactFrom, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !forked {
+		t.Fatal("expected partial fork")
+	}
+	if !strings.Contains(r.Formatted, "partial-fork") {
+		t.Fatalf("got %q", r.Formatted)
+	}
+}
+
 func TestAnthropicAssistant_StreamCompactSummary_PTLRetryThenOK(t *testing.T) {
 	t.Setenv(features.EnvUseBedrock, "")
 	t.Setenv(features.EnvUseVertex, "")

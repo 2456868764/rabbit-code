@@ -221,6 +221,11 @@ func StripImagesFromAPIMessagesJSON(transcript []byte) ([]byte, error) {
 	return json.Marshal(arr)
 }
 
+// StripImagesFromMessages mirrors compact.ts stripImagesFromMessages (alias of StripImagesFromAPIMessagesJSON).
+func StripImagesFromMessages(transcript []byte) ([]byte, error) {
+	return StripImagesFromAPIMessagesJSON(transcript)
+}
+
 func stripImagesInAPIContentBlocks(blocks []interface{}) ([]interface{}, bool) {
 	out := make([]interface{}, 0, len(blocks))
 	changed := false
@@ -322,6 +327,11 @@ func StripReinjectedAttachmentsFromTranscriptJSON(transcript []byte) ([]byte, er
 		return append([]byte(nil), transcript...), nil
 	}
 	return json.Marshal(out)
+}
+
+// StripReinjectedAttachments mirrors compact.ts stripReinjectedAttachments (alias of StripReinjectedAttachmentsFromTranscriptJSON).
+func StripReinjectedAttachments(transcript []byte) ([]byte, error) {
+	return StripReinjectedAttachmentsFromTranscriptJSON(transcript)
 }
 
 func shouldDropReinjectedAttachmentMessage(m map[string]interface{}) bool {

@@ -304,3 +304,38 @@ func AutoCompactThresholdForProactive(model string, maxOutputTokens, contextWind
 	effective := EffectiveContextInputWindow(cw, maxOutputTokens)
 	return AutoCompactThresholdTokens(effective, features.AutocompactPctOverride())
 }
+
+// GetEffectiveContextWindowSize mirrors autoCompact.ts getEffectiveContextWindowSize(model): model context window
+// (with RABBIT_CODE_AUTO_COMPACT_WINDOW cap) minus reserved output headroom capped at MaxOutputTokensForSummaryCap.
+func GetEffectiveContextWindowSize(model string, maxOutputTokens int) int {
+	cw := features.ContextWindowTokensForModel(model)
+	cw = features.ApplyAutoCompactWindowCap(cw)
+	return EffectiveContextInputWindow(cw, maxOutputTokens)
+}
+
+// GetAutoCompactThreshold mirrors autoCompact.ts getAutoCompactThreshold(model) using env percentage override when set.
+func GetAutoCompactThreshold(model string, maxOutputTokens int) int {
+	effective := GetEffectiveContextWindowSize(model, maxOutputTokens)
+	return AutoCompactThresholdTokens(effective, features.AutocompactPctOverride())
+}
+
+// CalculateTokenWarningStateForModel mirrors autoCompact.ts calculateTokenWarningState(tokenUsage, model).
+func CalculateTokenWarningStateForModel(tokenUsage int, model string, maxOutputTokens int) TokenWarningState {
+	effectiveWin := GetEffectiveContextWindowSize(model, maxOutputTokens)
+	autoTh := GetAutoCompactThreshold(model, maxOutputTokens)
+	thForPercent := effectiveWin
+	if features.IsAutoCompactEnabled() {
+		thForPercent = autoTh
+	}
+	if thForPercent <= 0 {
+		thForPercent = effectiveWin
+	}
+	return CalculateTokenWarningState(
+		tokenUsage,
+		thForPercent,
+		effectiveWin,
+		autoTh,
+		features.IsAutoCompactEnabled(),
+		features.BlockingLimitOverrideTokens(),
+	)
+}

@@ -375,3 +375,43 @@ func mcJSONBlockStringify(b map[string]json.RawMessage) string {
 	}
 	return string(out)
 }
+
+// ConsumePendingCacheEdits mirrors microCompact.ts consumePendingCacheEdits (nil buffer → nil).
+func ConsumePendingCacheEdits(buf *MicrocompactEditBuffer) json.RawMessage {
+	if buf == nil {
+		return nil
+	}
+	return buf.ConsumePendingCacheEdits()
+}
+
+// GetPinnedCacheEdits mirrors microCompact.ts getPinnedCacheEdits.
+func GetPinnedCacheEdits(buf *MicrocompactEditBuffer) []PinnedCacheEdits {
+	if buf == nil {
+		return nil
+	}
+	return buf.GetPinnedCacheEdits()
+}
+
+// PinCacheEdits mirrors microCompact.ts pinCacheEdits.
+func PinCacheEdits(buf *MicrocompactEditBuffer, userMessageIndex int, block json.RawMessage) {
+	if buf == nil {
+		return
+	}
+	buf.PinCacheEdits(userMessageIndex, block)
+}
+
+// MarkToolsSentToAPIState mirrors microCompact.ts markToolsSentToAPIState.
+func MarkToolsSentToAPIState(buf *MicrocompactEditBuffer) {
+	if buf == nil {
+		return
+	}
+	buf.MarkToolsSentToAPIState()
+}
+
+// ResetMicrocompactState mirrors microCompact.ts resetMicrocompactState.
+func ResetMicrocompactState(buf *MicrocompactEditBuffer) {
+	if buf == nil {
+		return
+	}
+	buf.ResetMicrocompactState()
+}

@@ -185,6 +185,61 @@ func TestEngine_SessionMemoryCompact_skipsLegacyAutoExecutor(t *testing.T) {
 	}
 }
 
+func TestEngine_AfterSessionMemoryCompactSuccess_onSMCompact(t *testing.T) {
+	t.Setenv(features.EnvContextWindowTokens, "50000")
+	t.Setenv(features.EnvReactiveCompactMinBytes, "999999999")
+	t.Setenv(features.EnvReactiveCompactMinTokens, "999999999")
+	t.Setenv(features.EnvDisableCompact, "")
+	t.Setenv(features.EnvDisableAutoCompact, "")
+	t.Setenv(features.EnvAutoCompact, "")
+	t.Setenv(features.EnvContextCollapse, "")
+	t.Setenv(features.EnvSuppressProactiveAutoCompact, "")
+	var hookCalls int32
+	longReply := strings.Repeat("z", 150_000)
+	e := New(context.Background(), &Config{
+		AfterSessionMemoryCompactSuccess: func(ctx context.Context, querySource, agentID string) {
+			_ = ctx
+			_ = querySource
+			_ = agentID
+			atomic.AddInt32(&hookCalls, 1)
+		},
+		SessionMemoryCompact: func(ctx context.Context, agentID, model string, th int, transcript json.RawMessage) (json.RawMessage, bool, error) {
+			_ = ctx
+			_ = agentID
+			_ = model
+			_ = th
+			_ = transcript
+			return json.RawMessage(`[{"role":"user","content":[{"type":"text","text":"sm"}]}]`), true, nil
+		},
+		Deps: querydeps.Deps{
+			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return longReply, nil
+			}),
+		},
+		Model: "m", MaxTokens: 1024,
+	})
+	e.Submit("hi")
+	ch := e.Events()
+	deadline := time.After(8 * time.Second)
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindDone {
+				e.Wait()
+				if atomic.LoadInt32(&hookCalls) != 1 {
+					t.Fatalf("AfterSessionMemoryCompactSuccess calls=%d", hookCalls)
+				}
+				return
+			}
+			if ev.Kind == EventKindError {
+				t.Fatal(ev.Err)
+			}
+		case <-deadline:
+			t.Fatal("timeout")
+		}
+	}
+}
+
 func TestNew_defaultSessionMemoryCompactFromMemdir(t *testing.T) {
 	ctx := context.Background()
 	t.Setenv(features.EnvSessionMemoryFeature, "1")

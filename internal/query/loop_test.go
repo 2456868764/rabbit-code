@@ -645,3 +645,46 @@ func TestRunTurnLoop_promptCacheBreak_secondCompactRound(t *testing.T) {
 		t.Fatalf("AssistantTurn calls: want 3 (break, break after seed1, ok after seed2), got %d", turn.n)
 	}
 }
+
+func TestLoopDriver_SnipTokensFreedAccum_onHistorySnip(t *testing.T) {
+	t.Setenv(features.EnvPromptCacheBreak, "")
+	t.Setenv(features.EnvPromptCacheBreakTrimResend, "0")
+	t.Setenv(features.EnvPromptCacheBreakAutoCompact, "")
+	var parts []string
+	for i := 0; i < 6; i++ {
+		parts = append(parts, `{"role":"user","content":[{"type":"text","text":"`+strings.Repeat("W", 120)+`"}]}`)
+	}
+	seed := json.RawMessage("[" + strings.Join(parts, ",") + "]")
+	// assistantTurnWithPromptCacheBreakHandling may call AssistantTurn more than once when cache-break recovery is active in the environment.
+	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+		{Text: "done"}, {Text: "done"}, {Text: "done"},
+	}}
+	d := LoopDriver{
+		Deps:                 querydeps.Deps{Turn: turns},
+		Model:                "m",
+		MaxTokens:            8,
+		HistorySnipMaxBytes:  500,
+		HistorySnipMaxRounds: 20,
+		ContextWindowTokens:  500_000,
+	}
+	st := LoopState{}
+	_, _, err := d.RunTurnLoopFromMessages(context.Background(), &st, seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.SnipTokensFreedAccum <= 0 {
+		t.Fatalf("expected SnipTokensFreedAccum > 0 after snip, got %d", st.SnipTokensFreedAccum)
+	}
+	firstAccum := st.SnipTokensFreedAccum
+	st2 := LoopState{}
+	_, _, err = d.RunTurnLoopFromMessages(context.Background(), &st2, seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st2.SnipTokensFreedAccum <= 0 {
+		t.Fatalf("expected fresh RunTurnLoop to accumulate snip again, got %d", st2.SnipTokensFreedAccum)
+	}
+	if st2.SnipTokensFreedAccum != firstAccum {
+		t.Fatalf("deterministic snip accum: want %d, got %d", firstAccum, st2.SnipTokensFreedAccum)
+	}
+}

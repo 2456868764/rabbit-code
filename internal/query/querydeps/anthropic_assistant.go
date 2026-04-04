@@ -27,6 +27,8 @@ type AnthropicAssistant struct {
 	APIContextManagementOpts *compact.APIContextManagementOptions
 	// ForkCompactSummary optional runForkedAgent / cache-sharing analogue: same inputs as compact.ts fork path; return raw assistant text or error to fall back to streaming.
 	ForkCompactSummary func(ctx context.Context, summaryUserJSON []byte, transcriptJSON []byte) (assistantText string, err error)
+	// ForkPartialCompactSummary optional cache-sharing for partial compact: messagesJSON is the Messages API array from BuildPartialCompactStreamRequestMessagesJSON (same body as the streaming path).
+	ForkPartialCompactSummary func(ctx context.Context, messagesJSON []byte) (assistantText string, err error)
 	// CompactToolsJSON optional Messages API tools for StreamCompactSummary; nil uses compact.DefaultCompactStreamingToolsJSON(features.CompactStreamingToolSearchEnabled()).
 	CompactToolsJSON json.RawMessage
 	// CompactStreamExtraBetas optional betas appended to compact stream body (e.g. tool-search beta when host enables deferred tools).

@@ -204,6 +204,25 @@ func TestAfterTurnProactiveAutocompactFromUsage_circuitTripped(t *testing.T) {
 	}
 }
 
+func TestGetEffectiveContextWindowSize_andCalculateTokenWarningStateForModel(t *testing.T) {
+	t.Setenv(features.EnvContextWindowTokens, "100000")
+	t.Setenv(features.EnvAutoCompactWindow, "")
+	t.Setenv(features.EnvDisableCompact, "")
+	t.Setenv(features.EnvDisableAutoCompact, "")
+	t.Setenv(features.EnvAutoCompact, "")
+	g := GetEffectiveContextWindowSize("m", 1024)
+	if g <= 0 {
+		t.Fatal(g)
+	}
+	if GetAutoCompactThreshold("m", 1024) <= 0 {
+		t.Fatal("threshold")
+	}
+	st := CalculateTokenWarningStateForModel(0, "m", 1024)
+	if st.PercentLeft != 100 {
+		t.Fatalf("percent %d", st.PercentLeft)
+	}
+}
+
 func TestAfterTurnReactiveCompactSuggested(t *testing.T) {
 	blob := []byte(strings.Repeat("a", 100))
 	if !AfterTurnReactiveCompactSuggested(blob, 10, 0, false) {
