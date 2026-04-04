@@ -55,26 +55,32 @@ This package is **headless**: UI-only TS (e.g. `compactWarningHook.ts` / React) 
 
 ---
 
-## 3. Execution list — completed
+## 3. Execution list (逐项：验证 → 提交)
 
-1. ~~**Export inventory**~~ — See **Appendix A** (TS exports) and **Appendix B** (Go public symbols in this package).
-2. ~~**apiMicrocompact.ts**~~ — Compared branches to `GetAPIContextManagement` (`clear_thinking_20251015`, `clear_tool_uses_20250919`, tool lists in `toolsClearableResults` / `toolsClearableUses`). Re-verify when TS edits `USER_TYPE` / env names.
-3. ~~**autoCompact.ts**~~ — Buffer constants locked by `TestAutoCompactBufferConstants_matchAutoCompactTs`; threshold math covered by `auto_compact_test.go`.
-4. ~~**compact.ts constants**~~ — `TestCompactConstantsMatchTS_compactTs` (POST_COMPACT_*, retries, errors, PTL marker, deny message).
-5. ~~**compact.ts strip**~~ — Reinjected attachments: feature-gated test; images: existing strip tests in `compact_test.go` / integration paths.
-6. ~~**compact.ts streaming**~~ — Mapped to Go: `anthropic_compact.go` (`StreamCompactSummaryDetailed`, `StreamPartialCompactSummaryDetailed`), `compact_executor.go` (`StreamingCompactExecutorWithConfig`, partial variant), builders in `compact_conversation.go`. **Manual:** re-diff TS on stream/tool changes.
-7. ~~**createCompactCanUseTool**~~ — Message string verified = `CompactToolUseDenyMessage` (orchestration may live entirely in TS client; Go exposes constant for callers).
-8. ~~**Post-compact file restore**~~ — Go: `post_compact_attachments.go` + `internal/query/engine/post_compact_runtime.go` (`RecordPostCompactFileRead`). Re-diff TS attachment ordering when `createPostCompactFileAttachments` changes.
-9. ~~**microCompact.ts**~~ — Covered by `micro_compact_test.go` (tokens, time-based, cache edits).
-10. ~~**cachedMicrocompact**~~ — `cached_microcompact_test.go`.
-11. ~~**Time-based**~~ — `time_based_trigger_test.go` + cleared-message const test.
-12. ~~**sessionMemoryCompact.ts**~~ — `session_memory_compact_test.go`.
-13. ~~**prompt.ts**~~ — `TestPromptCompact_smokeMatchesTSExports` (non-empty prompts + `FormatCompactSummary` unwrap).
-14. ~~**postCompactCleanup.ts**~~ — `RunPostCompactCleanup` order matches TS (microcompact reset first; main-thread gates; hooks for TS-only clears). Engine must register hooks.
-15. ~~**grouping.ts**~~ — `TestGroupRawMessagesByAPIRound_matchesTypedGrouping`.
-16. ~~**compactWarning***~~ — Documented in §1; tests in `compact_warning_test.go`, `micro_compact_test.go` (suppression clear on MC).
-17. ~~**Document splits**~~ — `doc.go` + this file; **Appendix C** lists cross-package entry points.
-18. ~~**notifyCacheDeletion**~~ — **Permanent non-goal** in this repo unless product adds phase-2 cache read comparison (`doc.go` already notes).
+工作方式：每一项在 Go 侧有**可运行验证**（测试或文档中的明确命令），再 **git commit**。历史上有批量文档+回归测试提交 **`cb097ca`**；`apiMicrocompact` 补测单独为 **`e978cbd`**。
+
+| # | 项 | 如何验证 | 提交 / 备注 |
+|---|-----|----------|-------------|
+| 1 | Export inventory | 附录 A–B–C 与 `doc.go` 映射 | `cb097ca` |
+| 2 | `apiMicrocompact.ts` | `go test ./internal/services/compact/... -run 'APIContext|APIClear|DefaultAPI'` | `cb097ca` + **`e978cbd`**（thinking `clear_all` / redact / `exclude_tools`） |
+| 3 | `autoCompact.ts` | `go test ./internal/services/compact/... -run AutoCompact\|CalculateToken\|EffectiveContext` | `cb097ca`（常量 `TestAutoCompactBufferConstants_*`）+ `auto_compact_test.go` |
+| 4 | `compact.ts` 常量/错误串 | `go test ./internal/services/compact/... -run TestCompactConstantsMatchTS` | `cb097ca` |
+| 5 | `compact.ts` strip | `go test ./internal/services/compact/... -run StripReinjected\|StripImages` | `cb097ca` + `compact_test.go` |
+| 6 | `compact.ts` streaming | `go test ./internal/query/querydeps/... -run Compact\|Partial`；对照附录 C 源文件 | 行为在 **querydeps**；TS 大改时人工 diff |
+| 7 | `createCompactCanUseTool` | `go test ./internal/services/compact/... -run TestCompactConstantsMatchTS`（含 deny 文案） | `cb097ca` |
+| 8 | Post-compact 文件 | `go test ./internal/services/compact/... -run PostCompact\|FilterAttachment`；`engine/post_compact_runtime_test.go`（若有） | `cb097ca` + engine 包测试 |
+| 9 | `microCompact.ts` | `go test ./internal/services/compact/... -run Microcompact\|EstimateMessage` | `cb097ca` + `micro_compact_test.go` |
+| 10 | cached microcompact | `go test ./internal/services/compact/... -run CachedMicrocompact` | `cb097ca` |
+| 11 | Time-based | `go test ./internal/services/compact/... -run TimeBased\|TestTimeBasedMCCleared` | `cb097ca` |
+| 12 | `sessionMemoryCompact.ts` | `go test ./internal/services/compact/... -run SessionMemory` | `cb097ca` |
+| 13 | `prompt.ts` | `go test ./internal/services/compact/... -run TestPromptCompact` | `cb097ca` |
+| 14 | `postCompactCleanup.ts` | `post_compact_cleanup.go` 与 engine 注册 hooks；必要时单测 mock | 文档 + 引擎接线 |
+| 15 | `grouping.ts` | `go test ./internal/services/compact/... -run GroupMessages\|GroupRaw` | `cb097ca` |
+| 16 | `compactWarning*` | `go test ./internal/services/compact/... -run CompactWarning` | `cb097ca` |
+| 17 | 文档拆分 | `doc.go` + 本文件 §1/§4/附录 | `cb097ca` |
+| 18 | `notifyCacheDeletion` | 不实现；§2 **gap** | 非目标（见 `doc.go`） |
+
+**一键全量：** `go test ./internal/services/compact/... -count=1` 与 `go test ./internal/... -count=1`。
 
 ---
 
