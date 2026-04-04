@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/2456868764/rabbit-code/internal/features"
-	anthropic "github.com/2456868764/rabbit-code/internal/services/api"
 )
 
 // --- compact.ts orchestration helpers (pure JSON / no query import). Streaming, hooks, fork, attachments stay in engine/app. ---
@@ -449,7 +448,7 @@ func BuildCompactStreamRequestMessagesJSON(transcript []byte, boundaryOpt AfterC
 
 // CompactSummaryLooksLikePromptTooLong mirrors summary?.startsWith(PROMPT_TOO_LONG_ERROR_MESSAGE) in compact.ts.
 func CompactSummaryLooksLikePromptTooLong(summaryText string) bool {
-	return strings.HasPrefix(strings.TrimSpace(summaryText), anthropic.ErrPromptTooLongMessage)
+	return strings.HasPrefix(strings.TrimSpace(summaryText), PromptTooLongErrorPrefix)
 }
 
 // ShouldSuppressCompactErrorNotification mirrors addErrorNotificationIfNeeded exclusions (exact message match).

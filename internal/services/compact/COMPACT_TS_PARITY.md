@@ -14,7 +14,7 @@ This package is **headless**: UI-only TS (e.g. `compactWarningHook.ts` / React) 
 |-----------|------------|--------|
 | `apiMicrocompact.ts` | `api_microcompact.go` | Request `context_management` JSON; HTTP merge may live in `internal/services/api` |
 | `autoCompact.ts` | `auto_compact.go`, `auto_compact_if_needed.go` | `isAutoCompactEnabled` → **`internal/features.IsAutoCompactEnabled`** |
-| `compact.ts` | `compact.go`, `compact_conversation.go`, `compact_context.go`, `post_compact_attachments.go` | Streaming orchestration → **`internal/query`** (`anthropic_compact.go`, `compact_executor.go`; see §5) |
+| `compact.ts` | `compact.go`, `compact_conversation.go`, `compact_context.go`, `post_compact_attachments.go` | Streaming summary → **`internal/services/api`** (`anthropic_stream_compact.go`); executor → **`internal/query/streaming_compact_executor.go`** (see §5) |
 | `microCompact.ts` | `micro_compact.go`, `cached_microcompact.go`, `time_based_trigger.go`, `time_based_microcompact.go` | Cached path split to `cached_microcompact.go` |
 | `timeBasedMCConfig.ts` | `time_based_trigger.go` | `getTimeBasedMCConfig` colocated with eval |
 | `sessionMemoryCompact.ts` | `session_memory_compact.go` | `session_memory_compact_test.go` |
@@ -66,7 +66,7 @@ This package is **headless**: UI-only TS (e.g. `compactWarningHook.ts` / React) 
 | 3 | `autoCompact.ts` | `go test ./internal/services/compact/... -run AutoCompact\|CalculateToken\|EffectiveContext` | `cb097ca`（常量 `TestAutoCompactBufferConstants_*`）+ `auto_compact_test.go` |
 | 4 | `compact.ts` 常量/错误串 | `go test ./internal/services/compact/... -run TestCompactConstantsMatchTS` | `cb097ca` |
 | 5 | `compact.ts` strip | `go test ./internal/services/compact/... -run StripReinjected\|StripImages` | `cb097ca` + `compact_test.go` |
-| 6 | `compact.ts` streaming | `go test ./internal/query/... -run Compact\|Partial`；对照附录 C 源文件 | 行为在 **`internal/query`**；TS 大改时人工 diff |
+| 6 | `compact.ts` streaming | `go test ./internal/services/api/... -run AnthropicAssistant_StreamCompact\|StartCompactKeepAlive`；`go test ./internal/query/... -run StreamingCompact`；附录 C | 摘要逻辑在 **`api`**；executor 在 **`query`** |
 | 7 | `createCompactCanUseTool` | `go test ./internal/services/compact/... -run TestCompactConstantsMatchTS`（含 deny 文案） | `cb097ca` |
 | 8 | Post-compact 文件 | `go test ./internal/services/compact/... -run PostCompact\|FilterAttachment`；`engine/post_compact_runtime_test.go`（若有） | `cb097ca` + engine 包测试 |
 | 9 | `microCompact.ts` | `go test ./internal/services/compact/... -run Microcompact\|EstimateMessage` | `cb097ca` + `micro_compact_test.go` |
@@ -121,8 +121,9 @@ Primary types/functions: `compact.go` (`RunPhase`, strip/build/truncate/group PT
 
 | Concern | Go location |
 |---------|-------------|
-| Stream compact / partial summary | `internal/query/anthropic_compact.go`, `compact_executor.go` |
-| Anthropic assistant config (compact tools JSON) | `internal/query/anthropic_assistant.go` |
+| Stream compact / partial summary | `internal/services/api/anthropic_stream_compact.go` |
+| Anthropic assistant + Messages stream / turns | `internal/services/api/anthropic_assistant.go`, `prompt_cache_context.go`, `fork_compact_wiring.go` |
+| Streaming compact executor closure | `internal/query/streaming_compact_executor.go` |
 | Auto-compact chain / loop | `internal/query/engine/auto_compact_chain.go`, `internal/query/loop.go` |
 | Post-compact file capture | `internal/query/engine/post_compact_runtime.go` |
 | Feature gates (auto compact, ant user, API clear tools, …) | `internal/features/env.go` |

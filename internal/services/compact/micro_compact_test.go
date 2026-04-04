@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// microcompactAPIStateMarker mirrors query.MicrocompactAPIStateMarker (avoid compact_test → query → compact cycle).
+// microcompactAPIStateMarker: *MicrocompactEditBuffer satisfies services/api.MicrocompactAPIStateMarker (implicit).
 type microcompactAPIStateMarker interface {
 	MarkToolsSentToAPIState()
 }

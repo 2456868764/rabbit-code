@@ -2,22 +2,15 @@ package query
 
 import (
 	"context"
-	"encoding/json"
+
+	"github.com/2456868764/rabbit-code/internal/types"
 )
 
 // ToolUseCall is one tool_use block in an assistant message (Messages API shape).
-type ToolUseCall struct {
-	ID    string
-	Name  string
-	Input json.RawMessage
-}
+type ToolUseCall = types.ToolUseCall
 
 // TurnResult is one assistant model response (text + optional tool uses).
-type TurnResult struct {
-	Text       string
-	ToolUses   []ToolUseCall
-	StopReason string // e.g. end_turn, tool_use (from message_delta when present)
-}
+type TurnResult = types.TurnResult
 
 // TurnAssistant performs one assistant turn and may return tool calls (P5.1.2 / AC5-3).
 type TurnAssistant interface {

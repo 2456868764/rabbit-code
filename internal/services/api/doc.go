@@ -31,6 +31,7 @@
 // Unattended: Policy.Unattended (RABBIT_CODE_UNATTENDED_RETRY) after MaxAttempts on HTTP 429/529 enters withRetry.ts persistent backoff + HEARTBEAT_INTERVAL_MS chunked waits.
 // Attribution: AttributionSystemPromptLine matches system.ts getAttributionHeader (cc_version / cc_entrypoint / optional cch=00000 / cc_workload); inject into system prompt when wiring messages (Phase 5).
 // Prompt cache break: ReadAssistantStream WithOnPromptCacheBreak telemetry hook (AC4-F3).
+// Phase 5 headless: AnthropicAssistant (anthropic_assistant.go), stream compact summary (anthropic_stream_compact.go), ContextWithOnPromptCacheBreak (prompt_cache_context.go), fork wiring (fork_compact_wiring.go); query loop imports this package; shared turn shapes in internal/types.
 // Anti-distillation: RABBIT_CODE_ANTI_DISTILLATION_CC + RABBIT_CODE_ANTI_DISTILLATION_FAKE_TOOLS adds JSON anti_distillation: ["fake_tools"] (getExtraBodyParams); optional header envs remain.
 // Stale connection: RABBIT_CODE_DISABLE_KEEPALIVE_ON_ECONNRESET wraps a dedicated *http.Transport (not http.DefaultTransport) to set DisableKeepAlives after ECONNRESET/EPIPE.
 package anthropic

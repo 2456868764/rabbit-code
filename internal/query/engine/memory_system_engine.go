@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/2456868764/rabbit-code/internal/memdir"
-	"github.com/2456868764/rabbit-code/internal/query"
+	anthropic "github.com/2456868764/rabbit-code/internal/services/api"
 )
 
 func (e *Engine) refreshMemorySystemPromptForAssistant() {
@@ -27,7 +27,7 @@ func (e *Engine) refreshMemorySystemPromptForAssistant() {
 
 func (e *Engine) setAnthropicSystemPrompt(s string) {
 	for _, x := range []any{e.deps.Turn, e.deps.Assistant} {
-		if a, ok := x.(*query.AnthropicAssistant); ok && a != nil {
+		if a, ok := x.(*anthropic.AnthropicAssistant); ok && a != nil {
 			a.SystemPrompt = s
 		}
 	}

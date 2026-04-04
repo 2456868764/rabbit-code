@@ -227,7 +227,7 @@ func NewEngine(parent context.Context) *Engine {
 }
 
 // New constructs an engine. Nil cfg or nil cfg.Assistant uses timed stub text.
-// When Assistant is *query.AnthropicAssistant and Turn is nil, Turn is promoted to the same pointer so tool_use streams work.
+// When Assistant is *anthropic.AnthropicAssistant and Turn is nil, Turn is promoted to the same pointer so tool_use streams work.
 func New(parent context.Context, cfg *Config) *Engine {
 	ctx, cancel := context.WithCancel(parent)
 	e := &Engine{
@@ -245,7 +245,7 @@ func New(parent context.Context, cfg *Config) *Engine {
 	if cfg != nil {
 		deps := cfg.Deps
 		if deps.Turn == nil {
-			if aa, ok := deps.Assistant.(*query.AnthropicAssistant); ok {
+			if aa, ok := deps.Assistant.(*anthropic.AnthropicAssistant); ok {
 				deps.Turn = aa
 			}
 		}
@@ -331,10 +331,10 @@ func New(parent context.Context, cfg *Config) *Engine {
 		e.postCompactCleanup = cfg.PostCompactCleanup
 		e.postCompactHooks = cfg.PostCompactCleanupHooks
 		e.microcompactEditBuffer = cfg.MicrocompactEditBuffer
-		if aa, ok := e.deps.Assistant.(*query.AnthropicAssistant); ok && cfg.MicrocompactEditBuffer != nil {
+		if aa, ok := e.deps.Assistant.(*anthropic.AnthropicAssistant); ok && cfg.MicrocompactEditBuffer != nil {
 			aa.MicrocompactBuffer = cfg.MicrocompactEditBuffer
 		}
-		if aa, ok := e.deps.Turn.(*query.AnthropicAssistant); ok && cfg.MicrocompactEditBuffer != nil {
+		if aa, ok := e.deps.Turn.(*anthropic.AnthropicAssistant); ok && cfg.MicrocompactEditBuffer != nil {
 			aa.MicrocompactBuffer = cfg.MicrocompactEditBuffer
 		}
 		e.autoCompactConsecutiveFailures = cfg.InitialAutocompactConsecutiveFailures
@@ -622,26 +622,26 @@ func (e *Engine) loopObservers() *query.LoopObservers {
 }
 
 func (e *Engine) anthropicClientPtr() *anthropic.Client {
-	if a, ok := e.deps.Turn.(*query.AnthropicAssistant); ok && a != nil && a.Client != nil {
+	if a, ok := e.deps.Turn.(*anthropic.AnthropicAssistant); ok && a != nil && a.Client != nil {
 		return a.Client
 	}
-	if a, ok := e.deps.Assistant.(*query.AnthropicAssistant); ok && a != nil && a.Client != nil {
+	if a, ok := e.deps.Assistant.(*anthropic.AnthropicAssistant); ok && a != nil && a.Client != nil {
 		return a.Client
 	}
 	return nil
 }
 
 func (e *Engine) anthropicPolicy() anthropic.Policy {
-	if a, ok := e.deps.Turn.(*query.AnthropicAssistant); ok && a != nil && a.Policy.MaxAttempts != 0 {
+	if a, ok := e.deps.Turn.(*anthropic.AnthropicAssistant); ok && a != nil && a.Policy.MaxAttempts != 0 {
 		return a.Policy
 	}
-	if a, ok := e.deps.Assistant.(*query.AnthropicAssistant); ok && a != nil && a.Policy.MaxAttempts != 0 {
+	if a, ok := e.deps.Assistant.(*anthropic.AnthropicAssistant); ok && a != nil && a.Policy.MaxAttempts != 0 {
 		return a.Policy
 	}
-	if a, ok := e.deps.Turn.(*query.AnthropicAssistant); ok && a != nil {
+	if a, ok := e.deps.Turn.(*anthropic.AnthropicAssistant); ok && a != nil {
 		return a.Policy
 	}
-	if a, ok := e.deps.Assistant.(*query.AnthropicAssistant); ok && a != nil {
+	if a, ok := e.deps.Assistant.(*anthropic.AnthropicAssistant); ok && a != nil {
 		return a.Policy
 	}
 	return anthropic.Policy{}
@@ -804,7 +804,7 @@ func (e *Engine) runTurnLoop(userText string) {
 	atomic.StoreInt32(&e.cacheBreakSeen, 0)
 	ctxLoop := e.ctx
 	if features.PromptCacheBreakDetectionEnabled() || features.PromptCacheBreakSuggestCompactEnabled() {
-		ctxLoop = query.ContextWithOnPromptCacheBreak(e.ctx, func() {
+		ctxLoop = anthropic.ContextWithOnPromptCacheBreak(e.ctx, func() {
 			atomic.StoreInt32(&e.cacheBreakSeen, 1)
 			if features.PromptCacheBreakDetectionEnabled() {
 				e.trySend(EngineEvent{Kind: EventKindPromptCacheBreakDetected, PhaseDetail: "sse"})

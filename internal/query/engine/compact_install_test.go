@@ -4,19 +4,19 @@ import (
 	"context"
 	"testing"
 
-	"github.com/2456868764/rabbit-code/internal/query"
+	anthropic "github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
 func TestInstallAnthropicStreamingCompact_setsExecutor(t *testing.T) {
 	e := New(context.Background(), &Config{})
-	aa := &query.AnthropicAssistant{Client: nil}
+	aa := &anthropic.AnthropicAssistant{Client: nil}
 	e.InstallAnthropicStreamingCompact(aa, "x")
 	if e.compactExecutor == nil {
 		t.Fatal("expected compactExecutor")
 	}
 	_, _, err := e.compactExecutor(context.Background(), compact.RunIdle, []byte(`[{"role":"user","content":[{"type":"text","text":"a"}]}]`))
-	if err != query.ErrNilAnthropicClient {
+	if err != anthropic.ErrNilAnthropicClient {
 		t.Fatalf("want ErrNilAnthropicClient, got %v", err)
 	}
 }
@@ -29,7 +29,7 @@ func TestInstallAnthropicStreamingCompact_skipsWhenAlreadyConfigured(t *testing.
 			return "", nil, nil
 		},
 	})
-	e.InstallAnthropicStreamingCompact(&query.AnthropicAssistant{}, "")
+	e.InstallAnthropicStreamingCompact(&anthropic.AnthropicAssistant{}, "")
 	_, _, _ = e.compactExecutor(context.Background(), compact.RunIdle, []byte(`[]`))
 	if calls != 1 {
 		t.Fatalf("custom executor calls=%d", calls)

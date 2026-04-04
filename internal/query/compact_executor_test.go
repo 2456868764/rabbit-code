@@ -30,7 +30,7 @@ func TestStreamingCompactExecutorWithConfig_hooksAndNext(t *testing.T) {
 	cl.BaseURL = srv.URL
 	cl.Provider = anthropic.ProviderAnthropic
 
-	a := &AnthropicAssistant{
+	a := &anthropic.AnthropicAssistant{
 		Client:           cl,
 		DefaultModel:     "m",
 		DefaultMaxTokens: 256,
@@ -89,7 +89,7 @@ func TestStreamingCompactExecutorWithConfig_postCompactAttachments(t *testing.T)
 	cl.BaseURL = srv.URL
 	cl.Provider = anthropic.ProviderAnthropic
 
-	a := &AnthropicAssistant{
+	a := &anthropic.AnthropicAssistant{
 		Client:           cl,
 		DefaultModel:     "m",
 		DefaultMaxTokens: 256,

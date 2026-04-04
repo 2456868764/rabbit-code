@@ -1,9 +1,8 @@
-package query
+package anthropic
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/2456868764/rabbit-code/internal/features"
-	"github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
@@ -46,15 +44,15 @@ func TestAnthropicAssistant_httptest(t *testing.T) {
 	t.Setenv(features.EnvUseVertex, "")
 	t.Setenv(features.EnvUseFoundry, "")
 
-	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl := NewClient(NewTransportChain(http.DefaultTransport, "k", ""))
 	cl.BaseURL = srv.URL
-	cl.Provider = anthropic.ProviderAnthropic
+	cl.Provider = ProviderAnthropic
 
 	a := &AnthropicAssistant{
 		Client:           cl,
 		DefaultModel:     "m",
 		DefaultMaxTokens: 8,
-		Policy:           anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		Policy:           Policy{MaxAttempts: 1, Retry529429: false},
 	}
 	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
 	text, err := a.StreamAssistant(context.Background(), "", 0, msgs)
@@ -78,15 +76,15 @@ func TestAnthropicAssistant_StreamAssistant_promptCacheBreakFromContext(t *testi
 	}))
 	defer srv.Close()
 
-	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl := NewClient(NewTransportChain(http.DefaultTransport, "k", ""))
 	cl.BaseURL = srv.URL
-	cl.Provider = anthropic.ProviderAnthropic
+	cl.Provider = ProviderAnthropic
 
 	a := &AnthropicAssistant{
 		Client:           cl,
 		DefaultModel:     "m",
 		DefaultMaxTokens: 8,
-		Policy:           anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		Policy:           Policy{MaxAttempts: 1, Retry529429: false},
 	}
 	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
 	_, err := a.StreamAssistant(ctx, "", 0, msgs)
@@ -110,15 +108,15 @@ func TestAnthropicAssistant_AssistantTurn_promptCacheBreakFromContext(t *testing
 	}))
 	defer srv.Close()
 
-	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl := NewClient(NewTransportChain(http.DefaultTransport, "k", ""))
 	cl.BaseURL = srv.URL
-	cl.Provider = anthropic.ProviderAnthropic
+	cl.Provider = ProviderAnthropic
 
 	a := &AnthropicAssistant{
 		Client:           cl,
 		DefaultModel:     "m",
 		DefaultMaxTokens: 8,
-		Policy:           anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		Policy:           Policy{MaxAttempts: 1, Retry529429: false},
 	}
 	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
 	_, err := a.AssistantTurn(ctx, "", 0, msgs)
@@ -154,7 +152,7 @@ func TestAnthropicAssistant_streamBody_anthropicBetaCachedMicrocompact(t *testin
 		}
 		ok := false
 		for _, x := range body.AnthropicBeta {
-			if x == anthropic.BetaCachedMicrocompactBody {
+			if x == BetaCachedMicrocompactBody {
 				ok = true
 				break
 			}
@@ -167,15 +165,15 @@ func TestAnthropicAssistant_streamBody_anthropicBetaCachedMicrocompact(t *testin
 	}))
 	defer srv.Close()
 
-	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl := NewClient(NewTransportChain(http.DefaultTransport, "k", ""))
 	cl.BaseURL = srv.URL
-	cl.Provider = anthropic.ProviderAnthropic
+	cl.Provider = ProviderAnthropic
 
 	a := &AnthropicAssistant{
 		Client:           cl,
 		DefaultModel:     "m",
 		DefaultMaxTokens: 8,
-		Policy:           anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		Policy:           Policy{MaxAttempts: 1, Retry529429: false},
 	}
 	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
 	_, err := a.StreamAssistant(context.Background(), "", 0, msgs)
@@ -222,7 +220,7 @@ func TestAnthropicAssistant_streamBody_contextManagement_ant(t *testing.T) {
 		_ = json.Unmarshal(body.ContextManagement, &cm)
 		hasBeta := false
 		for _, x := range body.AnthropicBeta {
-			if x == anthropic.BetaContextManagement {
+			if x == BetaContextManagement {
 				hasBeta = true
 				break
 			}
@@ -235,15 +233,15 @@ func TestAnthropicAssistant_streamBody_contextManagement_ant(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl := NewClient(NewTransportChain(http.DefaultTransport, "k", ""))
 	cl.BaseURL = srv.URL
-	cl.Provider = anthropic.ProviderAnthropic
+	cl.Provider = ProviderAnthropic
 
 	a := &AnthropicAssistant{
 		Client:           cl,
 		DefaultModel:     "m",
 		DefaultMaxTokens: 8,
-		Policy:           anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		Policy:           Policy{MaxAttempts: 1, Retry529429: false},
 	}
 	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
 	_, err := a.StreamAssistant(context.Background(), "claude-3-5-haiku-20241022", 0, msgs)
@@ -288,16 +286,16 @@ func TestAnthropicAssistant_streamBody_contextManagement_model4Thinking(t *testi
 	}))
 	defer srv.Close()
 
-	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl := NewClient(NewTransportChain(http.DefaultTransport, "k", ""))
 	cl.BaseURL = srv.URL
-	cl.Provider = anthropic.ProviderAnthropic
+	cl.Provider = ProviderAnthropic
 
 	opts := compact.APIContextManagementOptions{HasThinking: true}
 	a := &AnthropicAssistant{
 		Client:                   cl,
 		DefaultModel:             "m",
 		DefaultMaxTokens:         8,
-		Policy:                   anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		Policy:                   Policy{MaxAttempts: 1, Retry529429: false},
 		APIContextManagementOpts: &opts,
 	}
 	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
@@ -324,16 +322,16 @@ func TestAnthropicAssistant_MicrocompactBuffer_markAfterStreamSuccess(t *testing
 	}))
 	defer srv.Close()
 
-	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl := NewClient(NewTransportChain(http.DefaultTransport, "k", ""))
 	cl.BaseURL = srv.URL
-	cl.Provider = anthropic.ProviderAnthropic
+	cl.Provider = ProviderAnthropic
 
 	var buf testMicrocompactMarker
 	a := &AnthropicAssistant{
 		Client:             cl,
 		DefaultModel:       "m",
 		DefaultMaxTokens:   8,
-		Policy:             anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		Policy:             Policy{MaxAttempts: 1, Retry529429: false},
 		MicrocompactBuffer: &buf,
 	}
 	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
@@ -370,16 +368,16 @@ func TestAnthropicAssistant_StreamCompactSummary_success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl := NewClient(NewTransportChain(http.DefaultTransport, "k", ""))
 	cl.BaseURL = srv.URL
-	cl.Provider = anthropic.ProviderAnthropic
+	cl.Provider = ProviderAnthropic
 
 	var buf testMicrocompactMarker
 	a := &AnthropicAssistant{
 		Client:             cl,
 		DefaultModel:       "m",
 		DefaultMaxTokens:   8,
-		Policy:             anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		Policy:             Policy{MaxAttempts: 1, Retry529429: false},
 		MicrocompactBuffer: &buf,
 	}
 	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
@@ -416,15 +414,15 @@ func TestAnthropicAssistant_StreamCompactSummary_forkPath(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl := NewClient(NewTransportChain(http.DefaultTransport, "k", ""))
 	cl.BaseURL = srv.URL
-	cl.Provider = anthropic.ProviderAnthropic
+	cl.Provider = ProviderAnthropic
 
 	a := &AnthropicAssistant{
 		Client:           cl,
 		DefaultModel:     "m",
 		DefaultMaxTokens: 256,
-		Policy:           anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		Policy:           Policy{MaxAttempts: 1, Retry529429: false},
 		ForkCompactSummary: func(ctx context.Context, summaryUserJSON []byte, transcriptJSON []byte) (string, error) {
 			forked = true
 			return "<summary>forked</summary>", nil
@@ -454,15 +452,15 @@ func TestAnthropicAssistant_StreamPartialCompactSummaryDetailed_forkPath(t *test
 	}))
 	defer srv.Close()
 
-	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl := NewClient(NewTransportChain(http.DefaultTransport, "k", ""))
 	cl.BaseURL = srv.URL
-	cl.Provider = anthropic.ProviderAnthropic
+	cl.Provider = ProviderAnthropic
 
 	a := &AnthropicAssistant{
 		Client:           cl,
 		DefaultModel:     "m",
 		DefaultMaxTokens: 256,
-		Policy:           anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		Policy:           Policy{MaxAttempts: 1, Retry529429: false},
 		ForkPartialCompactSummary: func(ctx context.Context, messagesJSON []byte) (string, error) {
 			_ = messagesJSON
 			forked = true
@@ -501,15 +499,15 @@ func TestAnthropicAssistant_StreamCompactSummary_PTLRetryThenOK(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl := NewClient(NewTransportChain(http.DefaultTransport, "k", ""))
 	cl.BaseURL = srv.URL
-	cl.Provider = anthropic.ProviderAnthropic
+	cl.Provider = ProviderAnthropic
 
 	a := &AnthropicAssistant{
 		Client:           cl,
 		DefaultModel:     "m",
 		DefaultMaxTokens: 8192,
-		Policy:           anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		Policy:           Policy{MaxAttempts: 1, Retry529429: false},
 	}
 	msgs := []byte(`[
 		{"role":"user","content":[{"type":"text","text":"u1"}]},
@@ -526,23 +524,5 @@ func TestAnthropicAssistant_StreamCompactSummary_PTLRetryThenOK(t *testing.T) {
 	}
 	if !strings.Contains(out, "second") {
 		t.Fatalf("got %q", out)
-	}
-}
-
-func TestStreamingCompactExecutor_nilClient(t *testing.T) {
-	ex := StreamingCompactExecutor(nil, "")
-	_, _, err := ex(context.Background(), compact.RunExecuting, []byte(`[]`))
-	if err != ErrNilAnthropicClient {
-		t.Fatalf("got %v", err)
-	}
-}
-
-func TestStreamAssistantFunc(t *testing.T) {
-	var f StreamAssistantFunc = func(ctx context.Context, model string, maxTokens int, messagesJSON []byte) (string, error) {
-		return fmt.Sprintf("%s:%d:%s", model, maxTokens, string(messagesJSON)), nil
-	}
-	out, err := f.StreamAssistant(context.Background(), "x", 3, []byte(`[]`))
-	if err != nil || out != "x:3:[]" {
-		t.Fatalf("%q %v", out, err)
 	}
 }

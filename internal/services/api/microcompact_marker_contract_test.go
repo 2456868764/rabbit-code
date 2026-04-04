@@ -1,14 +1,14 @@
-package query_test
+package anthropic_test
 
 import (
 	"testing"
 
-	"github.com/2456868764/rabbit-code/internal/query"
+	anthropic "github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
 func TestMicrocompactEditBuffer_satisfiesMarker(t *testing.T) {
 	var buf compact.MicrocompactEditBuffer
-	var m query.MicrocompactAPIStateMarker = &buf
+	var m anthropic.MicrocompactAPIStateMarker = &buf
 	m.MarkToolsSentToAPIState()
 }

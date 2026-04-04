@@ -1,4 +1,4 @@
-package query
+package anthropic
 
 import (
 	"context"
@@ -7,18 +7,18 @@ import (
 	"time"
 
 	"github.com/2456868764/rabbit-code/internal/features"
-	"github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
+	"github.com/2456868764/rabbit-code/internal/types"
 )
 
-// AnthropicAssistant implements StreamAssistant using internal/services/api Client (Phase 4 + Phase 5 bridge).
+// AnthropicAssistant implements StreamAssistant / TurnAssistant for the query loop (Phase 4 + Phase 5 bridge; TS: services/api + queryModelWithStreaming).
 type AnthropicAssistant struct {
-	Client           *anthropic.Client
+	Client           *Client
 	DefaultModel     string
 	DefaultMaxTokens int
-	Policy           anthropic.Policy
+	Policy           Policy
 	// ExtraReadOptions are appended after context-derived options (tests / host hooks).
-	ExtraReadOptions []anthropic.ReadAssistantOption
+	ExtraReadOptions []ReadAssistantOption
 	// MicrocompactBuffer optional; MarkToolsSentToAPIState after successful stream (microCompact.ts markToolsSentToAPIState).
 	MicrocompactBuffer MicrocompactAPIStateMarker
 	// SystemPrompt when non-empty is sent as the Messages API "system" string (memdir loadMemoryPrompt analogue, H8).
@@ -39,17 +39,17 @@ type AnthropicAssistant struct {
 	CompactKeepAliveInterval time.Duration
 }
 
-func (a *AnthropicAssistant) readOpts(ctx context.Context) []anthropic.ReadAssistantOption {
-	var opts []anthropic.ReadAssistantOption
+func (a *AnthropicAssistant) readOpts(ctx context.Context) []ReadAssistantOption {
+	var opts []ReadAssistantOption
 	if cb, ok := OnPromptCacheBreakFromContext(ctx); ok && cb != nil {
-		opts = append(opts, anthropic.WithOnPromptCacheBreak(cb))
+		opts = append(opts, WithOnPromptCacheBreak(cb))
 	}
 	opts = append(opts, a.ExtraReadOptions...)
 	return opts
 }
 
-func (a *AnthropicAssistant) streamBody(model string, maxTokens int, messagesJSON []byte) anthropic.MessagesStreamBody {
-	body := anthropic.MessagesStreamBody{
+func (a *AnthropicAssistant) streamBody(model string, maxTokens int, messagesJSON []byte) MessagesStreamBody {
+	body := MessagesStreamBody{
 		Model:     model,
 		MaxTokens: maxTokens,
 		Messages:  json.RawMessage(messagesJSON),
@@ -61,13 +61,13 @@ func (a *AnthropicAssistant) streamBody(model string, maxTokens int, messagesJSO
 		}
 	}
 	if features.CachedMicrocompactEnabled() {
-		body.AnthropicBeta = append(body.AnthropicBeta, anthropic.BetaCachedMicrocompactBody)
+		body.AnthropicBeta = append(body.AnthropicBeta, BetaCachedMicrocompactBody)
 	}
 	a.attachAPIContextManagement(model, &body)
 	return body
 }
 
-func (a *AnthropicAssistant) attachAPIContextManagement(model string, body *anthropic.MessagesStreamBody) {
+func (a *AnthropicAssistant) attachAPIContextManagement(model string, body *MessagesStreamBody) {
 	if a == nil || a.Client == nil || body == nil {
 		return
 	}
@@ -80,7 +80,7 @@ func (a *AnthropicAssistant) attachAPIContextManagement(model string, body *anth
 	if cm == nil {
 		return
 	}
-	if !anthropic.ShouldAttachContextManagementBeta(m, a.Client.Provider) {
+	if !ShouldAttachContextManagementBeta(m, a.Client.Provider) {
 		return
 	}
 	raw, err := json.Marshal(cm)
@@ -88,7 +88,7 @@ func (a *AnthropicAssistant) attachAPIContextManagement(model string, body *anth
 		return
 	}
 	body.ContextManagement = raw
-	body.AnthropicBeta = anthropic.AppendBetaUnique(body.AnthropicBeta, anthropic.BetaContextManagement)
+	body.AnthropicBeta = AppendBetaUnique(body.AnthropicBeta, BetaContextManagement)
 }
 
 // StreamAssistant calls PostMessagesStreamReadAssistant with messagesJSON as the Messages field.
@@ -110,7 +110,7 @@ func (a *AnthropicAssistant) StreamAssistant(ctx context.Context, model string, 
 	}
 	pol := a.Policy
 	if pol.MaxAttempts == 0 {
-		pol = anthropic.DefaultPolicy()
+		pol = DefaultPolicy()
 	}
 	body := a.streamBody(model, maxTokens, messagesJSON)
 	text, _, err := a.Client.PostMessagesStreamReadAssistant(ctx, body, pol, a.readOpts(ctx)...)
@@ -120,10 +120,10 @@ func (a *AnthropicAssistant) StreamAssistant(ctx context.Context, model string, 
 	return text, err
 }
 
-// AssistantTurn implements TurnAssistant using streamed tool_use assembly (Phase 5).
-func (a *AnthropicAssistant) AssistantTurn(ctx context.Context, model string, maxTokens int, messagesJSON []byte) (TurnResult, error) {
+// AssistantTurn implements streamed tool_use assembly (Phase 5).
+func (a *AnthropicAssistant) AssistantTurn(ctx context.Context, model string, maxTokens int, messagesJSON []byte) (types.TurnResult, error) {
 	if a == nil || a.Client == nil {
-		return TurnResult{}, ErrNilAnthropicClient
+		return types.TurnResult{}, ErrNilAnthropicClient
 	}
 	if model == "" {
 		model = a.DefaultModel
@@ -139,15 +139,15 @@ func (a *AnthropicAssistant) AssistantTurn(ctx context.Context, model string, ma
 	}
 	pol := a.Policy
 	if pol.MaxAttempts == 0 {
-		pol = anthropic.DefaultPolicy()
+		pol = DefaultPolicy()
 	}
 	body := a.streamBody(model, maxTokens, messagesJSON)
 	turn, _, err := a.Client.PostMessagesStreamReadAssistantTurn(ctx, body, pol, a.readOpts(ctx)...)
 	if err != nil {
-		return TurnResult{}, err
+		return types.TurnResult{}, err
 	}
 	a.markMicrocompactAfterSuccessfulAPI()
-	out := TurnResult{
+	out := types.TurnResult{
 		Text:       turn.Text,
 		StopReason: turn.StopReason,
 	}
@@ -156,7 +156,7 @@ func (a *AnthropicAssistant) AssistantTurn(ctx context.Context, model string, ma
 		if len(in) == 0 {
 			in = json.RawMessage(`{}`)
 		}
-		out.ToolUses = append(out.ToolUses, ToolUseCall{
+		out.ToolUses = append(out.ToolUses, types.ToolUseCall{
 			ID:    t.ID,
 			Name:  t.Name,
 			Input: in,

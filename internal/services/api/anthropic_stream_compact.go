@@ -1,4 +1,4 @@
-package query
+package anthropic
 
 import (
 	"bytes"
@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/2456868764/rabbit-code/internal/features"
-	anthropic "github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
@@ -48,7 +47,7 @@ func (a *AnthropicAssistant) StreamCompactSummaryDetailed(ctx context.Context, t
 	maxTok := compact.EffectiveCompactSummaryMaxTokens(a.DefaultMaxTokens)
 	pol := a.Policy
 	if pol.MaxAttempts == 0 {
-		pol = anthropic.DefaultPolicy()
+		pol = DefaultPolicy()
 	}
 
 	customInst := customInstructions
@@ -139,7 +138,7 @@ func (a *AnthropicAssistant) StreamPartialCompactSummaryDetailed(ctx context.Con
 	maxTok := compact.EffectiveCompactSummaryMaxTokens(a.DefaultMaxTokens)
 	pol := a.Policy
 	if pol.MaxAttempts == 0 {
-		pol = anthropic.DefaultPolicy()
+		pol = DefaultPolicy()
 	}
 	customInst := customInstructions
 
@@ -258,13 +257,13 @@ func assistantTextMessageJSONRaw(text string) []byte {
 	return b
 }
 
-func (a *AnthropicAssistant) streamCompactSummaryFromMessages(ctx context.Context, model string, maxTokens int, messagesJSON []byte, pol anthropic.Policy) (string, error) {
+func (a *AnthropicAssistant) streamCompactSummaryFromMessages(ctx context.Context, model string, maxTokens int, messagesJSON []byte, pol Policy) (string, error) {
 	body := a.compactSummaryStreamBody(model, maxTokens, messagesJSON)
 	text, _, err := a.Client.PostMessagesStreamReadAssistant(ctx, body, pol, a.readOpts(ctx)...)
 	return text, err
 }
 
-func (a *AnthropicAssistant) streamCompactSummaryOnce(ctx context.Context, model string, maxTokens int, transcriptJSON []byte, customInstructions string, pol anthropic.Policy) (string, error) {
+func (a *AnthropicAssistant) streamCompactSummaryOnce(ctx context.Context, model string, maxTokens int, transcriptJSON []byte, customInstructions string, pol Policy) (string, error) {
 	prompt := compact.GetCompactPrompt(customInstructions)
 	msgs, err := compact.BuildCompactStreamRequestMessagesJSON(transcriptJSON, compact.AfterCompactBoundaryOptions{}, prompt)
 	if err != nil {
@@ -273,8 +272,8 @@ func (a *AnthropicAssistant) streamCompactSummaryOnce(ctx context.Context, model
 	return a.streamCompactSummaryFromMessages(ctx, model, maxTokens, msgs, pol)
 }
 
-func (a *AnthropicAssistant) compactSummaryStreamBody(model string, maxTokens int, messagesJSON []byte) anthropic.MessagesStreamBody {
-	body := anthropic.MessagesStreamBody{
+func (a *AnthropicAssistant) compactSummaryStreamBody(model string, maxTokens int, messagesJSON []byte) MessagesStreamBody {
+	body := MessagesStreamBody{
 		Model:     model,
 		MaxTokens: maxTokens,
 		Messages:  json.RawMessage(messagesJSON),
@@ -286,10 +285,10 @@ func (a *AnthropicAssistant) compactSummaryStreamBody(model string, maxTokens in
 		body.Tools = tools
 	}
 	for _, beta := range a.compactBetas() {
-		body.AnthropicBeta = anthropic.AppendBetaUnique(body.AnthropicBeta, beta)
+		body.AnthropicBeta = AppendBetaUnique(body.AnthropicBeta, beta)
 	}
 	if features.CachedMicrocompactEnabled() {
-		body.AnthropicBeta = anthropic.AppendBetaUnique(body.AnthropicBeta, anthropic.BetaCachedMicrocompactBody)
+		body.AnthropicBeta = AppendBetaUnique(body.AnthropicBeta, BetaCachedMicrocompactBody)
 	}
 	if a != nil {
 		a.attachAPIContextManagement(model, &body)

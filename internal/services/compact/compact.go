@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/2456868764/rabbit-code/internal/features"
-	anthropic "github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/tools/filereadtool"
 )
 
@@ -448,7 +447,7 @@ func PromptTooLongTokenGapFromAssistantJSON(assistant []byte) (gap int64, ok boo
 	if detail == "" {
 		detail = firstAssistantTextFromContent(m["content"])
 	}
-	actual, limit, parsed := anthropic.ParsePromptTooLongTokenCounts(detail)
+	actual, limit, parsed := ParsePromptTooLongTokenCounts(detail)
 	if !parsed {
 		return 0, false
 	}

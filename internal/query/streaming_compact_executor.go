@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"strings"
 
+	anthropic "github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
 // StreamingCompactExecutor returns engine.CompactExecutor using default options (customInstructions only).
-func StreamingCompactExecutor(a *AnthropicAssistant, customInstructions string) func(context.Context, compact.RunPhase, []byte) (summary string, nextTranscriptJSON []byte, err error) {
+// Lives in package query to avoid compact ↔ api import cycles (compact.ts streaming is invoked from query/engine).
+func StreamingCompactExecutor(a *anthropic.AnthropicAssistant, customInstructions string) func(context.Context, compact.RunPhase, []byte) (summary string, nextTranscriptJSON []byte, err error) {
 	return StreamingCompactExecutorWithConfig(a, StreamingCompactExecutorConfig{
 		CustomInstructions: customInstructions,
 	})
@@ -31,10 +33,10 @@ type StreamingCompactExecutorConfig struct {
 
 // StreamingCompactExecutorWithConfig runs StreamCompactSummaryDetailed with MergeHookInstructions, optional hooks, and optional BuildDefaultPostCompactTranscriptJSON next payload.
 // Auto vs manual uses compact.ExecutorSuggestMetaFromContext (set by engine around CompactExecutor).
-func StreamingCompactExecutorWithConfig(a *AnthropicAssistant, cfg StreamingCompactExecutorConfig) func(context.Context, compact.RunPhase, []byte) (summary string, nextTranscriptJSON []byte, err error) {
+func StreamingCompactExecutorWithConfig(a *anthropic.AnthropicAssistant, cfg StreamingCompactExecutorConfig) func(context.Context, compact.RunPhase, []byte) (summary string, nextTranscriptJSON []byte, err error) {
 	return func(ctx context.Context, _ compact.RunPhase, transcriptJSON []byte) (string, []byte, error) {
 		if a == nil || a.Client == nil {
-			return "", nil, ErrNilAnthropicClient
+			return "", nil, anthropic.ErrNilAnthropicClient
 		}
 		auto := false
 		if m, ok := compact.ExecutorSuggestMetaFromContext(ctx); ok {
@@ -103,12 +105,11 @@ func StreamingCompactExecutorWithConfig(a *AnthropicAssistant, cfg StreamingComp
 	}
 }
 
-// StreamingPartialCompactExecutorWithConfig mirrors partialCompactConversation + StreamingCompactExecutorWithConfig:
-// summary stream uses GetPartialCompactPrompt; hooks and next-transcript behave like full compact.
-func StreamingPartialCompactExecutorWithConfig(a *AnthropicAssistant, pivot int, direction compact.PartialCompactDirection, cfg StreamingCompactExecutorConfig) func(context.Context, compact.RunPhase, []byte) (summary string, nextTranscriptJSON []byte, err error) {
+// StreamingPartialCompactExecutorWithConfig mirrors partialCompactConversation + StreamingCompactExecutorWithConfig.
+func StreamingPartialCompactExecutorWithConfig(a *anthropic.AnthropicAssistant, pivot int, direction compact.PartialCompactDirection, cfg StreamingCompactExecutorConfig) func(context.Context, compact.RunPhase, []byte) (summary string, nextTranscriptJSON []byte, err error) {
 	return func(ctx context.Context, _ compact.RunPhase, transcriptJSON []byte) (string, []byte, error) {
 		if a == nil || a.Client == nil {
-			return "", nil, ErrNilAnthropicClient
+			return "", nil, anthropic.ErrNilAnthropicClient
 		}
 		auto := false
 		if m, ok := compact.ExecutorSuggestMetaFromContext(ctx); ok {

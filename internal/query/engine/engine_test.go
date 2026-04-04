@@ -2203,7 +2203,7 @@ func (cacheBreakFireTurn) AssistantTurn(ctx context.Context, model string, maxTo
 	_ = model
 	_ = maxTokens
 	_ = msgs
-	if cb, ok := query.OnPromptCacheBreakFromContext(ctx); ok && cb != nil {
+	if cb, ok := anthropic.OnPromptCacheBreakFromContext(ctx); ok && cb != nil {
 		cb()
 	}
 	return query.TurnResult{Text: "ok"}, nil

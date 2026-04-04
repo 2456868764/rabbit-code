@@ -2,18 +2,18 @@ package anthropic
 
 // Beta header name strings aligned with constants/betas.ts (Phase 4 / P4.F.6).
 const (
-	BetaClaudeCode20250219     = "claude-code-20250219"
-	BetaInterleavedThinking    = "interleaved-thinking-2025-05-14"
-	BetaContext1M              = "context-1m-2025-08-07"
-	BetaContextManagement      = "context-management-2025-06-27"
-	BetaStructuredOutputs      = "structured-outputs-2025-12-15"
-	BetaWebSearch              = "web-search-2025-03-05"
-	BetaToolSearch1P           = "advanced-tool-use-2025-11-20"
-	BetaToolSearch3P           = "tool-search-tool-2025-10-19"
-	BetaEffort                 = "effort-2025-11-24"
-	BetaTaskBudgets            = "task-budgets-2026-03-13"
-	BetaPromptCachingScope = "prompt-caching-scope-2026-01-05"
-	// BetaCachedMicrocompactBody is JSON-body anthropic_beta when RABBIT_CODE_CACHED_MICROCOMPACT is on (query.AnthropicAssistant, P5.F.8).
+	BetaClaudeCode20250219  = "claude-code-20250219"
+	BetaInterleavedThinking = "interleaved-thinking-2025-05-14"
+	BetaContext1M           = "context-1m-2025-08-07"
+	BetaContextManagement   = "context-management-2025-06-27"
+	BetaStructuredOutputs   = "structured-outputs-2025-12-15"
+	BetaWebSearch           = "web-search-2025-03-05"
+	BetaToolSearch1P        = "advanced-tool-use-2025-11-20"
+	BetaToolSearch3P        = "tool-search-tool-2025-10-19"
+	BetaEffort              = "effort-2025-11-24"
+	BetaTaskBudgets         = "task-budgets-2026-03-13"
+	BetaPromptCachingScope  = "prompt-caching-scope-2026-01-05"
+	// BetaCachedMicrocompactBody is JSON-body anthropic_beta when RABBIT_CODE_CACHED_MICROCOMPACT is on (AnthropicAssistant, P5.F.8).
 	// Alias until cache-editing exposes a dedicated frozen name in parity docs (see microCompact.ts).
 	BetaCachedMicrocompactBody = BetaPromptCachingScope
 	BetaFastMode               = "fast-mode-2026-02-01"

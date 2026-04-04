@@ -5,7 +5,9 @@
 // several Go files group related parity to avoid a large sprawl of tiny sources):
 //
 //   - config.ts          → config.go (+ StopHooksUpstreamModule for stopHooks.ts notes)
-//   - deps.ts            → deps.go (same package; TurnAssistant / assistants / compact stream helpers live alongside loop)
+//   - deps.ts            → deps.go (same package; TurnAssistant / test adapters / StreamingCompactExecutor wiring live alongside loop)
+//   - (TS services/api)  → internal/services/api: AnthropicAssistant, stream compact summary, prompt-cache-break context, fork wiring
+//   - shared turn shapes → internal/types (ToolUseCall, TurnResult) to avoid query↔api import cycles
 //   - stopHooks.ts       → engine + config constant; hook slots / extract in engine
 //   - tokenBudget.ts     → token_budget.go (also utils/tokenBudget + microCompact estimate + H5 submit helpers)
 //
@@ -18,6 +20,7 @@
 //   - messages.go        — append user/assistant/tool messages
 //   - assistant_adapters.go — StreamAssistantFunc, Sequence* (tests; no standalone TS file)
 //   - bash_tool_runner.go — BashStubToolRunner, BashExecToolRunner
+//   - streaming_compact_executor.go — StreamingCompactExecutor* (stays in query: avoids compact↔api cycle)
 //   - transcript.go      — trim prefix, strip cache_control, user hints, template appendix
 //
 // Most loop/orchestration logic still corresponds to src/query.ts and src/QueryEngine.ts; see engine/doc.go.
