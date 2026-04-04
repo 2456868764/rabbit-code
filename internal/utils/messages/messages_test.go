@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -551,6 +552,59 @@ func TestNotebookFormatOutputTruncated(t *testing.T) {
 	if !strings.Contains(s, "lines truncated") {
 		t.Fatalf("got %q", s)
 	}
+}
+
+func TestNotebookFormatOutputTruncated_utf16Units(t *testing.T) {
+	t.Setenv("RABBIT_BASH_MAX_OUTPUT_LENGTH", "3")
+	// Exactly 3 UTF-16 code units: one BMP + one astral (pair) — differs from byte/rune counts.
+	s := notebookFormatOutputTruncated("e" + "\U0001F600")
+	if strings.Contains(s, "lines truncated") {
+		t.Fatalf("expected no truncation at 3 UTF-16 units, got %q", s)
+	}
+	t.Setenv("RABBIT_BASH_MAX_OUTPUT_LENGTH", "2")
+	s2 := notebookFormatOutputTruncated("e" + "\U0001F600")
+	if !strings.Contains(s2, "lines truncated") || strings.Contains(s2, "\U0001F600") {
+		t.Fatalf("expected truncate before astral rune, got %q", s2)
+	}
+}
+
+func TestOutputStyleDisplayName_pluginsJSON(t *testing.T) {
+	t.Setenv("RABBIT_OUTPUT_STYLE_NAMES_JSON", "")
+	t.Setenv("RABBIT_OUTPUT_STYLE_CONFIG_PATH", "")
+	t.Setenv("RABBIT_OUTPUT_STYLE_SCAN_DIRS", "")
+	t.Setenv("RABBIT_OUTPUT_STYLE_PLUGINS_PATH", "")
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "Alpha.md"), []byte("---\nname: Alpha\n---\nbody"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("RABBIT_OUTPUT_STYLE_PLUGINS_JSON", `[{"plugin":"myplug","dir":"`+dir+`"}]`)
+	if n := outputStyleDisplayName("myplug:Alpha"); n != "myplug:Alpha" {
+		t.Fatalf("got %q", n)
+	}
+	t.Setenv("RABBIT_OUTPUT_STYLE_PLUGINS_JSON", "")
+}
+
+func TestNormalizeAttachmentForAPI_output_style_settingsFallback(t *testing.T) {
+	t.Setenv("RABBIT_OUTPUT_STYLE_NAMES_JSON", "")
+	t.Setenv("RABBIT_OUTPUT_STYLE_CONFIG_PATH", "")
+	t.Setenv("RABBIT_OUTPUT_STYLE_SCAN_DIRS", "")
+	t.Setenv("RABBIT_OUTPUT_STYLE_PLUGINS_JSON", "")
+	t.Setenv("RABBIT_SETTINGS_OUTPUT_STYLE", "Explanatory")
+	msgs, err := NormalizeAttachmentForAPI(map[string]any{"type": "output_style", "style": ""})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) == 0 {
+		t.Fatal("expected reminder message")
+	}
+	var joined string
+	for _, m := range msgs {
+		joined += fmt.Sprintf("%v", m)
+	}
+	if !strings.Contains(joined, "Explanatory output style is active") {
+		t.Fatalf("missing Explanatory reminder: %s", joined)
+	}
+	t.Setenv("RABBIT_SETTINGS_OUTPUT_STYLE", "")
 }
 
 func TestOutputStyleDisplayName_scanDirs(t *testing.T) {

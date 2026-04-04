@@ -348,6 +348,11 @@ Read the team config to discover your teammates' names. Check the task list peri
 
 	case "output_style":
 		style, _ := attachment["style"].(string)
+		style = strings.TrimSpace(style)
+		if style == "" || style == "default" {
+			style = settingsFallbackOutputStyle()
+			style = strings.TrimSpace(style)
+		}
 		if style == "" || style == "default" {
 			return nil, nil
 		}
@@ -896,12 +901,13 @@ func notebookCellContentBlock(cellType, source, cellID, language string) map[str
 }
 
 func notebookTruncateApproxOutputText(s string) string {
-	if len(s) <= notebookCellOutputTruncateBytes {
+	maxU := notebookCellOutputTruncateBytes
+	if jsStringUTF16Len(s) <= maxU {
 		return s
 	}
-	tail := s[notebookCellOutputTruncateBytes:]
-	extraLines := strings.Count(tail, "\n") + 1
-	return s[:notebookCellOutputTruncateBytes] + fmt.Sprintf("\n\n... [%d lines truncated] ...", extraLines)
+	prefix, suffix := truncateJSStringToMaxUTF16(s, maxU)
+	extraLines := strings.Count(suffix, "\n") + 1
+	return prefix + fmt.Sprintf("\n\n... [%d lines truncated] ...", extraLines)
 }
 
 func notebookJupyterWhitespaceStrip(s string) string {
@@ -959,11 +965,11 @@ func notebookFormatOutputTruncated(content string) string {
 		return content
 	}
 	maxLen := bashMaxOutputLength()
-	if len(content) <= maxLen {
+	if jsStringUTF16Len(content) <= maxLen {
 		return content
 	}
-	truncatedPart := content[:maxLen]
-	remainingLines := strings.Count(content[maxLen:], "\n") + 1
+	truncatedPart, rest := truncateJSStringToMaxUTF16(content, maxLen)
+	remainingLines := strings.Count(rest, "\n") + 1
 	return fmt.Sprintf("%s\n\n... [%d lines truncated] ...", truncatedPart, remainingLines)
 }
 
@@ -1043,9 +1049,9 @@ func notebookCellToBlocks(m map[string]any, index int) []map[string]any {
 func notebookProcessedOutputsTooLarge(outputs []map[string]any) bool {
 	total := 0
 	for _, o := range outputs {
-		total += len(strField(o, "text"))
+		total += jsStringUTF16Len(strField(o, "text"))
 		if im, ok := o["image"].(map[string]any); ok {
-			total += len(strField(im, "image_data"))
+			total += jsStringUTF16Len(strField(im, "image_data"))
 		}
 		if total > notebookCellOutputTruncateBytes {
 			return true
@@ -1240,6 +1246,9 @@ func outputStyleDisplayName(style string) string {
 		return n
 	}
 	if n, ok := outputStyleNameFromScanDirs(style); ok {
+		return n
+	}
+	if n, ok := outputStyleNameFromPlugins(style); ok {
 		return n
 	}
 	if ExtraOutputStyleNames != nil {

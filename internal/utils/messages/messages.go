@@ -17,6 +17,8 @@
 // RABBIT_FEATURE_KAIROS (Brief alias), RABBIT_ANT_UNKNOWN_ATTACHMENT (log unknown attachment types like TS logAntError),
 // RABBIT_OUTPUT_STYLE_NAMES_JSON (inline style display map), RABBIT_OUTPUT_STYLE_CONFIG_PATH (JSON file like OUTPUT_STYLE_CONFIG),
 // RABBIT_OUTPUT_STYLE_SCAN_DIRS (path list of dirs with *.md styles, like .claude/output-styles),
+// RABBIT_OUTPUT_STYLE_PLUGINS_PATH / RABBIT_OUTPUT_STYLE_PLUGINS_JSON (JSON array of {plugin,dir} for recursive *.md, TS loadPluginOutputStyles),
+// RABBIT_SETTINGS_OUTPUT_STYLE / RABBIT_CLAUDE_SETTINGS_PATH (settings outputStyle fallback when attachment.style is empty/default),
 // RABBIT_BASH_MAX_OUTPUT_LENGTH (notebook text truncation / TS BASH_MAX_OUTPUT_LENGTH, default 30000 cap 150000),
 // RABBIT_TASK_OUTPUT_DIR (Bash background output path when transcript omits backgroundTaskOutputPath),
 // RABBIT_MCP_RESOURCE_DEBUG (log empty MCP resource render), etc.
