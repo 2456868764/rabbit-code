@@ -891,6 +891,97 @@ func notebookTruncateApproxOutputText(s string) string {
 	return s[:notebookCellOutputTruncateBytes] + fmt.Sprintf("\n\n... [%d lines truncated] ...", extraLines)
 }
 
+func notebookJupyterWhitespaceStrip(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r == ' ' || r == '\n' || r == '\r' || r == '\t' {
+			return -1
+		}
+		return r
+	}, s)
+}
+
+// notebookExtractImageFromJupyterData mirrors TS extractImage (display_data / execute_result).
+func notebookExtractImageFromJupyterData(data map[string]any) map[string]any {
+	if data == nil {
+		return nil
+	}
+	if s, ok := data["image/png"].(string); ok && strings.TrimSpace(s) != "" {
+		return map[string]any{
+			"image_data": notebookJupyterWhitespaceStrip(s),
+			"media_type": "image/png",
+		}
+	}
+	if s, ok := data["image/jpeg"].(string); ok && strings.TrimSpace(s) != "" {
+		return map[string]any{
+			"image_data": notebookJupyterWhitespaceStrip(s),
+			"media_type": "image/jpeg",
+		}
+	}
+	return nil
+}
+
+func notebookProcessOutputTextPlain(v any) string {
+	switch x := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return x
+	case []any:
+		var b strings.Builder
+		for _, it := range x {
+			if s, ok := it.(string); ok {
+				b.WriteString(s)
+			}
+		}
+		return b.String()
+	default:
+		return fmt.Sprint(x)
+	}
+}
+
+// notebookProcessRawOutput mirrors TS processOutput for raw Jupyter cell.outputs[].
+func notebookProcessRawOutput(om map[string]any) map[string]any {
+	ot, _ := om["output_type"].(string)
+	switch ot {
+	case "stream":
+		return map[string]any{
+			"output_type": ot,
+			"text":        notebookProcessOutputTextPlain(om["text"]),
+		}
+	case "execute_result", "display_data":
+		data, _ := om["data"].(map[string]any)
+		text := ""
+		if data != nil {
+			text = notebookProcessOutputTextPlain(data["text/plain"])
+		}
+		out := map[string]any{"output_type": ot, "text": text}
+		if img := notebookExtractImageFromJupyterData(data); img != nil {
+			out["image"] = img
+		}
+		return out
+	case "error":
+		ename, _ := om["ename"].(string)
+		evalue, _ := om["evalue"].(string)
+		var lines []string
+		if arr, ok := om["traceback"].([]any); ok {
+			for _, line := range arr {
+				if s, ok := line.(string); ok {
+					lines = append(lines, s)
+				}
+			}
+		}
+		raw := fmt.Sprintf("%s: %s\n%s", ename, evalue, strings.Join(lines, "\n"))
+		return map[string]any{"output_type": ot, "text": raw}
+	default:
+		return om
+	}
+}
+
+func notebookIsRawJupyterOutput(om map[string]any) bool {
+	_, ok := om["output_type"].(string)
+	return ok
+}
+
 func notebookOutputBlocks(om map[string]any) []map[string]any {
 	var blocks []map[string]any
 	if t := strField(om, "text"); t != "" {
@@ -938,6 +1029,9 @@ func notebookCellToBlocks(m map[string]any, index int) []map[string]any {
 			om, ok := o.(map[string]any)
 			if !ok {
 				continue
+			}
+			if notebookIsRawJupyterOutput(om) {
+				om = notebookProcessRawOutput(om)
 			}
 			out = append(out, notebookOutputBlocks(om)...)
 		}

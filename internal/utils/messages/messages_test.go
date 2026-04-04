@@ -753,6 +753,59 @@ func TestNormalizeLegacyToolName_featureKairos(t *testing.T) {
 	}
 }
 
+func TestNotebookCellToBlocks_rawJupyterDisplayData(t *testing.T) {
+	cell := map[string]any{
+		"cell_type": "code",
+		"source":    "plot()",
+		"outputs": []any{map[string]any{
+			"output_type": "display_data",
+			"data": map[string]any{
+				"text/plain": "chart",
+				"image/png":  "Zm9v\nb\n", // "foo" + "b" base64-ish, whitespace stripped
+			},
+		}},
+	}
+	blocks := notebookCellToBlocks(cell, 0)
+	var gotImg, gotPlain bool
+	for _, b := range blocks {
+		if mapStr(b, "type") == "image" {
+			src, _ := b["source"].(map[string]any)
+			if mapStr(src, "data") != "" {
+				gotImg = true
+			}
+		}
+		if mapStr(b, "type") == "text" {
+			if strings.Contains(mapStr(b, "text"), "chart") {
+				gotPlain = true
+			}
+		}
+	}
+	if !gotImg || !gotPlain {
+		t.Fatalf("gotImg=%v gotPlain=%v blocks=%d", gotImg, gotPlain, len(blocks))
+	}
+}
+
+func TestNotebookCellToBlocks_rawJupyterStream(t *testing.T) {
+	cell := map[string]any{
+		"cell_type": "code",
+		"source":    "print(1)",
+		"outputs": []any{map[string]any{
+			"output_type": "stream",
+			"text":        []any{"a", "b"},
+		}},
+	}
+	blocks := notebookCellToBlocks(cell, 0)
+	var joined bool
+	for _, b := range blocks {
+		if mapStr(b, "type") == "text" && strings.Contains(mapStr(b, "text"), "ab") {
+			joined = true
+		}
+	}
+	if !joined {
+		t.Fatal(blocks)
+	}
+}
+
 func TestNormalizeAttachmentForAPI_teammateMailbox_defaultFormat(t *testing.T) {
 	t.Setenv("RABBIT_AGENT_SWARMS", "1")
 	msgs, err := NormalizeAttachmentForAPI(map[string]any{
