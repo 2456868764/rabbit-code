@@ -150,7 +150,7 @@ Read the team config to discover your teammates' names. Check the task list peri
 		path, _ := attachment["path"].(string)
 		return WrapMessagesInSystemReminder([]TSMsg{
 			metaToolUseMessage(ToolNameBash, map[string]any{"command": fmt.Sprintf("ls %q", path), "description": fmt.Sprintf("Lists files in %s", path)}),
-			metaToolResultMessage(ToolNameBash, BashAttachmentToolResultContentString(attachment)),
+			BashToolResultMetaMessage(ToolNameBash, attachment),
 		}), nil
 
 	case "edited_text_file":

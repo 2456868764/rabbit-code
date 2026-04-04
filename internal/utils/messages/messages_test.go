@@ -608,15 +608,73 @@ func TestDefaultFormatTeammateMailboxMessagesForAPI(t *testing.T) {
 	}
 }
 
-func TestBashAttachmentToolResultContentString_isImageMarker(t *testing.T) {
+func TestBashAttachmentToolResultContentString_isImageInvalidFallsBackToText(t *testing.T) {
 	s := BashAttachmentToolResultContentString(map[string]any{
 		"bash": map[string]any{
 			"stdout":  "AAA",
 			"isImage": true,
 		},
 	})
+	if s != "AAA" {
+		t.Fatalf("TS falls through to text when data URI parse fails; got %q", s)
+	}
+}
+
+func TestBashAttachmentToolResultContentString_isImageDataURIPlaceholder(t *testing.T) {
+	uri := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+	s := BashAttachmentToolResultContentString(map[string]any{
+		"bash": map[string]any{"stdout": uri, "isImage": true},
+	})
 	if !strings.Contains(s, "Image output") {
 		t.Fatalf("got %q", s)
+	}
+}
+
+func TestBashToolResultMetaMessage_imageBlocks(t *testing.T) {
+	uri := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+	m := BashToolResultMetaMessage(ToolNameBash, map[string]any{
+		"bash": map[string]any{"stdout": uri, "isImage": true},
+	})
+	inner, _ := m["message"].(map[string]any)
+	arr, ok := inner["content"].([]any)
+	if !ok || len(arr) != 1 {
+		t.Fatalf("expected one content block, got %#v", inner["content"])
+	}
+	b0, _ := arr[0].(map[string]any)
+	if b0["type"] != "image" {
+		t.Fatalf("got %#v", b0)
+	}
+}
+
+func TestNormalizeAttachmentForAPI_directory_bashImageBlocks(t *testing.T) {
+	uri := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+	msgs, err := NormalizeAttachmentForAPI(map[string]any{
+		"type":    "directory",
+		"path":    "/tmp",
+		"content": uri,
+		"bash":    map[string]any{"isImage": true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) < 1 {
+		t.Fatal("no messages")
+	}
+	// Wrapped in system-reminder user messages; find image block in chain.
+	var found bool
+	for _, msg := range msgs {
+		inner, _ := msg["message"].(map[string]any)
+		if arr, ok := inner["content"].([]any); ok {
+			for _, it := range arr {
+				b, ok := it.(map[string]any)
+				if ok && b["type"] == "image" {
+					found = true
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("no image in %#v", msgs)
 	}
 }
 
