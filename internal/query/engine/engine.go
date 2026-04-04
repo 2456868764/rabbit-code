@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -34,7 +33,8 @@ type CompactExecutor func(ctx context.Context, phase compact.RunPhase, transcrip
 // If ok and replacement is non-empty, the engine emits compact suggest/result and skips the legacy auto executor for that wave.
 type SessionMemoryCompact func(ctx context.Context, agentID, model string, autoCompactThreshold int, transcriptJSON json.RawMessage) (replacement json.RawMessage, ok bool, err error)
 
-// PostCompactCleanup mirrors runPostCompactCleanup side effects (postCompactCleanup.ts); mainThreadCompact matches isMainThreadCompact.
+// PostCompactCleanup optional extra hook after compact (postCompactCleanup.ts); runs after compact.RunPostCompactCleanup when both are set.
+// mainThreadCompact matches isMainThreadCompact.
 type PostCompactCleanup func(ctx context.Context, querySource, agentID string, mainThreadCompact bool)
 
 // ContextCollapseDrain trims transcript on recoverable prompt_too_long when CONTEXT_COLLAPSE is on; committed feeds LoopContinue (H6).
@@ -131,6 +131,8 @@ type Config struct {
 	SessionMemoryCompact SessionMemoryCompact
 	// PostCompactCleanup optional hook after any successful compact executor / session-memory compact (H3).
 	PostCompactCleanup PostCompactCleanup
+	// PostCompactCleanupHooks optional TS-ordered steps (postCompactCleanup.ts); runs before PostCompactCleanup when both set.
+	PostCompactCleanupHooks *compact.PostCompactCleanupHooks
 	// MicrocompactEditBuffer optional; reset on successful compact and wired to AnthropicAssistant when possible (H4).
 	MicrocompactEditBuffer *compact.MicrocompactEditBuffer
 	// InitialAutocompactConsecutiveFailures seeds the autocompact circuit when restoring a session (autoCompact.ts tracking).
@@ -185,6 +187,7 @@ type Engine struct {
 	stopHooksAfterSuccessfulTurn     []StopHookAfterTurnFunc
 	sessionMemoryCompact             SessionMemoryCompact
 	postCompactCleanup               PostCompactCleanup
+	postCompactHooks                 *compact.PostCompactCleanupHooks
 	microcompactEditBuffer           *compact.MicrocompactEditBuffer
 	sessionLastAssistantAt           time.Time // wall clock of last model assistant (cross-Submit time-based MC)
 	cacheBreakSeen                   int32     // atomic: prompt-cache break callback ran this Submit
@@ -201,6 +204,16 @@ type Engine struct {
 	extractCtl             *memdir.ExtractController
 	initialSettings        map[string]interface{}
 	extractMemoriesSavedFn func(memoryPaths []string, teamMemoryCount int)
+
+	// Post-compact attachment state (compact.ts readFileState + plan + deltas); see post_compact_runtime.go.
+	postCompactMu           sync.Mutex
+	postCompactReads        map[string]postCompactReadEntry
+	postCompactPlanPath     string
+	postCompactPlanContent  string
+	postCompactPlanMode     bool
+	postCompactSkills       []compact.PostCompactSkillEntry
+	postCompactDeltaAttach  []json.RawMessage
+	postCompactWorkspaceDir string
 }
 
 // NewEngine is equivalent to New(parent, nil) (stub assistant).
@@ -222,6 +235,7 @@ func New(parent context.Context, cfg *Config) *Engine {
 		memdirSurfaced:      make(map[string]struct{}),
 		memdirRelevanceMode: memdir.RelevanceModeHeuristic,
 		extractCtl:          &memdir.ExtractController{},
+		postCompactReads:    make(map[string]postCompactReadEntry),
 	}
 	if cfg != nil {
 		deps := cfg.Deps
@@ -293,7 +307,23 @@ func New(parent context.Context, cfg *Config) *Engine {
 		e.querySource = strings.TrimSpace(cfg.QuerySource)
 		e.stopHooksAfterSuccessfulTurn = append([]StopHookAfterTurnFunc(nil), cfg.StopHooksAfterSuccessfulTurn...)
 		e.sessionMemoryCompact = cfg.SessionMemoryCompact
+		if e.sessionMemoryCompact == nil && features.SessionMemoryCompactionEnabled() {
+			if md := resolveEngineMemdirMemoryDir(cfg); md != "" {
+				hooks := memdir.SessionMemoryCompactHooksForMemoryDir(md)
+				if hooks.GetSessionMemoryContent != nil {
+					fn := compact.NewSessionMemoryCompactExecutor(hooks)
+					e.sessionMemoryCompact = func(ctx context.Context, agentID, model string, th int, transcript json.RawMessage) (json.RawMessage, bool, error) {
+						rep, ok, err := fn(ctx, agentID, model, th, transcript)
+						if len(rep) == 0 {
+							return nil, ok, err
+						}
+						return json.RawMessage(rep), ok, err
+					}
+				}
+			}
+		}
 		e.postCompactCleanup = cfg.PostCompactCleanup
+		e.postCompactHooks = cfg.PostCompactCleanupHooks
 		e.microcompactEditBuffer = cfg.MicrocompactEditBuffer
 		if aa, ok := e.deps.Assistant.(*querydeps.AnthropicAssistant); ok && cfg.MicrocompactEditBuffer != nil {
 			aa.MicrocompactBuffer = cfg.MicrocompactEditBuffer
@@ -538,13 +568,14 @@ func (e *Engine) loopObservers() *query.LoopObservers {
 				ToolInputJSON: string(input),
 			})
 		},
-		OnToolDone: func(name, id string, result []byte) {
+		OnToolDone: func(name, id string, inputJSON, result []byte) {
 			e.trySend(EngineEvent{
 				Kind:           EventKindToolCallDone,
 				ToolName:       name,
 				ToolUseID:      id,
 				ToolResultJSON: string(result),
 			})
+			e.recordPostCompactReadTool(name, inputJSON, result)
 		},
 		OnToolError: func(name, id string, err error) {
 			e.trySend(EngineEvent{
@@ -877,7 +908,11 @@ func (e *Engine) runTurnLoop(userText string) {
 		})
 		if e.compactExecutor != nil {
 			execPh := compact.ExecutorPhaseAfterSchedule(ph)
-			sum, _, exErr := e.compactExecutor(e.ctx, execPh, msgs)
+			ctxCompact := compact.ContextWithExecutorSuggestMeta(e.ctx, compact.ExecutorSuggestMeta{
+				AutoCompact:     false,
+				ReactiveCompact: true,
+			})
+			sum, _, exErr := e.compactExecutor(ctxCompact, execPh, msgs)
 			resPh := compact.ResultPhaseAfterCompactExecutor(execPh, exErr)
 			e.trySend(EngineEvent{
 				Kind:           EventKindCompactResult,
@@ -902,86 +937,7 @@ func (e *Engine) runTurnLoop(userText string) {
 		}
 	}
 
-	auto, react := false, false
-	if e.compactAdvisor != nil {
-		auto, react = e.compactAdvisor(*st, msgs)
-	}
-	cw := e.contextWindowTokens
-	if cw <= 0 {
-		cw = features.ContextWindowTokensForModel(e.model)
-	}
-	cw = features.ApplyAutoCompactWindowCap(cw)
-	if !e.autoCompactCircuitTripped() &&
-		compact.ProactiveAutoCompactSuggestedWithSource(msgs, e.model, e.maxTokens, cw, 0, st.ToolUseContext.QuerySource) {
-		auto = true
-	}
-	if query.TranscriptReactiveCompactSuggested(st, msgs, features.ReactiveCompactMinTranscriptBytes(), features.ReactiveCompactMinEstimatedTokens()) {
-		react = true
-	}
-
-	if auto && e.sessionMemoryCompact != nil {
-		th := compact.AutoCompactThresholdForProactive(e.model, e.maxTokens, cw)
-		if th > 0 {
-			next, ok, smErr := e.sessionMemoryCompact(e.ctx, st.ToolUseContext.AgentID, e.model, th, msgs)
-			switch {
-			case smErr != nil:
-				// Legacy auto path may still run.
-			case ok && len(bytes.TrimSpace(next)) > 0:
-				msgs = json.RawMessage(append([]byte(nil), next...))
-				st.SetMessagesJSON(msgs)
-				ph := compact.RunIdle.Next(true, false)
-				execPh := compact.ExecutorPhaseAfterSchedule(ph)
-				e.trySend(EngineEvent{
-					Kind:               EventKindCompactSuggest,
-					CompactPhase:       ph.String(),
-					SuggestAutoCompact: true,
-				})
-				resPh := compact.ResultPhaseAfterCompactExecutor(execPh, nil)
-				e.noteAutoCompactExecutorOutcome(st, true, nil)
-				e.trySend(EngineEvent{
-					Kind:           EventKindCompactResult,
-					CompactPhase:   resPh.String(),
-					CompactSummary: "session_memory_compact",
-					Err:            nil,
-				})
-				query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonAutoCompactExecuted})
-				auto = false
-				react = query.TranscriptReactiveCompactSuggested(st, msgs, features.ReactiveCompactMinTranscriptBytes(), features.ReactiveCompactMinEstimatedTokens())
-				e.afterCompactSuccess(st)
-			}
-		}
-	}
-
-	if auto || react {
-		phase := compact.RunIdle.Next(auto, react)
-		e.trySend(EngineEvent{
-			Kind:                   EventKindCompactSuggest,
-			CompactPhase:           phase.String(),
-			SuggestAutoCompact:     auto,
-			SuggestReactiveCompact: react,
-		})
-		if e.compactExecutor != nil {
-			execPh := compact.ExecutorPhaseAfterSchedule(phase)
-			sum, _, exErr := e.compactExecutor(e.ctx, execPh, msgs)
-			resPh := compact.ResultPhaseAfterCompactExecutor(execPh, exErr)
-			e.noteAutoCompactExecutorOutcome(st, auto, exErr)
-			e.trySend(EngineEvent{
-				Kind:           EventKindCompactResult,
-				CompactPhase:   resPh.String(),
-				CompactSummary: sum,
-				Err:            exErr,
-			})
-			if exErr == nil {
-				if react {
-					query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonReactiveCompactRetry})
-					st.HasAttemptedReactiveCompact = true
-				} else if auto {
-					query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonAutoCompactExecuted})
-				}
-				e.afterCompactSuccess(st)
-			}
-		}
-	}
+	msgs = e.runCompactSuggestAfterSuccessfulTurn(st, msgs)
 
 	e.persistSessionLastAssistantAt(st)
 	e.trySend(EngineEvent{Kind: EventKindDone, LoopTurnCount: st.TurnCount})
@@ -1004,10 +960,11 @@ func (e *Engine) persistSessionLastAssistantAt(st *query.LoopState) {
 }
 
 func (e *Engine) afterCompactSuccess(st *query.LoopState) {
-	compact.ResetMicrocompactStateIfAny(e.microcompactEditBuffer)
+	src := e.effectiveQuerySource(st)
+	main := compact.IsMainThreadPostCompactSource(src)
+	compact.RunPostCompactCleanup(e.ctx, src, e.microcompactEditBuffer, e.postCompactHooks)
 	if e.postCompactCleanup != nil {
-		src := e.effectiveQuerySource(st)
-		e.postCompactCleanup(e.ctx, src, e.agentID, compact.IsMainThreadPostCompactSource(src))
+		e.postCompactCleanup(e.ctx, src, e.agentID, main)
 	}
 }
 

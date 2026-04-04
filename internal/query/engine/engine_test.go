@@ -185,6 +185,64 @@ func TestEngine_SessionMemoryCompact_skipsLegacyAutoExecutor(t *testing.T) {
 	}
 }
 
+func TestNew_defaultSessionMemoryCompactFromMemdir(t *testing.T) {
+	ctx := context.Background()
+	t.Setenv(features.EnvSessionMemoryFeature, "1")
+	t.Setenv(features.EnvSessionMemoryCompactFeature, "1")
+	t.Setenv(features.EnvDisableClaudeCodeSMCompact, "")
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "MEMORY.md"), []byte("# M\n\nbody"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e := New(ctx, &Config{
+		MemdirMemoryDir: dir,
+		InitialSettings: map[string]interface{}{"autoMemoryEnabled": true},
+	})
+	if e.sessionMemoryCompact == nil {
+		t.Fatal("expected default SessionMemoryCompact from MEMORY.md")
+	}
+}
+
+func TestNew_sessionMemoryCompactExplicitOverridesDefault(t *testing.T) {
+	ctx := context.Background()
+	t.Setenv(features.EnvSessionMemoryFeature, "1")
+	t.Setenv(features.EnvSessionMemoryCompactFeature, "1")
+	var called bool
+	explicit := func(context.Context, string, string, int, json.RawMessage) (json.RawMessage, bool, error) {
+		called = true
+		return nil, false, nil
+	}
+	dir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(dir, "MEMORY.md"), []byte("x"), 0o600)
+	e := New(ctx, &Config{
+		MemdirMemoryDir:      dir,
+		InitialSettings:      map[string]interface{}{"autoMemoryEnabled": true},
+		SessionMemoryCompact: explicit,
+	})
+	_, _, _ = e.sessionMemoryCompact(context.Background(), "", "", 0, json.RawMessage(`[]`))
+	if !called {
+		t.Fatal("explicit SessionMemoryCompact should be kept")
+	}
+}
+
+func TestRunCompactSuggestAfterSuccessfulTurn_respectsDisableCompact(t *testing.T) {
+	t.Setenv(features.EnvDisableCompact, "1")
+	t.Setenv(features.EnvSessionMemoryFeature, "")
+	t.Setenv(features.EnvSessionMemoryCompactFeature, "")
+	var advisorCalls int
+	e := New(context.Background(), &Config{
+		CompactAdvisor: func(query.LoopState, []byte) (bool, bool) {
+			advisorCalls++
+			return true, true
+		},
+	})
+	st := &query.LoopState{}
+	_ = e.runCompactSuggestAfterSuccessfulTurn(st, json.RawMessage(`[]`))
+	if advisorCalls != 0 {
+		t.Fatalf("advisor should not run when DISABLE_COMPACT: calls=%d", advisorCalls)
+	}
+}
+
 func drainEngineUntilDone(t *testing.T, ch <-chan EngineEvent) {
 	t.Helper()
 	deadline := time.After(8 * time.Second)

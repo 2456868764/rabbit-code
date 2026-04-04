@@ -85,6 +85,7 @@ type vertexStreamJSONBody struct {
 	Stream            bool            `json:"stream"`
 	Messages          json.RawMessage `json:"messages"`
 	System            json.RawMessage `json:"system,omitempty"`
+	Tools             json.RawMessage `json:"tools,omitempty"`
 	OutputConfig      *OutputConfig   `json:"output_config,omitempty"`
 	AnthropicBeta     []string        `json:"anthropic_beta,omitempty"`
 	ContextManagement json.RawMessage `json:"context_management,omitempty"`
@@ -107,14 +108,16 @@ func (c *Client) marshalMessagesStreamJSON(body MessagesStreamBody) ([]byte, err
 	body.Stream = true
 	if c.Provider == ProviderVertex && envVertexProjectID() != "" {
 		vb := vertexStreamJSONBody{
-			MaxTokens:        body.MaxTokens,
-			Stream:           true,
-			Messages:         body.Messages,
-			System:           body.System,
-			OutputConfig:     body.OutputConfig,
-			AnthropicBeta:    append([]string(nil), body.AnthropicBeta...),
-			AnthropicVersion: VertexDefaultAnthropicVersion,
-			AntiDistillation: append([]string(nil), body.AntiDistillation...),
+			MaxTokens:         body.MaxTokens,
+			Stream:            true,
+			Messages:          body.Messages,
+			System:            body.System,
+			Tools:             append(json.RawMessage(nil), body.Tools...),
+			OutputConfig:      body.OutputConfig,
+			AnthropicBeta:     append([]string(nil), body.AnthropicBeta...),
+			ContextManagement: append(json.RawMessage(nil), body.ContextManagement...),
+			AnthropicVersion:  VertexDefaultAnthropicVersion,
+			AntiDistillation:  append([]string(nil), body.AntiDistillation...),
 		}
 		return json.Marshal(vb)
 	}
@@ -147,6 +150,25 @@ func (c *Client) effectiveTransport() http.RoundTripper {
 	return c.cachedWrapRT
 }
 
+// mergeBodyAnthropicBetasIntoHeader appends JSON body anthropic_beta entries to the HTTP anthropic-beta header
+// (claude.ts parity). On Bedrock, betas in BedrockExtraParamsBetas stay body-only and are not duplicated in the header.
+func mergeBodyAnthropicBetasIntoHeader(header string, bodyBetas []string, p Provider) string {
+	out := header
+	for _, b := range bodyBetas {
+		b = strings.TrimSpace(b)
+		if b == "" {
+			continue
+		}
+		if p == ProviderBedrock {
+			if _, bodyOnly := BedrockExtraParamsBetas[b]; bodyOnly {
+				continue
+			}
+		}
+		out = MergeBetaHeaderAppend(out, b)
+	}
+	return out
+}
+
 // MessagesStreamBody is the JSON body for POST .../messages with stream:true (subset).
 type MessagesStreamBody struct {
 	Model     string          `json:"model"`
@@ -163,6 +185,8 @@ type MessagesStreamBody struct {
 	AntiDistillation []string `json:"anti_distillation,omitempty"`
 	// ContextManagement is sent when getAPIContextManagement returns edits and the context-management beta is active (apiMicrocompact.ts / claude.ts).
 	ContextManagement json.RawMessage `json:"context_management,omitempty"`
+	// Tools is optional tool definitions (compact.ts streamCompactSummary Read / ToolSearch path).
+	Tools json.RawMessage `json:"tools,omitempty"`
 }
 
 // PostMessagesStream starts a streaming request. Caller must close resp.Body.
@@ -194,6 +218,7 @@ func (c *Client) PostMessagesStream(ctx context.Context, body MessagesStreamBody
 	for _, extra := range features.OAuthBetaAppendNames() {
 		betaVal = MergeBetaHeaderAppend(betaVal, extra)
 	}
+	betaVal = mergeBodyAnthropicBetasIntoHeader(betaVal, body.AnthropicBeta, c.Provider)
 	if betaVal != "" {
 		req.Header.Set("anthropic-beta", betaVal)
 	}

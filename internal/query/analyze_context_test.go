@@ -72,6 +72,21 @@ func TestBuildHeadlessContextReport_sessionMemoryBlocked(t *testing.T) {
 	}
 }
 
+func TestBuildHeadlessContextReport_contextCollapseInactiveUnblocksProactive(t *testing.T) {
+	blob := []byte(strings.Repeat("a", 10_000))
+	t.Setenv(features.EnvContextWindowTokens, "50000")
+	t.Setenv(features.EnvDisableCompact, "")
+	t.Setenv(features.EnvDisableAutoCompact, "")
+	t.Setenv(features.EnvAutoCompact, "")
+	t.Setenv(features.EnvSuppressProactiveAutoCompact, "")
+	t.Setenv(features.EnvContextCollapse, "1")
+	t.Setenv(features.EnvContextCollapseInactive, "1")
+	r := BuildHeadlessContextReport(blob, "m", 1024, 0, 0, "")
+	if r.ProactiveAutoCompactBlocked {
+		t.Fatal("expected proactive not blocked when CONTEXT_COLLAPSE_INACTIVE=1")
+	}
+}
+
 func TestProactiveAutoCompactAllowedForQuerySource(t *testing.T) {
 	if !ProactiveAutoCompactAllowedForQuerySource("") {
 		t.Fatal("main loop empty source should allow")

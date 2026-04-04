@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/2456868764/rabbit-code/internal/features"
@@ -342,6 +343,157 @@ func TestAnthropicAssistant_MicrocompactBuffer_markAfterStreamSuccess(t *testing
 	}
 	if !buf.marked {
 		t.Fatal("expected MarkToolsSentToAPIState after successful stream when CACHED_MICROCOMPACT is on")
+	}
+}
+
+func TestAnthropicAssistant_StreamCompactSummary_success(t *testing.T) {
+	t.Setenv(features.EnvUseBedrock, "")
+	t.Setenv(features.EnvUseVertex, "")
+	t.Setenv(features.EnvUseFoundry, "")
+
+	var gotTools, gotSys string
+	var gotMsgs []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			System   json.RawMessage `json:"system"`
+			Messages json.RawMessage `json:"messages"`
+			Tools    json.RawMessage `json:"tools"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		gotTools = string(body.Tools)
+		_ = json.Unmarshal(body.System, &gotSys)
+		gotMsgs = append([]byte(nil), body.Messages...)
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"<summary>done</summary>\"}}\n\n")
+		_, _ = io.WriteString(w, "data: {\"type\":\"message_stop\"}\n\n")
+	}))
+	defer srv.Close()
+
+	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl.BaseURL = srv.URL
+	cl.Provider = anthropic.ProviderAnthropic
+
+	var buf testMicrocompactMarker
+	a := &AnthropicAssistant{
+		Client:             cl,
+		DefaultModel:       "m",
+		DefaultMaxTokens:   8,
+		Policy:             anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		MicrocompactBuffer: &buf,
+	}
+	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
+	out, err := a.StreamCompactSummary(context.Background(), msgs, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(gotTools, "Read") {
+		t.Fatalf("expected compact tools Read, got %q", gotTools)
+	}
+	if !strings.Contains(gotSys, "summarizing conversations") {
+		t.Fatalf("system: %q", gotSys)
+	}
+	if !strings.Contains(string(gotMsgs), "CRITICAL: Respond with TEXT ONLY") {
+		t.Fatalf("messages: %s", gotMsgs)
+	}
+	if !strings.Contains(out, "done") {
+		t.Fatalf("got %q", out)
+	}
+	if buf.marked {
+		t.Fatal("compact summary stream should not mark microcompact buffer")
+	}
+}
+
+func TestAnthropicAssistant_StreamCompactSummary_forkPath(t *testing.T) {
+	t.Setenv(features.EnvUseBedrock, "")
+	t.Setenv(features.EnvUseVertex, "")
+	t.Setenv(features.EnvUseFoundry, "")
+	t.Setenv(features.EnvCompactCachePrefix, "1")
+
+	var forked bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("streaming should not be called when fork succeeds")
+	}))
+	defer srv.Close()
+
+	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl.BaseURL = srv.URL
+	cl.Provider = anthropic.ProviderAnthropic
+
+	a := &AnthropicAssistant{
+		Client:           cl,
+		DefaultModel:     "m",
+		DefaultMaxTokens: 256,
+		Policy:           anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		ForkCompactSummary: func(ctx context.Context, summaryUserJSON []byte, transcriptJSON []byte) (string, error) {
+			forked = true
+			return "<summary>forked</summary>", nil
+		},
+	}
+	out, err := a.StreamCompactSummary(context.Background(), []byte(`[{"role":"user","content":[{"type":"text","text":"a"}]}]`), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !forked {
+		t.Fatal("expected fork")
+	}
+	if !strings.Contains(out, "forked") {
+		t.Fatalf("%q", out)
+	}
+}
+
+func TestAnthropicAssistant_StreamCompactSummary_PTLRetryThenOK(t *testing.T) {
+	t.Setenv(features.EnvUseBedrock, "")
+	t.Setenv(features.EnvUseVertex, "")
+	t.Setenv(features.EnvUseFoundry, "")
+
+	var calls int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		text := "<summary>second</summary>"
+		if calls == 1 {
+			text = "Prompt is too long: 100 tokens > 50 maximum"
+		}
+		_, _ = io.WriteString(w, "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\""+strings.ReplaceAll(text, `"`, `\"`)+"\"}}\n\n")
+		_, _ = io.WriteString(w, "data: {\"type\":\"message_stop\"}\n\n")
+	}))
+	defer srv.Close()
+
+	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl.BaseURL = srv.URL
+	cl.Provider = anthropic.ProviderAnthropic
+
+	a := &AnthropicAssistant{
+		Client:           cl,
+		DefaultModel:     "m",
+		DefaultMaxTokens: 8192,
+		Policy:           anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+	}
+	msgs := []byte(`[
+		{"role":"user","content":[{"type":"text","text":"u1"}]},
+		{"role":"assistant","id":"r1","content":[{"type":"text","text":"a1"}]},
+		{"role":"user","content":[{"type":"text","text":"u2"}]},
+		{"role":"assistant","id":"r2","content":[{"type":"text","text":"a2"}]}
+	]`)
+	out, err := a.StreamCompactSummary(context.Background(), msgs, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("want 2 API calls after PTL retry, got %d", calls)
+	}
+	if !strings.Contains(out, "second") {
+		t.Fatalf("got %q", out)
+	}
+}
+
+func TestStreamingCompactExecutor_nilClient(t *testing.T) {
+	ex := StreamingCompactExecutor(nil, "")
+	_, _, err := ex(context.Background(), compact.RunExecuting, []byte(`[]`))
+	if err != ErrNilAnthropicClient {
+		t.Fatalf("got %v", err)
 	}
 }
 

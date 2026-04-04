@@ -22,3 +22,39 @@ func TestFormatCompactSummary_noTags(t *testing.T) {
 		t.Fatalf("%q", g)
 	}
 }
+
+func TestGetCompactPrompt_structure(t *testing.T) {
+	p := GetCompactPrompt("")
+	if !strings.HasPrefix(p, "CRITICAL: Respond with TEXT ONLY") {
+		t.Fatal("preamble")
+	}
+	if !strings.Contains(p, "Primary Request and Intent") || !strings.Contains(p, "REMINDER: Do NOT call any tools") {
+		t.Fatal("body/trailer")
+	}
+	p2 := GetCompactPrompt("focus on tests")
+	if !strings.Contains(p2, "Additional Instructions:\nfocus on tests") {
+		t.Fatal(p2)
+	}
+}
+
+func TestGetPartialCompactPrompt_direction(t *testing.T) {
+	from := GetPartialCompactPrompt("", PartialCompactFrom)
+	if !strings.Contains(from, "RECENT portion of the conversation") {
+		t.Fatal(from)
+	}
+	up := GetPartialCompactPrompt("", PartialCompactUpTo)
+	if !strings.Contains(up, "Context for Continuing Work") || strings.Contains(up, "RECENT portion") {
+		t.Fatalf("up_to template: %s", up)
+	}
+}
+
+func TestGetCompactUserSummaryMessage_paths(t *testing.T) {
+	s := GetCompactUserSummaryMessage("<summary>x</summary>", false, "/t.json", true)
+	if !strings.Contains(s, "Summary:\nx") || !strings.Contains(s, "/t.json") || !strings.Contains(s, "Recent messages are preserved") {
+		t.Fatal(s)
+	}
+	s2 := GetCompactUserSummaryMessage("hi", true, "", false)
+	if !strings.Contains(s2, "Continue the conversation from where it left off") {
+		t.Fatal(s2)
+	}
+}

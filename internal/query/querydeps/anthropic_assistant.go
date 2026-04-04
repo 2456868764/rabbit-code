@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/services/api"
@@ -24,6 +25,16 @@ type AnthropicAssistant struct {
 	SystemPrompt string
 	// APIContextManagementOpts optional; when nil, GetAPIContextManagement uses zero options (thinking off unless set here).
 	APIContextManagementOpts *compact.APIContextManagementOptions
+	// ForkCompactSummary optional runForkedAgent / cache-sharing analogue: same inputs as compact.ts fork path; return raw assistant text or error to fall back to streaming.
+	ForkCompactSummary func(ctx context.Context, summaryUserJSON []byte, transcriptJSON []byte) (assistantText string, err error)
+	// CompactToolsJSON optional Messages API tools for StreamCompactSummary; nil uses compact.DefaultCompactStreamingToolsJSON(features.CompactStreamingToolSearchEnabled()).
+	CompactToolsJSON json.RawMessage
+	// CompactStreamExtraBetas optional betas appended to compact stream body (e.g. tool-search beta when host enables deferred tools).
+	CompactStreamExtraBetas []string
+	// SessionActivityPing optional; with RemoteSendKeepalivesEnabled, called on CompactKeepAliveInterval during StreamCompactSummaryDetailed (compact.ts streamCompactSummary + sessionActivity).
+	SessionActivityPing func(ctx context.Context)
+	// CompactKeepAliveInterval defaults to 30s when <= 0.
+	CompactKeepAliveInterval time.Duration
 }
 
 func (a *AnthropicAssistant) readOpts(ctx context.Context) []anthropic.ReadAssistantOption {

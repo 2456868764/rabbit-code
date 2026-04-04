@@ -438,6 +438,41 @@ func TestBashExecEnabled(t *testing.T) {
 	}
 }
 
+func TestCompactStreamingEnvGates(t *testing.T) {
+	t.Setenv(EnvCompactStreamingRetry, "")
+	if CompactStreamingRetryEnabled() {
+		t.Fatal("default off")
+	}
+	t.Setenv(EnvCompactStreamingRetry, "1")
+	if !CompactStreamingRetryEnabled() {
+		t.Fatal()
+	}
+	t.Setenv(EnvCompactCachePrefix, "")
+	if !CompactCachePrefixEnabled() {
+		t.Fatal("default on when unset")
+	}
+	t.Setenv(EnvCompactCachePrefix, "0")
+	if CompactCachePrefixEnabled() {
+		t.Fatal("explicit off")
+	}
+	t.Setenv(EnvCompactToolSearch, "1")
+	if !CompactStreamingToolSearchEnabled() {
+		t.Fatal()
+	}
+}
+
+func TestRemoteSendKeepalivesEnabled(t *testing.T) {
+	t.Setenv(EnvRemoteSendKeepalives, "")
+	t.Setenv(EnvRemoteSendKeepalivesRabbit, "")
+	if RemoteSendKeepalivesEnabled() {
+		t.Fatal("default off")
+	}
+	t.Setenv(EnvRemoteSendKeepalivesRabbit, "true")
+	if !RemoteSendKeepalivesEnabled() {
+		t.Fatal("rabbit alias")
+	}
+}
+
 func TestSnipCompactEnabled(t *testing.T) {
 	t.Setenv(EnvSnipCompact, "true")
 	if !SnipCompactEnabled() {

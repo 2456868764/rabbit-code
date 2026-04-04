@@ -256,7 +256,8 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 			if s := strings.TrimSpace(st.ToolUseContext.QuerySource); s != "" {
 				qs = s
 			}
-			out, _, mcChanged, mcErr := compact.RunMaybeTimeBasedMicrocompactAPIJSON(msgs, qs, time.Now(), st.LastAssistantAt, d.MicrocompactEditBuffer)
+			model, _ := d.modelAndMax()
+			out, _, mcChanged, _, mcErr := compact.MicrocompactMessagesAPIJSON(msgs, qs, time.Now(), st.LastAssistantAt, model, d.MicrocompactEditBuffer)
 			if mcErr != nil {
 				st.SetMessagesJSON(msgs)
 				return msgs, lastAssistantText, mcErr
@@ -317,7 +318,11 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 				return msgs, lastAssistantText, err
 			}
 			if o := d.Observe; o != nil && o.OnToolDone != nil {
-				o.OnToolDone(u.Name, u.ID, out)
+				in := u.Input
+				if len(in) == 0 {
+					in = []byte("{}")
+				}
+				o.OnToolDone(u.Name, u.ID, in, out)
 			}
 			results = append(results, ToolResultBlock{ToolUseID: u.ID, Content: string(out)})
 		}
@@ -340,7 +345,7 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 type LoopObservers struct {
 	OnAssistantText            func(text string)
 	OnToolStart                func(name, toolUseID string, input []byte)
-	OnToolDone                 func(name, toolUseID string, result []byte)
+	OnToolDone                 func(name, toolUseID string, inputJSON, result []byte)
 	OnToolError                func(name, toolUseID string, err error)
 	OnHistorySnip              func(bytesBefore, bytesAfter, rounds int, snipID string)
 	OnSnipCompact              func(bytesBefore, bytesAfter, rounds int, snipID string)

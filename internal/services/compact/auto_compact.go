@@ -2,6 +2,7 @@ package compact
 
 import (
 	"encoding/json"
+	"math"
 	"strings"
 
 	"github.com/2456868764/rabbit-code/internal/features"
@@ -94,10 +95,8 @@ func CalculateTokenWarningState(
 	if thresholdForPercent <= 0 {
 		return st
 	}
-	st.PercentLeft = (thresholdForPercent - tokenUsage) * 100 / thresholdForPercent
-	if st.PercentLeft < 0 {
-		st.PercentLeft = 0
-	}
+	// Match autoCompact.ts: Math.max(0, Math.round(((threshold - tokenUsage) / threshold) * 100))
+	st.PercentLeft = int(math.Max(0, math.Round(float64(thresholdForPercent-tokenUsage)/float64(thresholdForPercent)*100)))
 	warningTh := thresholdForPercent - WarningThresholdBufferTokens
 	errorTh := thresholdForPercent - ErrorThresholdBufferTokens
 	st.IsAboveWarningThreshold = tokenUsage >= warningTh
@@ -216,19 +215,52 @@ func ProactiveAutoCompactPreflight(querySource string) bool {
 }
 
 // ProactiveAutoCompactSuggested mirrors shouldAutoCompact for the main loop (empty querySource).
+// Token count uses the raw JSON byte heuristic only; for Messages-array parity with tokenCountWithEstimation, use
+// ProactiveAutocompactFromUsage with query.EstimateMessageTokensFromTranscriptJSON (engine path).
 func ProactiveAutoCompactSuggested(transcriptJSON []byte, model string, maxOutputTokens int, contextWindowTokens int, snipTokensFreed int) bool {
 	return ProactiveAutoCompactSuggestedWithSource(transcriptJSON, model, maxOutputTokens, contextWindowTokens, snipTokensFreed, "")
 }
 
-// ProactiveAutoCompactSuggestedWithSource mirrors shouldAutoCompact including querySource fork gates (autoCompact.ts).
-func ProactiveAutoCompactSuggestedWithSource(transcriptJSON []byte, model string, maxOutputTokens int, contextWindowTokens int, snipTokensFreed int, querySource string) bool {
+// AfterTurnProactiveAutocompactFromUsage is the proactive usage gate for post-turn scheduling (autoCompact.ts):
+// same as ProactiveAutocompactFromUsage but suppresses proactive autocompact when the session circuit has tripped.
+func AfterTurnProactiveAutocompactFromUsage(tokenUsage int, model string, maxOutputTokens, contextWindowTokens int, querySource string, circuitTripped bool) bool {
+	if circuitTripped {
+		return false
+	}
+	return ProactiveAutocompactFromUsage(tokenUsage, model, maxOutputTokens, contextWindowTokens, querySource)
+}
+
+// AfterTurnReactiveCompactSuggested mirrors transcript-driven reactive compact after a successful turn without importing query.
+// Caller passes whether this wave already attempted reactive compact (LoopState.HasAttemptedReactiveCompact).
+func AfterTurnReactiveCompactSuggested(transcriptJSON []byte, minBytes, minTokens int, hasAttemptedReactive bool) bool {
+	if hasAttemptedReactive {
+		return false
+	}
+	if features.DisableCompact() {
+		return false
+	}
+	if minBytes > 0 && len(transcriptJSON) >= minBytes {
+		return true
+	}
+	if minTokens > 0 {
+		tok := estimateTranscriptJSONTokens(transcriptJSON)
+		if tok >= minTokens {
+			return true
+		}
+	}
+	return false
+}
+
+// ProactiveAutocompactFromUsage is the threshold half of shouldAutoCompact after preflight (autoCompact.ts): tokenUsage
+// should already subtract snipTokensFreed. Callers typically derive usage from structured Messages JSON when valid.
+func ProactiveAutocompactFromUsage(tokenUsage int, model string, maxOutputTokens, contextWindowTokens int, querySource string) bool {
 	if !ProactiveAutoCompactPreflight(querySource) {
 		return false
 	}
 	if !features.IsAutoCompactEnabled() {
 		return false
 	}
-	if features.ContextCollapseEnabled() {
+	if features.ContextCollapseSuppressesProactiveAutocompact() {
 		return false
 	}
 	if features.SuppressProactiveAutoCompact() {
@@ -244,11 +276,22 @@ func ProactiveAutoCompactSuggestedWithSource(transcriptJSON []byte, model string
 	if threshold <= 0 {
 		return false
 	}
+	tok := tokenUsage
+	if tok < 0 {
+		tok = 0
+	}
+	// autoCompact.ts: isAboveAutoCompactThreshold = isAutoCompactEnabled() && tokenUsage >= autoCompactThreshold
+	return tok >= threshold
+}
+
+// ProactiveAutoCompactSuggestedWithSource mirrors shouldAutoCompact including querySource fork gates (autoCompact.ts).
+// Uses byte/4 on the raw JSON blob; prefer ProactiveAutocompactFromUsage when the transcript is valid API messages JSON.
+func ProactiveAutoCompactSuggestedWithSource(transcriptJSON []byte, model string, maxOutputTokens int, contextWindowTokens int, snipTokensFreed int, querySource string) bool {
 	tok := estimateTranscriptJSONTokens(transcriptJSON) - snipTokensFreed
 	if tok < 0 {
 		tok = 0
 	}
-	return tok >= threshold
+	return ProactiveAutocompactFromUsage(tok, model, maxOutputTokens, contextWindowTokens, querySource)
 }
 
 // AutoCompactThresholdForProactive returns getAutoCompactThreshold(model) headless inputs (autoCompact.ts).

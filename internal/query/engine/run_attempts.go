@@ -49,7 +49,11 @@ func (e *Engine) promptCacheBreakCompactRecovery(ctx context.Context, msgs json.
 		return nil, false, nil
 	}
 	ph := compact.RunIdle.Next(false, true)
-	_, next, err := e.compactExecutor(ctx, ph, msgs)
+	ctxCompact := compact.ContextWithExecutorSuggestMeta(ctx, compact.ExecutorSuggestMeta{
+		AutoCompact:     false,
+		ReactiveCompact: true,
+	})
+	_, next, err := e.compactExecutor(ctxCompact, ph, msgs)
 	if err != nil {
 		return nil, false, err
 	}
@@ -126,7 +130,11 @@ func (e *Engine) executeRunTurnLoopAttempts(ctxLoop context.Context, st *query.L
 			})
 			if e.compactExecutor != nil {
 				execPh := compact.ExecutorPhaseAfterSchedule(ph)
-				sum, next, exErr := e.compactExecutor(e.ctx, execPh, msgs)
+				ctxCompact := compact.ContextWithExecutorSuggestMeta(e.ctx, compact.ExecutorSuggestMeta{
+					AutoCompact:     true,
+					ReactiveCompact: false,
+				})
+				sum, next, exErr := e.compactExecutor(ctxCompact, execPh, msgs)
 				resPh := compact.ResultPhaseAfterCompactExecutor(execPh, exErr)
 				e.noteAutoCompactExecutorOutcome(st, true, exErr)
 				e.trySend(EngineEvent{

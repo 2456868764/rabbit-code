@@ -13,6 +13,7 @@
 //	team_mem_prompts.go      — teamMemPrompts.ts (combined private+team prompt)
 //	find_relevant_memories.go — findRelevantMemories.ts (+ heuristic scoring, LLM JSON selection)
 //	extract_memories.go      — extractMemories.ts / prompts (fork, controller, transcript helpers, gated tools)
+//	session_memory_compact_hooks.go — file-backed compact.SessionMemoryCompactHooks (MEMORY.md under auto-mem dir)
 //
 // Related: internal/features and rabbit env gates for auto-memory; engine wires FindRelevantMemories and extract stop hook.
 // Trusted autoMemoryDirectory: config.LoadTrustedAutoMemoryDirectory ↔ paths.ts getAutoMemPathSetting (policy → flag → local → user; no project).

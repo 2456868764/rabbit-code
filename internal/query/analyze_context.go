@@ -21,25 +21,14 @@ func ProactiveAutoCompactAllowedForQuerySource(source string) bool {
 // ReactiveCompactByTranscript mirrors a minimal analyzeContext-style gate: reactive compact is suggested
 // when transcript JSON exceeds a byte threshold and/or a heuristic token threshold (continuation item 5).
 func ReactiveCompactByTranscript(transcriptJSON []byte, minBytes, minTokens int) bool {
-	if features.DisableCompact() {
-		return false
-	}
-	if minBytes > 0 && len(transcriptJSON) >= minBytes {
-		return true
-	}
-	if minTokens > 0 && EstimateTranscriptJSONTokens(transcriptJSON) >= minTokens {
-		return true
-	}
-	return false
+	return compact.AfterTurnReactiveCompactSuggested(transcriptJSON, minBytes, minTokens, false)
 }
 
 // TranscriptReactiveCompactSuggested is like ReactiveCompactByTranscript but respects LoopState.HasAttemptedReactiveCompact
 // (query.ts hasAttemptedReactiveCompact: skip duplicate transcript-driven reactive compact in the same wave; H2).
 func TranscriptReactiveCompactSuggested(st *LoopState, transcriptJSON []byte, minBytes, minTokens int) bool {
-	if st != nil && st.HasAttemptedReactiveCompact {
-		return false
-	}
-	return ReactiveCompactByTranscript(transcriptJSON, minBytes, minTokens)
+	hasAttempted := st != nil && st.HasAttemptedReactiveCompact
+	return compact.AfterTurnReactiveCompactSuggested(transcriptJSON, minBytes, minTokens, hasAttempted)
 }
 
 // ToolTokenCountOverhead mirrors analyzeContext.ts TOOL_TOKEN_COUNT_OVERHEAD (API preamble when tools present).
@@ -50,12 +39,12 @@ type HeadlessContextReport struct {
 	TranscriptBytes int
 	EstimatedTokens int
 	// StructuredMessageTokens is set when transcriptJSON parses as a messages array (microCompact.ts estimateMessageTokens path); 0 if unavailable.
-	StructuredMessageTokens int
-	ContextWindowTokens     int
-	EffectiveInputWindow    int
-	AutoCompactThreshold    int
+	StructuredMessageTokens     int
+	ContextWindowTokens         int
+	EffectiveInputWindow        int
+	AutoCompactThreshold        int
 	ProactiveAutoCompactBlocked bool
-	TokenWarning            compact.TokenWarningState
+	TokenWarning                compact.TokenWarningState
 }
 
 // BuildHeadlessContextReport mirrors analyzeContext-style totals for a transcript JSON blob (heuristic tokens only).
@@ -83,7 +72,7 @@ func BuildHeadlessContextReport(transcriptJSON []byte, model string, maxOutputTo
 	r.AutoCompactThreshold = compact.AutoCompactThresholdForProactive(model, maxOutputTokens, contextWindowTokens)
 	r.ProactiveAutoCompactBlocked = !compact.ProactiveAutoCompactPreflight(querySource) ||
 		!features.IsAutoCompactEnabled() ||
-		features.ContextCollapseEnabled() ||
+		features.ContextCollapseSuppressesProactiveAutocompact() ||
 		features.SuppressProactiveAutoCompact()
 
 	thForPercent := r.EffectiveInputWindow

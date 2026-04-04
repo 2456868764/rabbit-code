@@ -38,6 +38,11 @@ func TestCalculateTokenWarningState(t *testing.T) {
 	if st.PercentLeft != 30 {
 		t.Fatalf("PercentLeft %d", st.PercentLeft)
 	}
+	// autoCompact.ts uses Math.round for percent left
+	stRound := CalculateTokenWarningState(1, 3, 100_000, 99_999, true, 0)
+	if stRound.PercentLeft != 67 {
+		t.Fatalf("PercentLeft rounding got %d want 67", stRound.PercentLeft)
+	}
 	if st.IsAboveAutoCompactThreshold {
 		t.Fatal("70000 < 87000 autocompact threshold")
 	}
@@ -105,9 +110,22 @@ func TestProactiveAutoCompactSuggested_gates(t *testing.T) {
 	t.Run("context collapse suppresses proactive", func(t *testing.T) {
 		t.Setenv(features.EnvDisableCompact, "")
 		t.Setenv(features.EnvContextCollapse, "1")
+		t.Setenv(features.EnvContextCollapseInactive, "")
 		t.Setenv(features.EnvContextWindowTokens, "50000")
 		if ProactiveAutoCompactSuggested(blob, "m", 1024, 0, 0) {
 			t.Fatal("expected false")
+		}
+	})
+	t.Run("context collapse inactive allows proactive", func(t *testing.T) {
+		t.Setenv(features.EnvDisableCompact, "")
+		t.Setenv(features.EnvDisableAutoCompact, "")
+		t.Setenv(features.EnvAutoCompact, "")
+		t.Setenv(features.EnvContextCollapse, "1")
+		t.Setenv(features.EnvContextCollapseInactive, "1")
+		t.Setenv(features.EnvSuppressProactiveAutoCompact, "")
+		t.Setenv(features.EnvContextWindowTokens, "50000")
+		if !ProactiveAutoCompactSuggested(blob, "m", 1024, 0, 0) {
+			t.Fatal("expected true when collapse env on but runtime inactive (TS isContextCollapseEnabled false)")
 		}
 	})
 	t.Run("suppress proactive", func(t *testing.T) {
@@ -146,4 +164,56 @@ func TestProactiveAutoCompactSuggested_gates(t *testing.T) {
 			t.Fatal("expected false when reactive+cobalt")
 		}
 	})
+}
+
+func TestProactiveAutocompactFromUsage_thresholdOnly(t *testing.T) {
+	t.Setenv(features.EnvDisableCompact, "")
+	t.Setenv(features.EnvDisableAutoCompact, "")
+	t.Setenv(features.EnvAutoCompact, "")
+	t.Setenv(features.EnvContextCollapse, "")
+	t.Setenv(features.EnvSuppressProactiveAutoCompact, "")
+	t.Setenv(features.EnvContextWindowTokens, "50000")
+	th := AutoCompactThresholdForProactive("m", 1024, 0)
+	if th <= 0 {
+		t.Fatal(th)
+	}
+	if ProactiveAutocompactFromUsage(th-1, "m", 1024, 0, "") {
+		t.Fatal("below threshold")
+	}
+	if !ProactiveAutocompactFromUsage(th, "m", 1024, 0, "") {
+		t.Fatal("at threshold should suggest")
+	}
+}
+
+func TestAfterTurnProactiveAutocompactFromUsage_circuitTripped(t *testing.T) {
+	t.Setenv(features.EnvDisableCompact, "")
+	t.Setenv(features.EnvDisableAutoCompact, "")
+	t.Setenv(features.EnvAutoCompact, "")
+	t.Setenv(features.EnvContextCollapse, "")
+	t.Setenv(features.EnvSuppressProactiveAutoCompact, "")
+	t.Setenv(features.EnvContextWindowTokens, "50000")
+	th := AutoCompactThresholdForProactive("m", 1024, 0)
+	if th <= 0 {
+		t.Fatal(th)
+	}
+	if AfterTurnProactiveAutocompactFromUsage(th, "m", 1024, 0, "", true) {
+		t.Fatal("circuit tripped should block proactive usage gate")
+	}
+	if !AfterTurnProactiveAutocompactFromUsage(th, "m", 1024, 0, "", false) {
+		t.Fatal("without circuit should match ProactiveAutocompactFromUsage")
+	}
+}
+
+func TestAfterTurnReactiveCompactSuggested(t *testing.T) {
+	blob := []byte(strings.Repeat("a", 100))
+	if !AfterTurnReactiveCompactSuggested(blob, 10, 0, false) {
+		t.Fatal("expected true from minBytes")
+	}
+	if AfterTurnReactiveCompactSuggested(blob, 10, 0, true) {
+		t.Fatal("hasAttemptedReactive should block")
+	}
+	t.Setenv(features.EnvDisableCompact, "1")
+	if AfterTurnReactiveCompactSuggested(blob, 10, 0, false) {
+		t.Fatal("DISABLE_COMPACT should block")
+	}
 }

@@ -276,12 +276,23 @@ const (
 	// EnvTenguCobaltRaccoon mirrors GrowthBook tengu_cobalt_raccoon (reactive-only mode under REACTIVE_COMPACT).
 	EnvTenguCobaltRaccoon = "RABBIT_CODE_TENGU_COBALT_RACCOON"
 	EnvContextCollapse    = "RABBIT_CODE_CONTEXT_COLLAPSE"
+	// EnvContextCollapseInactive when truthy: CONTEXT_COLLAPSE env is on but runtime collapse is off — proactive autocompact may run (autoCompact.ts isContextCollapseEnabled false).
+	EnvContextCollapseInactive = "RABBIT_CODE_CONTEXT_COLLAPSE_INACTIVE"
+	// EnvCommitAttribution mirrors internal COMMIT_ATTRIBUTION (postCompactCleanup.ts sweepFileContentCache gate).
+	EnvCommitAttribution  = "RABBIT_CODE_COMMIT_ATTRIBUTION"
 	EnvSessionRestore     = "RABBIT_CODE_SESSION_RESTORE"
 	EnvUltrathink         = "RABBIT_CODE_ULTRATHINK"
 	EnvUltraplan          = "RABBIT_CODE_ULTRAPLAN"
 	EnvBreakCacheCommand  = "RABBIT_CODE_BREAK_CACHE_COMMAND"
 	EnvTemplates          = "RABBIT_CODE_TEMPLATES"
 	EnvCachedMicrocompact = "RABBIT_CODE_CACHED_MICROCOMPACT"
+	// Compact API behaviour (compact.ts streamCompactSummary GrowthBook keys → env).
+	EnvCompactStreamingRetry = "RABBIT_CODE_COMPACT_STREAMING_RETRY" // tengu_compact_streaming_retry, default off
+	EnvCompactCachePrefix    = "RABBIT_CODE_COMPACT_CACHE_PREFIX"    // tengu_compact_cache_prefix, default on (try ForkCompactSummary when set)
+	EnvCompactToolSearch     = "RABBIT_CODE_COMPACT_TOOL_SEARCH"     // include ToolSearch in compact stream tools (default off)
+	// EnvRemoteSendKeepalives mirrors CLAUDE_CODE_REMOTE_SEND_KEEPALIVES (sessionActivity.ts sendSessionActivitySignal gate).
+	EnvRemoteSendKeepalives       = "CLAUDE_CODE_REMOTE_SEND_KEEPALIVES"
+	EnvRemoteSendKeepalivesRabbit = "RABBIT_CODE_REMOTE_SEND_KEEPALIVES"
 	// Time-based microcompact (timeBasedMCConfig.ts; GrowthBook key tengu_slate_heron → env analogue).
 	EnvTimeBasedMicrocompact          = "RABBIT_CODE_TIME_BASED_MICROCOMPACT"
 	EnvTimeBasedMCGapMinutes          = "RABBIT_CODE_TIME_BASED_MC_GAP_MINUTES"
@@ -346,6 +357,19 @@ const (
 	EnvKairosActive         = "RABBIT_CODE_KAIROS_ACTIVE"
 	// EnvCoworkMemoryExtraGuidelines appends lines to memory builders (CLAUDE_COWORK_MEMORY_EXTRA_GUIDELINES analogue).
 	EnvCoworkMemoryExtraGuidelines = "RABBIT_CODE_COWORK_MEMORY_EXTRA_GUIDELINES"
+	// EnvExperimentalSkillSearch mirrors feature('EXPERIMENTAL_SKILL_SEARCH') (compact.ts stripReinjectedAttachments).
+	EnvExperimentalSkillSearch = "RABBIT_CODE_EXPERIMENTAL_SKILL_SEARCH"
+	// Session memory compaction (sessionMemoryCompact.ts shouldUseSessionMemoryCompaction + GrowthBook tengu_session_memory / tengu_sm_compact).
+	EnvEnableClaudeCodeSMCompact   = "ENABLE_CLAUDE_CODE_SM_COMPACT"      // mirrors ENABLE_CLAUDE_CODE_SM_COMPACT
+	EnvDisableClaudeCodeSMCompact  = "DISABLE_CLAUDE_CODE_SM_COMPACT"     // mirrors DISABLE_CLAUDE_CODE_SM_COMPACT
+	EnvSessionMemoryFeature        = "RABBIT_CODE_SESSION_MEMORY"         // tengu_session_memory
+	EnvSessionMemoryCompactFeature = "RABBIT_CODE_SESSION_MEMORY_COMPACT" // tengu_sm_compact
+	EnvSMCompactMinTokens          = "RABBIT_CODE_SM_COMPACT_MIN_TOKENS"
+	EnvSMCompactMinTextMessages    = "RABBIT_CODE_SM_COMPACT_MIN_TEXT_MESSAGES"
+	EnvSMCompactMaxTokens          = "RABBIT_CODE_SM_COMPACT_MAX_TOKENS"
+	// Cached microcompact thresholds (cachedMicrocompact.ts GrowthBook analogue).
+	EnvCachedMCTriggerThreshold = "RABBIT_CODE_CACHED_MC_TRIGGER_THRESHOLD"
+	EnvCachedMCKeepRecent       = "RABBIT_CODE_CACHED_MC_KEEP_RECENT"
 )
 
 // MemdirRelevanceMode returns memdir.RelevanceMode values: "heuristic" or "llm".
@@ -638,6 +662,26 @@ func TenguCobaltRaccoon() bool { return truthy(os.Getenv(EnvTenguCobaltRaccoon))
 
 func ContextCollapseEnabled() bool { return truthy(os.Getenv(EnvContextCollapse)) }
 
+// ContextCollapseSuppressesProactiveAutocompact mirrors shouldAutoCompact when feature('CONTEXT_COLLAPSE') consults
+// isContextCollapseEnabled(): suppress proactive autocompact only while collapse is actively managing context.
+// Default when RABBIT_CODE_CONTEXT_COLLAPSE is on: suppress (prior rabbit-code behavior). Set RABBIT_CODE_CONTEXT_COLLAPSE_INACTIVE=1
+// when the collapse system is disabled at runtime while the env gate remains set.
+func ContextCollapseSuppressesProactiveAutocompact() bool {
+	if !ContextCollapseEnabled() {
+		return false
+	}
+	if truthy(os.Getenv(EnvContextCollapseInactive)) {
+		return false
+	}
+	return true
+}
+
+// CommitAttributionEnabled is the headless analogue of feature('COMMIT_ATTRIBUTION') (postCompactCleanup.ts).
+func CommitAttributionEnabled() bool { return truthy(os.Getenv(EnvCommitAttribution)) }
+
+// ExperimentalSkillSearchEnabled mirrors feature('EXPERIMENTAL_SKILL_SEARCH') (compact.ts stripReinjectedAttachments).
+func ExperimentalSkillSearchEnabled() bool { return truthy(os.Getenv(EnvExperimentalSkillSearch)) }
+
 // DisableCompact mirrors DISABLE_COMPACT (blocks autocompact entry in autoCompact.ts).
 func DisableCompact() bool { return truthy(os.Getenv(EnvDisableCompact)) }
 
@@ -746,6 +790,112 @@ func UltraplanEnabled() bool          { return truthy(os.Getenv(EnvUltraplan)) }
 func BreakCacheCommandEnabled() bool  { return truthy(os.Getenv(EnvBreakCacheCommand)) }
 func TemplatesEnabled() bool          { return truthy(os.Getenv(EnvTemplates)) }
 func CachedMicrocompactEnabled() bool { return truthy(os.Getenv(EnvCachedMicrocompact)) }
+
+// CompactStreamingRetryEnabled mirrors getFeatureValue_CACHED_MAY_BE_STALE('tengu_compact_streaming_retry', false).
+func CompactStreamingRetryEnabled() bool { return truthy(os.Getenv(EnvCompactStreamingRetry)) }
+
+// CompactCachePrefixEnabled mirrors getFeatureValue_CACHED_MAY_BE_STALE('tengu_compact_cache_prefix', true): when true, try ForkCompactSummary before streaming.
+func CompactCachePrefixEnabled() bool {
+	s := strings.TrimSpace(os.Getenv(EnvCompactCachePrefix))
+	if s == "" {
+		return true
+	}
+	return truthy(s)
+}
+
+// CompactStreamingToolSearchEnabled adds ToolSearch to compact stream tools (isToolSearchEnabled analogue; opt-in).
+func CompactStreamingToolSearchEnabled() bool { return truthy(os.Getenv(EnvCompactToolSearch)) }
+
+// RemoteSendKeepalivesEnabled mirrors isEnvTruthy(process.env.CLAUDE_CODE_REMOTE_SEND_KEEPALIVES) (optional rabbit-prefixed alias).
+func RemoteSendKeepalivesEnabled() bool {
+	return truthy(os.Getenv(EnvRemoteSendKeepalives)) || truthy(os.Getenv(EnvRemoteSendKeepalivesRabbit))
+}
+
+// SessionMemoryFeatureEnabled mirrors getFeatureValue_CACHED_MAY_BE_STALE('tengu_session_memory', false).
+func SessionMemoryFeatureEnabled() bool {
+	return truthy(os.Getenv(EnvSessionMemoryFeature))
+}
+
+// SessionMemoryCompactFeatureEnabled mirrors getFeatureValue_CACHED_MAY_BE_STALE('tengu_sm_compact', false).
+func SessionMemoryCompactFeatureEnabled() bool {
+	return truthy(os.Getenv(EnvSessionMemoryCompactFeature))
+}
+
+// SessionMemoryCompactionEnabled mirrors shouldUseSessionMemoryCompaction() (env overrides + both flags).
+func SessionMemoryCompactionEnabled() bool {
+	if truthy(os.Getenv(EnvEnableClaudeCodeSMCompact)) {
+		return true
+	}
+	if truthy(os.Getenv(EnvDisableClaudeCodeSMCompact)) {
+		return false
+	}
+	return SessionMemoryFeatureEnabled() && SessionMemoryCompactFeatureEnabled()
+}
+
+// CachedMicrocompactTriggerThreshold default 50 when unset/invalid (headless analogue of cached MC GrowthBook).
+func CachedMicrocompactTriggerThreshold() int {
+	s := strings.TrimSpace(os.Getenv(EnvCachedMCTriggerThreshold))
+	if s == "" {
+		return 50
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 1 {
+		return 50
+	}
+	return n
+}
+
+// CachedMicrocompactKeepRecent default 5 when unset/invalid.
+func CachedMicrocompactKeepRecent() int {
+	s := strings.TrimSpace(os.Getenv(EnvCachedMCKeepRecent))
+	if s == "" {
+		return 5
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 {
+		return 5
+	}
+	return n
+}
+
+// SessionMemoryCompactMinTokens mirrors DEFAULT_SM_COMPACT_CONFIG.minTokens (sessionMemoryCompact.ts).
+func SessionMemoryCompactMinTokens() int {
+	s := strings.TrimSpace(os.Getenv(EnvSMCompactMinTokens))
+	if s == "" {
+		return 10_000
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 1 {
+		return 10_000
+	}
+	return n
+}
+
+// SessionMemoryCompactMinTextBlockMessages mirrors DEFAULT_SM_COMPACT_CONFIG.minTextBlockMessages.
+func SessionMemoryCompactMinTextBlockMessages() int {
+	s := strings.TrimSpace(os.Getenv(EnvSMCompactMinTextMessages))
+	if s == "" {
+		return 5
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 1 {
+		return 5
+	}
+	return n
+}
+
+// SessionMemoryCompactMaxTokens mirrors DEFAULT_SM_COMPACT_CONFIG.maxTokens.
+func SessionMemoryCompactMaxTokens() int {
+	s := strings.TrimSpace(os.Getenv(EnvSMCompactMaxTokens))
+	if s == "" {
+		return 40_000
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 1 {
+		return 40_000
+	}
+	return n
+}
 
 // TimeBasedMicrocompactEnabled mirrors timeBasedMCConfig default enabled: false unless env truthy.
 func TimeBasedMicrocompactEnabled() bool {
