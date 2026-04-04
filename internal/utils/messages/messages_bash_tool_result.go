@@ -3,6 +3,8 @@ package messages
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -79,6 +81,16 @@ func bashResolvedStdout(src, att map[string]any) string {
 	return stdout
 }
 
+// bashDefaultTaskOutputPath mirrors TS getTaskOutputPath when transcript omits paths:
+// join(RABBIT_TASK_OUTPUT_DIR, taskId+".output") when the env is set.
+func bashDefaultTaskOutputPath(taskID string) string {
+	dir := strings.TrimSpace(os.Getenv("RABBIT_TASK_OUTPUT_DIR"))
+	if dir == "" || taskID == "" {
+		return ""
+	}
+	return filepath.Join(dir, taskID+".output")
+}
+
 func bashGeneratePreview(content string, maxBytes int) (preview string, hasMore bool) {
 	if len(content) <= maxBytes {
 		return content, false
@@ -148,6 +160,9 @@ func bashPlaintextToolResultBody(src, att map[string]any) string {
 		outPath := strField(src, "backgroundTaskOutputPath")
 		if outPath == "" {
 			outPath = strField(src, "taskOutputPath")
+		}
+		if outPath == "" {
+			outPath = bashDefaultTaskOutputPath(bgID)
 		}
 		switch {
 		case truthy(src["assistantAutoBackgrounded"]):

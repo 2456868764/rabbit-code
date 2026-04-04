@@ -685,6 +685,20 @@ func TestOutputStyleDisplayName_fromEnvJSON(t *testing.T) {
 	}
 }
 
+func TestBashBackgroundTaskOutputPath_fromEnv(t *testing.T) {
+	t.Setenv("RABBIT_TASK_OUTPUT_DIR", "/var/task-out")
+	s := BashAttachmentToolResultContentString(map[string]any{
+		"bash": map[string]any{
+			"stdout":                    "ok",
+			"backgroundTaskId":          "task-abc",
+			"assistantAutoBackgrounded": true,
+		},
+	})
+	if !strings.Contains(s, "/var/task-out/task-abc.output") {
+		t.Fatalf("expected derived path in message, got %q", s)
+	}
+}
+
 func TestBashAttachmentToolResultContentString(t *testing.T) {
 	s := BashAttachmentToolResultContentString(map[string]any{
 		"content": "  \n\nhello",
