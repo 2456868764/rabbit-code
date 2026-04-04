@@ -7,6 +7,7 @@ import (
 
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/services/api"
+	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
 // AnthropicAssistant implements StreamAssistant using internal/services/api Client (Phase 4 + Phase 5 bridge).
@@ -21,6 +22,8 @@ type AnthropicAssistant struct {
 	MicrocompactBuffer MicrocompactAPIStateMarker
 	// SystemPrompt when non-empty is sent as the Messages API "system" string (memdir loadMemoryPrompt analogue, H8).
 	SystemPrompt string
+	// APIContextManagementOpts optional; when nil, GetAPIContextManagement uses zero options (thinking off unless set here).
+	APIContextManagementOpts *compact.APIContextManagementOptions
 }
 
 func (a *AnthropicAssistant) readOpts(ctx context.Context) []anthropic.ReadAssistantOption {
@@ -45,9 +48,34 @@ func (a *AnthropicAssistant) streamBody(model string, maxTokens int, messagesJSO
 		}
 	}
 	if features.CachedMicrocompactEnabled() {
-		body.AnthropicBeta = []string{anthropic.BetaCachedMicrocompactBody}
+		body.AnthropicBeta = append(body.AnthropicBeta, anthropic.BetaCachedMicrocompactBody)
 	}
+	a.attachAPIContextManagement(model, &body)
 	return body
+}
+
+func (a *AnthropicAssistant) attachAPIContextManagement(model string, body *anthropic.MessagesStreamBody) {
+	if a == nil || a.Client == nil || body == nil {
+		return
+	}
+	m := strings.TrimSpace(model)
+	opts := compact.APIContextManagementOptions{}
+	if a.APIContextManagementOpts != nil {
+		opts = *a.APIContextManagementOpts
+	}
+	cm := compact.GetAPIContextManagement(opts)
+	if cm == nil {
+		return
+	}
+	if !anthropic.ShouldAttachContextManagementBeta(m, a.Client.Provider) {
+		return
+	}
+	raw, err := json.Marshal(cm)
+	if err != nil {
+		return
+	}
+	body.ContextManagement = raw
+	body.AnthropicBeta = anthropic.AppendBetaUnique(body.AnthropicBeta, anthropic.BetaContextManagement)
 }
 
 // StreamAssistant calls PostMessagesStreamReadAssistant with messagesJSON as the Messages field.

@@ -5,7 +5,7 @@
 //
 // TS module (restored-src/src/services/compact/)     Go file (this package)
 // -------------------------------------------------------------------------------------------------
-// apiMicrocompact.ts                                 api_microcompact.go, api_context_management.go — MicroCompactRequested; getAPIContextManagement JSON
+// apiMicrocompact.ts                                 api_microcompact.go, api_context_management.go — MicroCompactRequested; getAPIContextManagement JSON (wired on MessagesStreamBody via querydeps AnthropicAssistant)
 // autoCompact.ts                                     auto_compact.go — thresholds, TokenWarningState, proactive gates, AutoCompactTracking JSON, RecompactionMeta
 // compact.ts                                         compact.go — RunPhase, ExecuteStub, FormatStubCompactSummary, ExecuteStubWithMeta
 // microCompact.ts                                    micro_compact.go, time_based_trigger.go, time_based_microcompact.go — COMPACTABLE_TOOLS, EvaluateTimeBasedTrigger, maybeTimeBasedMicrocompact (CC JSON + Messages API JSON via wall-clock trigger)

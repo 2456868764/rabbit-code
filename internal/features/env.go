@@ -204,8 +204,10 @@ const (
 	EnvUserTypeRabbit         = "RABBIT_CODE_USER_TYPE"
 	EnvUseAPIClearToolResults = "USE_API_CLEAR_TOOL_RESULTS"
 	EnvUseAPIClearToolUses    = "USE_API_CLEAR_TOOL_USES"
-	EnvAPIMaxInputTokens      = "API_MAX_INPUT_TOKENS"
-	EnvAPITargetInputTokens   = "API_TARGET_INPUT_TOKENS"
+	// EnvUseAPIContextManagement mirrors USE_API_CONTEXT_MANAGEMENT (betas.ts ant tool-clearing gate for context-management beta).
+	EnvUseAPIContextManagement = "USE_API_CONTEXT_MANAGEMENT"
+	EnvAPIMaxInputTokens       = "API_MAX_INPUT_TOKENS"
+	EnvAPITargetInputTokens    = "API_TARGET_INPUT_TOKENS"
 )
 
 // AntUserType is true when USER_TYPE or RABBIT_CODE_USER_TYPE equals "ant" (apiMicrocompact ant-only branches).
@@ -225,6 +227,11 @@ func UseAPIClearToolResults() bool {
 // UseAPIClearToolUses mirrors isEnvTruthy(USE_API_CLEAR_TOOL_USES).
 func UseAPIClearToolUses() bool {
 	return truthy(os.Getenv(EnvUseAPIClearToolUses))
+}
+
+// UseAPIContextManagement mirrors isEnvTruthy(USE_API_CONTEXT_MANAGEMENT) (ant opt-in for tool clearing + beta).
+func UseAPIContextManagement() bool {
+	return truthy(os.Getenv(EnvUseAPIContextManagement))
 }
 
 const defaultAPIMaxInputTokens = 180_000

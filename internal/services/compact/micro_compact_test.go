@@ -3,12 +3,15 @@ package compact
 import (
 	"encoding/json"
 	"testing"
-
-	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 )
 
-func TestMicrocompactEditBuffer_implementsQuerydepsMarker(t *testing.T) {
-	var m querydeps.MicrocompactAPIStateMarker = &MicrocompactEditBuffer{}
+// microcompactAPIStateMarker mirrors querydeps.MicrocompactAPIStateMarker (avoid compact_test → querydeps → compact cycle).
+type microcompactAPIStateMarker interface {
+	MarkToolsSentToAPIState()
+}
+
+func TestMicrocompactEditBuffer_implementsMicrocompactMarker(t *testing.T) {
+	var m microcompactAPIStateMarker = &MicrocompactEditBuffer{}
 	m.MarkToolsSentToAPIState()
 }
 

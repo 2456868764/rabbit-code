@@ -11,6 +11,7 @@ import (
 
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/services/api"
+	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
 type testMicrocompactMarker struct {
@@ -150,7 +151,13 @@ func TestAnthropicAssistant_streamBody_anthropicBetaCachedMicrocompact(t *testin
 			http.Error(w, err.Error(), 400)
 			return
 		}
-		ok := len(body.AnthropicBeta) == 1 && body.AnthropicBeta[0] == anthropic.BetaCachedMicrocompactBody
+		ok := false
+		for _, x := range body.AnthropicBeta {
+			if x == anthropic.BetaCachedMicrocompactBody {
+				ok = true
+				break
+			}
+		}
 		okCh <- ok
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
@@ -176,6 +183,129 @@ func TestAnthropicAssistant_streamBody_anthropicBetaCachedMicrocompact(t *testin
 	}
 	if !<-okCh {
 		t.Fatal("expected JSON anthropic_beta with BetaCachedMicrocompactBody when RABBIT_CODE_CACHED_MICROCOMPACT is on")
+	}
+}
+
+func TestAnthropicAssistant_streamBody_contextManagement_ant(t *testing.T) {
+	t.Setenv(features.EnvUserType, "ant")
+	t.Setenv(features.EnvUserTypeRabbit, "")
+	t.Setenv(features.EnvUseAPIContextManagement, "1")
+	t.Setenv(features.EnvUseAPIClearToolResults, "1")
+	t.Setenv(features.EnvUseAPIClearToolUses, "")
+	t.Setenv(features.EnvAPIMaxInputTokens, "")
+	t.Setenv(features.EnvAPITargetInputTokens, "")
+	t.Setenv(features.EnvUseBedrock, "")
+	t.Setenv(features.EnvUseVertex, "")
+	t.Setenv(features.EnvUseFoundry, "")
+
+	okCh := make(chan bool, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(r.Body)
+		if err != nil {
+			okCh <- false
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		var body struct {
+			AnthropicBeta     []string        `json:"anthropic_beta"`
+			ContextManagement json.RawMessage `json:"context_management"`
+		}
+		if err := json.Unmarshal(b, &body); err != nil {
+			okCh <- false
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		var cm struct {
+			Edits []json.RawMessage `json:"edits"`
+		}
+		_ = json.Unmarshal(body.ContextManagement, &cm)
+		hasBeta := false
+		for _, x := range body.AnthropicBeta {
+			if x == anthropic.BetaContextManagement {
+				hasBeta = true
+				break
+			}
+		}
+		okCh <- hasBeta && len(cm.Edits) > 0
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"z\"}}\n\n")
+		_, _ = io.WriteString(w, "data: {\"type\":\"message_stop\"}\n\n")
+	}))
+	defer srv.Close()
+
+	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl.BaseURL = srv.URL
+	cl.Provider = anthropic.ProviderAnthropic
+
+	a := &AnthropicAssistant{
+		Client:           cl,
+		DefaultModel:     "m",
+		DefaultMaxTokens: 8,
+		Policy:           anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+	}
+	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
+	_, err := a.StreamAssistant(context.Background(), "claude-3-5-haiku-20241022", 0, msgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !<-okCh {
+		t.Fatal("expected context_management + context-management beta for ant + USE_API_CONTEXT_MANAGEMENT")
+	}
+}
+
+func TestAnthropicAssistant_streamBody_contextManagement_model4Thinking(t *testing.T) {
+	t.Setenv(features.EnvUserType, "")
+	t.Setenv(features.EnvUserTypeRabbit, "")
+	t.Setenv(features.EnvUseBedrock, "")
+	t.Setenv(features.EnvUseVertex, "")
+	t.Setenv(features.EnvUseFoundry, "")
+
+	okCh := make(chan bool, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(r.Body)
+		if err != nil {
+			okCh <- false
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		var body struct {
+			ContextManagement json.RawMessage `json:"context_management"`
+		}
+		if err := json.Unmarshal(b, &body); err != nil {
+			okCh <- false
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		var cm map[string]interface{}
+		_ = json.Unmarshal(body.ContextManagement, &cm)
+		_, ok := cm["edits"]
+		okCh <- ok
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "data: {\"type\":\"message_stop\"}\n\n")
+	}))
+	defer srv.Close()
+
+	cl := anthropic.NewClient(anthropic.NewTransportChain(http.DefaultTransport, "k", ""))
+	cl.BaseURL = srv.URL
+	cl.Provider = anthropic.ProviderAnthropic
+
+	opts := compact.APIContextManagementOptions{HasThinking: true}
+	a := &AnthropicAssistant{
+		Client:                   cl,
+		DefaultModel:             "m",
+		DefaultMaxTokens:         8,
+		Policy:                   anthropic.Policy{MaxAttempts: 1, Retry529429: false},
+		APIContextManagementOpts: &opts,
+	}
+	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
+	_, err := a.StreamAssistant(context.Background(), "claude-sonnet-4-20250514", 0, msgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !<-okCh {
+		t.Fatal("expected context_management for Claude 4 + HasThinking")
 	}
 }
 

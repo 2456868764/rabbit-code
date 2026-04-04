@@ -81,14 +81,15 @@ func (c *Client) messagesURL(body MessagesStreamBody) string {
 
 // vertexStreamJSONBody matches @anthropic-ai/vertex-sdk: model moves to path, body gets anthropic_version.
 type vertexStreamJSONBody struct {
-	MaxTokens        int             `json:"max_tokens"`
-	Stream           bool            `json:"stream"`
-	Messages         json.RawMessage `json:"messages"`
-	System           json.RawMessage `json:"system,omitempty"`
-	OutputConfig     *OutputConfig   `json:"output_config,omitempty"`
-	AnthropicBeta    []string        `json:"anthropic_beta,omitempty"`
-	AnthropicVersion string          `json:"anthropic_version"`
-	AntiDistillation []string        `json:"anti_distillation,omitempty"`
+	MaxTokens         int             `json:"max_tokens"`
+	Stream            bool            `json:"stream"`
+	Messages          json.RawMessage `json:"messages"`
+	System            json.RawMessage `json:"system,omitempty"`
+	OutputConfig      *OutputConfig   `json:"output_config,omitempty"`
+	AnthropicBeta     []string        `json:"anthropic_beta,omitempty"`
+	ContextManagement json.RawMessage `json:"context_management,omitempty"`
+	AnthropicVersion  string          `json:"anthropic_version"`
+	AntiDistillation  []string        `json:"anti_distillation,omitempty"`
 }
 
 func (c *Client) mergeStreamingBody(body MessagesStreamBody) MessagesStreamBody {
@@ -160,6 +161,8 @@ type MessagesStreamBody struct {
 	AnthropicBeta []string `json:"anthropic_beta,omitempty"`
 	// AntiDistillation is merged when RABBIT_CODE_ANTI_DISTILLATION_CC + RABBIT_CODE_ANTI_DISTILLATION_FAKE_TOOLS (claude.ts getExtraBodyParams).
 	AntiDistillation []string `json:"anti_distillation,omitempty"`
+	// ContextManagement is sent when getAPIContextManagement returns edits and the context-management beta is active (apiMicrocompact.ts / claude.ts).
+	ContextManagement json.RawMessage `json:"context_management,omitempty"`
 }
 
 // PostMessagesStream starts a streaming request. Caller must close resp.Body.

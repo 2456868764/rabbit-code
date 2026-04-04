@@ -584,3 +584,14 @@ func TestUseAPIClearToolFlags(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+func TestUseAPIContextManagement(t *testing.T) {
+	t.Setenv(EnvUseAPIContextManagement, "")
+	if UseAPIContextManagement() {
+		t.Fatal()
+	}
+	t.Setenv(EnvUseAPIContextManagement, "1")
+	if !UseAPIContextManagement() {
+		t.Fatal()
+	}
+}
