@@ -8,7 +8,7 @@
 // apiMicrocompact.ts                                 api_microcompact.go, api_context_management.go — MicroCompactRequested; getAPIContextManagement JSON
 // autoCompact.ts                                     auto_compact.go — thresholds, TokenWarningState, proactive gates, AutoCompactTracking JSON, RecompactionMeta
 // compact.ts                                         compact.go — RunPhase, ExecuteStub, FormatStubCompactSummary, ExecuteStubWithMeta
-// microCompact.ts                                    micro_compact.go, time_based_trigger.go — COMPACTABLE_TOOLS, EvaluateTimeBasedTrigger, TIME_BASED_MC_CLEARED_MESSAGE
+// microCompact.ts                                    micro_compact.go, time_based_trigger.go, time_based_microcompact.go — COMPACTABLE_TOOLS, EvaluateTimeBasedTrigger, maybeTimeBasedMicrocompact (CC JSON)
 // postCompactCleanup.ts                              post_compact_cleanup.go — main-thread post-compact source, reset microcompact state
 // prompt.ts                                          prompt_compact.go — FormatCompactSummary (subset; full prompts TBD)
 // grouping.ts                                        grouping.go — GroupMessagesByApiRound, ApiRoundMessage
