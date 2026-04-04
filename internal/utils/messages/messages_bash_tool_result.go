@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	// bashPreviewMaxUTF16 = 2000 (TS PREVIEW_SIZE_BYTES uses String.length / UTF-16 code units).
-	bashPreviewMaxUTF16            = 2000
-	bashAssistantBlockingBudgetSec = 15 // ASSISTANT_BLOCKING_BUDGET_MS / 1000
+	// bashPreviewMaxUTF16Units mirrors TS PREVIEW_SIZE_BYTES (2000): generatePreview compares
+	// content.length / slice (UTF-16 code units), not byte length.
+	bashPreviewMaxUTF16Units        = 2000
+	bashAssistantBlockingBudgetSec  = 15 // ASSISTANT_BLOCKING_BUDGET_MS / 1000
 	persistedOutputTag              = "<persisted-output>"
 	persistedOutputClosingTag       = "</persisted-output>"
 	notebookCellOutputTruncateBytes = 10000 // TS notebook LARGE_OUTPUT_THRESHOLD (text+image heuristic)
@@ -92,18 +93,20 @@ func bashDefaultTaskOutputPath(taskID string) string {
 	return filepath.Join(dir, taskID+".output")
 }
 
-func bashGeneratePreview(content string, maxUTF16 int) (preview string, hasMore bool) {
-	if jsStringUTF16Len(content) <= maxUTF16 {
+func bashGeneratePreview(content string, maxUTF16Units int) (preview string, hasMore bool) {
+	if jsStringUTF16Len(content) <= maxUTF16Units {
 		return content, false
 	}
-	truncated, _ := truncateJSStringToMaxUTF16(content, maxUTF16)
-	lastNL := lastNewlineUTF16Index(truncated)
-	cutUTF16 := maxUTF16
-	if lastNL > maxUTF16/2 {
-		cutUTF16 = lastNL
+	truncated, _ := truncateJSStringToMaxUTF16(content, maxUTF16Units)
+	lastNL := strings.LastIndex(truncated, "\n")
+	if lastNL < 0 {
+		return truncated, true
 	}
-	preview, _ = truncateJSStringToMaxUTF16(content, cutUTF16)
-	return preview, true
+	nlUTF16 := jsStringUTF16Len(truncated[:lastNL])
+	if float64(nlUTF16) > float64(maxUTF16Units)*0.5 {
+		return truncated[:lastNL], true
+	}
+	return truncated, true
 }
 
 func bashBuildLargePersistedMessage(path string, originalSize int, preview string, hasMore bool) string {
@@ -111,7 +114,7 @@ func bashBuildLargePersistedMessage(path string, originalSize int, preview strin
 	b.WriteString(persistedOutputTag)
 	b.WriteByte('\n')
 	fmt.Fprintf(&b, "Output too large (%s). Full output saved to: %s\n\n", formatFileSizeForAPI(originalSize), path)
-	fmt.Fprintf(&b, "Preview (first %s):\n", formatFileSizeForAPI(bashPreviewMaxUTF16))
+	fmt.Fprintf(&b, "Preview (first %s):\n", formatFileSizeForAPI(bashPreviewMaxUTF16Units))
 	b.WriteString(preview)
 	if hasMore {
 		b.WriteString("\n...\n")
@@ -148,7 +151,7 @@ func bashPlaintextToolResultBody(src, att map[string]any, primaryStdout string) 
 		if orig <= 0 && processed != "" {
 			orig = len(processed)
 		}
-		prev, more := bashGeneratePreview(processed, bashPreviewMaxUTF16)
+		prev, more := bashGeneratePreview(processed, bashPreviewMaxUTF16Units)
 		processed = bashBuildLargePersistedMessage(path, orig, prev, more)
 	}
 

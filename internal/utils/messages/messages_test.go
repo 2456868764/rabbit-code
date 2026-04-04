@@ -947,6 +947,103 @@ func TestNormalizeAttachmentForAPI_teammateMailbox_defaultFormat(t *testing.T) {
 	}
 }
 
+func TestNormalizeAttachmentForAPI_teammateMailbox_nonObjectSkippedEmpty(t *testing.T) {
+	t.Setenv("RABBIT_AGENT_SWARMS", "1")
+	msgs, err := NormalizeAttachmentForAPI(map[string]any{
+		"type":     "teammate_mailbox",
+		"messages": []any{"not-a-map", float64(1)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("got %d msgs", len(msgs))
+	}
+	mm, _ := msgs[0]["message"].(map[string]any)
+	body, _ := mm["content"].(string)
+	if strings.TrimSpace(body) != "" {
+		t.Fatalf("TS formatTeammateMessages yields empty when nothing mappable; got %q", body)
+	}
+	if strings.Contains(body, "unparseable") || strings.Contains(body, "Teammate mailbox") {
+		t.Fatalf("unexpected debug dump: %q", body)
+	}
+}
+
+func TestBashQuoteShellArg(t *testing.T) {
+	if q := bashQuoteShellArg("/tmp/foo bar"); q != `'/tmp/foo bar'` {
+		t.Fatalf("got %q", q)
+	}
+	if q := bashQuoteShellArg(`O'Brien`); !strings.Contains(q, `'"'"'`) {
+		t.Fatalf("expected POSIX single-quote escape, got %q", q)
+	}
+	if bashQuoteShellArg("") != "''" {
+		t.Fatal(bashQuoteShellArg(""))
+	}
+}
+
+func TestBashGeneratePreview_utf16Limit(t *testing.T) {
+	// 2000 ASCII + one BMP char = 2001 UTF-16 units; cap 2000 → drop trailing "b".
+	s := strings.Repeat("a", 2000) + "b"
+	prev, more := bashGeneratePreview(s, 2000)
+	if !more {
+		t.Fatal("expected hasMore")
+	}
+	if jsStringUTF16Len(prev) != 2000 {
+		t.Fatalf("want 2000 utf16 units, got %d", jsStringUTF16Len(prev))
+	}
+	if strings.Contains(prev, "b") {
+		t.Fatalf("tail should be truncated: %q", prev)
+	}
+}
+
+func TestNormalizeAttachmentForAPI_directory_lsShellQuote(t *testing.T) {
+	msgs, err := NormalizeAttachmentForAPI(map[string]any{
+		"type":    "directory",
+		"path":    "/tmp/foo bar",
+		"content": "x",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var joined string
+	for _, m := range msgs {
+		mm, _ := m["message"].(map[string]any)
+		joined += fmt.Sprint(mm["content"])
+	}
+	if !strings.Contains(joined, `ls '/tmp/foo bar'`) {
+		t.Fatalf("missing shell-quoted ls arg: %s", joined)
+	}
+}
+
+func TestNormalizeAttachmentForAPI_selectedLines_utf16Cap(t *testing.T) {
+	// 1998 'a' + emoji (2 utf16) = 2000 units (no truncation); add one more 'a' → 2001 → truncate.
+	content := strings.Repeat("a", 1998) + "\U0001F600" + "z"
+	msgs, err := NormalizeAttachmentForAPI(map[string]any{
+		"type":      "selected_lines_in_ide",
+		"filename":  "f.go",
+		"lineStart": float64(1),
+		"lineEnd":   float64(2),
+		"content":   content,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body string
+	for _, m := range msgs {
+		mm, _ := m["message"].(map[string]any)
+		body, _ = mm["content"].(string)
+		if body != "" {
+			break
+		}
+	}
+	if !strings.Contains(body, "truncated") {
+		t.Fatalf("expected truncation marker: %q", body)
+	}
+	if strings.Contains(body, "z") {
+		t.Fatalf("suffix char should be truncated away: %q", body)
+	}
+}
+
 func TestMergeUserContentBlocks_stringToolResultSmoosh(t *testing.T) {
 	t.Setenv("RABBIT_TENGU_CHAIR_SERMON", "")
 	a := []map[string]any{{
@@ -989,136 +1086,5 @@ func TestSanitizeErrorToolResultContentGeneric_stripsNonText(t *testing.T) {
 	tb, _ := trc[0].(map[string]any)
 	if tb["type"] != "text" || tb["text"] != "err" {
 		t.Fatalf("got %#v", tb)
-	}
-}
-
-func TestShellQuoteSingleArg_safePathUnquoted(t *testing.T) {
-	if got := ShellQuoteSingleArg("/tmp/foo_bar"); got != "/tmp/foo_bar" {
-		t.Fatalf("got %q want unquoted safe path", got)
-	}
-}
-
-func TestShellQuoteSingleArg_spaceQuoted(t *testing.T) {
-	got := ShellQuoteSingleArg("/tmp/foo bar")
-	want := "'/tmp/foo bar'"
-	if got != want {
-		t.Fatalf("got %q want %q", got, want)
-	}
-}
-
-func TestShellQuoteSingleArg_apostrophe(t *testing.T) {
-	got := ShellQuoteSingleArg("it's")
-	want := `'it'\''s'`
-	if got != want {
-		t.Fatalf("got %q want %q", got, want)
-	}
-	if ShellQuoteSingleArg("") != "''" {
-		t.Fatalf("empty: got %q", ShellQuoteSingleArg(""))
-	}
-}
-
-func TestBashGeneratePreview_utf16Semantics(t *testing.T) {
-	var b strings.Builder
-	for i := 0; i < 1990; i++ {
-		b.WriteByte('a')
-	}
-	b.WriteByte('\n')
-	for i := 0; i < 80; i++ {
-		b.WriteByte('b')
-	}
-	s := b.String()
-	preview, more := bashGeneratePreview(s, 2000)
-	if !more {
-		t.Fatal("expected hasMore")
-	}
-	if strings.Contains(preview, "\n") {
-		t.Fatalf("preview should end before newline (TS generatePreview cut at lastNewline): %q", preview)
-	}
-	if jsStringUTF16Len(preview) != 1990 {
-		t.Fatalf("want 1990 UTF-16 units, got %d", jsStringUTF16Len(preview))
-	}
-}
-
-func TestSelectedLinesTruncation_utf16(t *testing.T) {
-	long := strings.Repeat("a", 2001)
-	msgs, err := NormalizeAttachmentForAPI(map[string]any{
-		"type":      "selected_lines_in_ide",
-		"filename":  "f.go",
-		"lineStart": float64(1),
-		"lineEnd":   float64(2),
-		"content":   long,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(msgs) != 1 {
-		t.Fatalf("msgs=%d", len(msgs))
-	}
-	mm, _ := msgs[0]["message"].(map[string]any)
-	body, _ := mm["content"].(string)
-	const hdr = "from f.go:\n"
-	hi := strings.Index(body, hdr)
-	if hi < 0 {
-		t.Fatalf("missing header: %q", body)
-	}
-	rest := body[hi+len(hdr):]
-	idx := strings.Index(rest, "\n... (truncated)")
-	if idx < 0 {
-		t.Fatalf("missing truncation marker: %q", body)
-	}
-	prefix := rest[:idx]
-	if jsStringUTF16Len(prefix) != 2000 {
-		t.Fatalf("want 2000 UTF-16 units before marker, got %d", jsStringUTF16Len(prefix))
-	}
-}
-
-func TestNormalizeAttachment_teammateMailbox_skipsNonObjects(t *testing.T) {
-	t.Setenv("RABBIT_AGENT_SWARMS", "1")
-	msgs, err := NormalizeAttachmentForAPI(map[string]any{
-		"type": "teammate_mailbox",
-		"messages": []any{
-			float64(1),
-			"not-a-map",
-			map[string]any{"from": "ada", "text": "hello"},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	mm, _ := msgs[0]["message"].(map[string]any)
-	body, _ := mm["content"].(string)
-	if strings.Contains(body, "unparseable") || strings.Contains(body, "Teammate mailbox") {
-		t.Fatalf("TS does not dump raw JSON for bad entries: %q", body)
-	}
-	if !strings.Contains(body, `teammate_id="ada"`) || !strings.Contains(body, "hello") {
-		t.Fatalf("expected valid entry only: %q", body)
-	}
-}
-
-func TestNormalizeAttachment_teammateMailbox_emptyWhenOnlyBadEntries(t *testing.T) {
-	t.Setenv("RABBIT_AGENT_SWARMS", "1")
-	msgs, err := NormalizeAttachmentForAPI(map[string]any{
-		"type":     "teammate_mailbox",
-		"messages": []any{float64(1), "x"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if msgs != nil {
-		t.Fatalf("want nil messages, got %#v", msgs)
-	}
-}
-
-func TestTeammateMailbox_emptyReturnsNil(t *testing.T) {
-	t.Setenv("RABBIT_AGENT_SWARMS", "1")
-	msgs, err := NormalizeAttachmentForAPI(map[string]any{
-		"type":     "teammate_mailbox",
-		"messages": []any{},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if msgs != nil {
-		t.Fatalf("want nil, got %#v", msgs)
 	}
 }

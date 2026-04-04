@@ -72,9 +72,9 @@ func NormalizeAttachmentForAPI(attachment map[string]any) ([]TSMsg, error) {
 			} else {
 				body = DefaultFormatTeammateMailboxMessagesForAPI(raw)
 			}
-			if strings.TrimSpace(body) == "" {
-				return nil, nil
-			}
+			body = strings.TrimSpace(body)
+			// TS: formatTeammateMessages maps only structured entries; non-objects are not in TS typings.
+			// Malformed / all-skipped yields "" — still one meta user message like TS.
 			return []TSMsg{CreateUserMessage(CreateUserMessageOpts{
 				Content: body,
 				IsMeta:  true,
@@ -144,7 +144,7 @@ Read the team config to discover your teammates' names. Check the task list peri
 		path, _ := attachment["path"].(string)
 		return WrapMessagesInSystemReminder([]TSMsg{
 			metaToolUseMessage(ToolNameBash, map[string]any{
-				"command":     fmt.Sprintf("ls %s", ShellQuoteSingleArg(path)),
+				"command":     fmt.Sprintf("ls %s", bashQuoteShellArg(path)),
 				"description": fmt.Sprintf("Lists files in %s", path),
 			}),
 			BashToolResultMetaMessage(ToolNameBash, attachment),
@@ -192,10 +192,10 @@ Read the team config to discover your teammates' names. Check the task list peri
 		ls, _ := attachment["lineStart"].(float64)
 		le, _ := attachment["lineEnd"].(float64)
 		cont, _ := attachment["content"].(string)
-		const selectedLinesMaxUTF16 = 2000
-		if jsStringUTF16Len(cont) > selectedLinesMaxUTF16 {
-			prefix, _ := truncateJSStringToMaxUTF16(cont, selectedLinesMaxUTF16)
-			cont = prefix + "\n... (truncated)"
+		const maxIDESelUTF16 = 2000 // TS maxSelectionLength; JS String.length / substring
+		if jsStringUTF16Len(cont) > maxIDESelUTF16 {
+			pref, _ := truncateJSStringToMaxUTF16(cont, maxIDESelUTF16)
+			cont = pref + "\n... (truncated)"
 		}
 		return WrapMessagesInSystemReminder([]TSMsg{CreateUserMessage(CreateUserMessageOpts{
 			Content: fmt.Sprintf(
