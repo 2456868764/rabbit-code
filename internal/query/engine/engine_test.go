@@ -16,7 +16,6 @@ import (
 	"github.com/2456868764/rabbit-code/internal/config"
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query"
-	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 	"github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
@@ -41,8 +40,8 @@ func TestEngine_ProactiveAutoCompact_suggestWithoutAdvisor(t *testing.T) {
 	t.Setenv(features.EnvSuppressProactiveAutoCompact, "")
 	longReply := strings.Repeat("z", 150_000)
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return longReply, nil
 			}),
 		},
@@ -102,8 +101,8 @@ func TestEngine_PostCompactCleanup_afterSuccessfulCompactExecutor(t *testing.T) 
 			}
 			sawMain = mainThread
 		},
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return longReply, nil
 			}),
 		},
@@ -144,8 +143,8 @@ func TestEngine_SessionMemoryCompact_skipsLegacyAutoExecutor(t *testing.T) {
 			_ = transcript
 			return json.RawMessage(`[{"role":"user","content":[{"type":"text","text":"sm"}]}]`), true, nil
 		},
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return longReply, nil
 			}),
 		},
@@ -211,8 +210,8 @@ func TestEngine_AfterSessionMemoryCompactSuccess_onSMCompact(t *testing.T) {
 			_ = transcript
 			return json.RawMessage(`[{"role":"user","content":[{"type":"text","text":"sm"}]}]`), true, nil
 		},
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return longReply, nil
 			}),
 		},
@@ -327,8 +326,8 @@ func TestEngine_AutoCompactCircuit_tripsAfterExecutorFailures(t *testing.T) {
 	t.Setenv(features.EnvSuppressProactiveAutoCompact, "")
 	longReply := strings.Repeat("z", 150_000)
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return longReply, nil
 			}),
 		},
@@ -377,8 +376,8 @@ func TestEngine_ProactiveAutoCompact_suppressedForQuerySourceSessionMemory(t *te
 	longReply := strings.Repeat("z", 150_000)
 	e := New(context.Background(), &Config{
 		QuerySource: query.QuerySourceSessionMemory,
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return longReply, nil
 			}),
 		},
@@ -416,8 +415,8 @@ func TestEngine_ProactiveAutoCompact_suppressedForQuerySourceSessionMemory(t *te
 func TestEngine_CompactE2E_longTranscriptTriggersExecutor(t *testing.T) {
 	longReply := strings.Repeat("xy ", 400)
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return longReply, nil
 			}),
 		},
@@ -466,8 +465,8 @@ func TestEngine_TokenBudget_blocksOversizeResolvedText(t *testing.T) {
 	t.Setenv(features.EnvTokenBudget, "true")
 	t.Setenv(features.EnvTokenBudgetMaxInputBytes, "10")
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "ok", nil
 			}),
 		},
@@ -507,8 +506,8 @@ func TestEngine_TokenBudget_combinedTextAndInjectRawTokens(t *testing.T) {
 	t.Setenv(features.EnvTokenBudgetMaxInputTokens, "2")
 	e := New(context.Background(), &Config{
 		MemdirPaths: []string{p},
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "ok", nil
 			}),
 		},
@@ -541,8 +540,8 @@ func TestEngine_TokenBudget_emitsSubmitSnapshot(t *testing.T) {
 	t.Setenv(features.EnvTokenBudgetMaxInputBytes, "999999")
 	t.Setenv(features.EnvTokenBudgetMaxInputTokens, "999999")
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "ok", nil
 			}),
 		},
@@ -579,8 +578,8 @@ func TestEngine_TokenBudget_blocksByTokenEstimate(t *testing.T) {
 	t.Setenv(features.EnvTokenBudgetMaxInputBytes, "999999")
 	t.Setenv(features.EnvTokenBudgetMaxInputTokens, "1")
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "ok", nil
 			}),
 		},
@@ -618,8 +617,8 @@ func TestEngine_TokenBudget_blocksOversizeMemdirInject(t *testing.T) {
 	t.Setenv(features.EnvTokenBudgetMaxAttachmentBytes, "5")
 	e := New(context.Background(), &Config{
 		MemdirPaths: []string{p},
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "ok", nil
 			}),
 		},
@@ -649,8 +648,8 @@ attDone:
 
 func TestEngine_Submit_withStreamAssistant(t *testing.T) {
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(ctx context.Context, model string, maxTokens int, messagesJSON []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(ctx context.Context, model string, maxTokens int, messagesJSON []byte) (string, error) {
 				if model != "m" || maxTokens != 16 {
 					t.Fatalf("model=%q max=%d", model, maxTokens)
 				}
@@ -685,8 +684,8 @@ func TestEngine_Submit_withStreamAssistant(t *testing.T) {
 
 func TestEngine_Submit_streamAssistantError(t *testing.T) {
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "", errors.New("stream err")
 			}),
 		},
@@ -723,12 +722,12 @@ func TestEngine_Submit_emitsSequence(t *testing.T) {
 
 func TestEngine_RunTurnLoop_toolEvents(t *testing.T) {
 	tr := &countingToolRunner{}
-	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
-		{Text: "a", ToolUses: []querydeps.ToolUseCall{{ID: "1", Name: "bash", Input: json.RawMessage(`{}`)}}},
+	turns := &query.SequenceTurnAssistant{Turns: []query.TurnResult{
+		{Text: "a", ToolUses: []query.ToolUseCall{{ID: "1", Name: "bash", Input: json.RawMessage(`{}`)}}},
 		{Text: "b"},
 	}}
 	e := New(context.Background(), &Config{
-		Deps:  querydeps.Deps{Tools: tr, Turn: turns},
+		Deps:  query.Deps{Tools: tr, Turn: turns},
 		Model: "m", MaxTokens: 8,
 	})
 	e.Submit("hi")
@@ -766,8 +765,8 @@ func TestEngine_MemdirInject_prependsFragments(t *testing.T) {
 	var sawMemdir bool
 	var lastUser string
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
 				lastUser = string(messagesJSON)
 				return "ok", nil
 			}),
@@ -810,8 +809,8 @@ func TestEngine_MemdirMemoryDir_heuristicAndSurfacedExcludesSecondSubmit(t *test
 	var memdirCount int
 	var lastUser string
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
 				lastUser = string(messagesJSON)
 				return "ok", nil
 			}),
@@ -867,8 +866,8 @@ func TestEngine_MemdirMemoryDir_fromEnv(t *testing.T) {
 	}
 	var lastUser string
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
 				lastUser = string(messagesJSON)
 				return "ok", nil
 			}),
@@ -904,8 +903,8 @@ func TestEngine_MemdirMemoryDir_autoResolve_memoryPathOverride(t *testing.T) {
 	}
 	var lastUser string
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
 				lastUser = string(messagesJSON)
 				return "ok", nil
 			}),
@@ -957,8 +956,8 @@ func TestEngine_MemdirMemoryDir_trustedConfigOnly(t *testing.T) {
 	}
 	var lastUser string
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
 				lastUser = string(messagesJSON)
 				return "ok", nil
 			}),
@@ -1019,8 +1018,8 @@ func TestEngine_MemdirMemoryDir_fromLoadTrustedAutoMemoryDirectory(t *testing.T)
 	}
 	var lastUser string
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
 				lastUser = string(messagesJSON)
 				return "ok", nil
 			}),
@@ -1055,8 +1054,8 @@ func TestEngine_Memdir_initialSettings_autoMemoryDisabled(t *testing.T) {
 	}
 	var lastUser string
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
 				lastUser = string(messagesJSON)
 				return "ok", nil
 			}),
@@ -1085,8 +1084,8 @@ doneOff:
 
 func TestEngine_CompactSuggest_afterLoop(t *testing.T) {
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "x", nil
 			}),
 		},
@@ -1117,8 +1116,8 @@ func TestEngine_CompactSuggest_afterLoop(t *testing.T) {
 func TestEngine_Error_anthropicKindAndRecoverable(t *testing.T) {
 	apiErr := &anthropic.APIError{Kind: anthropic.KindPromptTooLong, Status: 400, Msg: "ptl"}
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "", fmt.Errorf("wrap: %w", apiErr)
 			}),
 		},
@@ -1144,8 +1143,8 @@ func TestEngine_Error_anthropicKindAndRecoverable(t *testing.T) {
 func TestEngine_StopHooks_order(t *testing.T) {
 	var order []int
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "ok", nil
 			}),
 		},
@@ -1172,8 +1171,8 @@ func TestEngine_StopHook_successAndFailure(t *testing.T) {
 	}
 
 	e1 := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "ok", nil
 			}),
 		},
@@ -1187,8 +1186,8 @@ func TestEngine_StopHook_successAndFailure(t *testing.T) {
 	}
 
 	e2 := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "", errors.New("fail")
 			}),
 		},
@@ -1204,12 +1203,12 @@ func TestEngine_StopHook_successAndFailure(t *testing.T) {
 
 func TestEngine_MaxAssistantTurns(t *testing.T) {
 	// One assistant message with tools consumes a turn; a second assistant round must not start when MaxTurns==1.
-	seq := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
-		{Text: "t1", ToolUses: []querydeps.ToolUseCall{{ID: "x", Name: "bash", Input: json.RawMessage(`{}`)}}},
+	seq := &query.SequenceTurnAssistant{Turns: []query.TurnResult{
+		{Text: "t1", ToolUses: []query.ToolUseCall{{ID: "x", Name: "bash", Input: json.RawMessage(`{}`)}}},
 		{Text: "t2"},
 	}}
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
+		Deps: query.Deps{
 			Turn:  seq,
 			Tools: &countingToolRunner{},
 		},
@@ -1233,8 +1232,8 @@ func TestEngine_MaxAssistantTurns(t *testing.T) {
 func TestEngine_RecoverableError_emitsCompactSuggestWhenConfigured(t *testing.T) {
 	apiErr := &anthropic.APIError{Kind: anthropic.KindPromptTooLong, Status: 400, Msg: "ptl"}
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "", fmt.Errorf("w: %w", apiErr)
 			}),
 		},
@@ -1257,8 +1256,8 @@ func TestEngine_RecoverableError_emitsCompactSuggestWhenConfigured(t *testing.T)
 
 func TestEngine_OrphanPermission_advisor(t *testing.T) {
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "y", nil
 			}),
 		},
@@ -1308,8 +1307,8 @@ func (c *countingToolRunner) RunTool(context.Context, string, []byte) ([]byte, e
 func TestEngine_RecoverStrategy_secondAttemptSucceeds(t *testing.T) {
 	var n int
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				n++
 				if n == 1 {
 					return "", errors.New("transient")
@@ -1351,8 +1350,8 @@ func TestEngine_RecoverStrategy_StopHook_seesSubmitRecoverContinue(t *testing.T)
 	var captured query.LoopState
 	var n int
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				n++
 				if n == 1 {
 					return "", errors.New("transient")
@@ -1378,8 +1377,8 @@ func TestEngine_RecoverStrategy_maxOutputTokens_recordsRecoveryContinue(t *testi
 	var n int
 	apiErr := &anthropic.APIError{Kind: anthropic.KindMaxOutputTokens, Status: 400, Msg: "otk"}
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				n++
 				if n == 1 {
 					return "", fmt.Errorf("wrap: %w", apiErr)
@@ -1407,8 +1406,8 @@ func TestEngine_recoverableError_compactStub_recordsReactiveContinue(t *testing.
 	var captured query.LoopState
 	apiErr := &anthropic.APIError{Kind: anthropic.KindPromptTooLong, Status: 400, Msg: "ptl"}
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "", fmt.Errorf("w: %w", apiErr)
 			}),
 		},
@@ -1427,13 +1426,13 @@ func TestEngine_recoverableError_compactStub_recordsReactiveContinue(t *testing.
 }
 
 func TestEngine_StopHookBlockingContinue_runsSecondTurnLoop(t *testing.T) {
-	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+	turns := &query.SequenceTurnAssistant{Turns: []query.TurnResult{
 		{Text: "a"},
 		{Text: "b"},
 	}}
 	var nCont int
 	e := New(context.Background(), &Config{
-		Deps:  querydeps.Deps{Turn: turns},
+		Deps:  query.Deps{Turn: turns},
 		Model: "m", MaxTokens: 8,
 		StopHookBlockingContinue: func(context.Context, query.LoopState) bool {
 			nCont++
@@ -1465,14 +1464,14 @@ func TestEngine_StopHookBlockingContinue_runsSecondTurnLoop(t *testing.T) {
 func TestEngine_TokenBudgetContinueAfterTurn_secondLoop(t *testing.T) {
 	t.Setenv(features.EnvTokenBudget, "true")
 	t.Setenv(features.EnvTokenBudgetMaxInputBytes, "999999")
-	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+	turns := &query.SequenceTurnAssistant{Turns: []query.TurnResult{
 		{Text: "t1"},
 		{Text: "t2"},
 	}}
 	var nTok int
 	var captured query.LoopState
 	e := New(context.Background(), &Config{
-		Deps:  querydeps.Deps{Turn: turns},
+		Deps:  query.Deps{Turn: turns},
 		Model: "m", MaxTokens: 8,
 		TokenBudgetContinueAfterTurn: func(context.Context, query.LoopState, json.RawMessage) bool {
 			nTok++
@@ -1498,8 +1497,8 @@ func TestEngine_ContextCollapseDrain_recordsContinueOnPTL(t *testing.T) {
 	var captured query.LoopState
 	apiErr := &anthropic.APIError{Kind: anthropic.KindPromptTooLong, Status: 400, Msg: "ptl"}
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "", fmt.Errorf("w: %w", apiErr)
 			}),
 		},
@@ -1528,8 +1527,8 @@ func TestEngine_ContextCollapseDrain_recoverRetryUsesDrainedSeed(t *testing.T) {
 	var n int
 	var secondBody string
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
 				n++
 				if n == 1 {
 					return "", fmt.Errorf("w: %w", apiErr)
@@ -1563,8 +1562,8 @@ func TestEngine_RecoverStrategy_compactNextTranscriptSeedsRetry(t *testing.T) {
 	var n int
 	var secondBody string
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
 				n++
 				if n == 1 {
 					return "", fmt.Errorf("w: %w", apiErr)
@@ -1604,8 +1603,8 @@ func TestEngine_drainThenCompact_compactNextWinsOnRetrySeed(t *testing.T) {
 	var n int
 	var secondBody string
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
 				n++
 				if n == 1 {
 					return "", fmt.Errorf("w: %w", apiErr)
@@ -1634,8 +1633,8 @@ func TestEngine_drainThenCompact_compactNextWinsOnRetrySeed(t *testing.T) {
 func TestEngine_ConfigAgentIDNonInteractive_inLoopState(t *testing.T) {
 	var captured query.LoopState
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "x", nil
 			}),
 		},
@@ -1671,8 +1670,8 @@ func TestEngine_StopHooksAfterSuccessfulTurn_preventContinuation(t *testing.T) {
 	var tokenCalls int
 	var captured query.LoopState
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "ok", nil
 			}),
 		},
@@ -1719,13 +1718,13 @@ func TestEngine_StopHooksAfterSuccessfulTurn_preventContinuation(t *testing.T) {
 }
 
 func TestEngine_StopHooksAfterSuccessfulTurn_blockingContinue(t *testing.T) {
-	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+	turns := &query.SequenceTurnAssistant{Turns: []query.TurnResult{
 		{Text: "a"},
 		{Text: "b"},
 	}}
 	var afterCalls int
 	e := New(context.Background(), &Config{
-		Deps:  querydeps.Deps{Turn: turns},
+		Deps:  query.Deps{Turn: turns},
 		Model: "m", MaxTokens: 8,
 		StopHooksAfterSuccessfulTurn: []StopHookAfterTurnFunc{
 			func(context.Context, query.LoopState, json.RawMessage) StopHookAfterTurnResult {
@@ -1746,12 +1745,12 @@ func TestEngine_StopHooksAfterSuccessfulTurn_blockingContinue(t *testing.T) {
 }
 
 func TestEngine_BashStubToolRunner(t *testing.T) {
-	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
-		{Text: "run", ToolUses: []querydeps.ToolUseCall{{ID: "t1", Name: "bash", Input: json.RawMessage(`{"cmd":"ls"}`)}}},
+	turns := &query.SequenceTurnAssistant{Turns: []query.TurnResult{
+		{Text: "run", ToolUses: []query.ToolUseCall{{ID: "t1", Name: "bash", Input: json.RawMessage(`{"cmd":"ls"}`)}}},
 		{Text: "done"},
 	}}
 	e := New(context.Background(), &Config{
-		Deps:  querydeps.Deps{Tools: querydeps.BashStubToolRunner{}, Turn: turns},
+		Deps:  query.Deps{Tools: query.BashStubToolRunner{}, Turn: turns},
 		Model: "m", MaxTokens: 8,
 	})
 	e.Submit("hi")
@@ -1760,14 +1759,14 @@ func TestEngine_BashStubToolRunner(t *testing.T) {
 }
 
 func TestEngine_ToolCallFailed_emitsOrphanFromError(t *testing.T) {
-	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
-		{Text: "x", ToolUses: []querydeps.ToolUseCall{{ID: "orph1", Name: "bash", Input: json.RawMessage(`{}`)}}},
+	turns := &query.SequenceTurnAssistant{Turns: []query.TurnResult{
+		{Text: "x", ToolUses: []query.ToolUseCall{{ID: "orph1", Name: "bash", Input: json.RawMessage(`{}`)}}},
 	}}
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
+		Deps: query.Deps{
 			Turn: turns,
 			Tools: toolRunnerFunc(func(_ context.Context, _ string, _ []byte) ([]byte, error) {
-				return nil, &querydeps.OrphanPermissionError{ToolUseID: "orph1"}
+				return nil, &query.OrphanPermissionError{ToolUseID: "orph1"}
 			}),
 		},
 		Model: "m", MaxTokens: 8,
@@ -1806,8 +1805,8 @@ func (f toolRunnerFunc) RunTool(ctx context.Context, name string, in []byte) ([]
 
 func TestEngine_CompactExecutor_afterAdvisor(t *testing.T) {
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "y", nil
 			}),
 		},
@@ -1852,8 +1851,8 @@ func TestEngine_CompactExecutor_afterAdvisor(t *testing.T) {
 
 func TestEngine_Submit_withStreamAssistant_doneTurnCount(t *testing.T) {
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "out", nil
 			}),
 		},
@@ -1884,8 +1883,8 @@ func TestEngine_headlessEnv_breakCacheTemplatesMicrocompactEvents(t *testing.T) 
 	t.Setenv(features.EnvTemplateNames, "a,b")
 	t.Setenv(features.EnvCachedMicrocompact, "true")
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "x", nil
 			}),
 		},
@@ -1933,8 +1932,8 @@ func TestEngine_templateMarkdownAppendixFromDir(t *testing.T) {
 	var captured string
 	e := New(context.Background(), &Config{
 		TemplateDir: dir,
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
 				captured = string(messagesJSON)
 				return "x", nil
 			}),
@@ -1961,8 +1960,8 @@ func TestEngine_UserSubmit_carriesHeadlessModeTags(t *testing.T) {
 	t.Setenv(features.EnvUltrathink, "true")
 	t.Setenv(features.EnvUltraplan, "true")
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "x", nil
 			}),
 		},
@@ -1989,8 +1988,8 @@ func TestEngine_ultrathinkInjectsIntoMessagesJSON(t *testing.T) {
 	t.Setenv(features.EnvUltrathink, "true")
 	var captured string
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
 				captured = string(messagesJSON)
 				return "ok", nil
 			}),
@@ -2019,8 +2018,8 @@ func TestEngine_reactiveCompactFromEnv_minTokens(t *testing.T) {
 	t.Setenv(features.EnvReactiveCompactMinBytes, "999999")
 	t.Setenv(features.EnvReactiveCompactMinTokens, "1")
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "r", nil
 			}),
 		},
@@ -2052,8 +2051,8 @@ func TestEngine_reactiveCompactFromEnv(t *testing.T) {
 	t.Setenv(features.EnvReactiveCompact, "true")
 	t.Setenv(features.EnvReactiveCompactMinBytes, "1")
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "r", nil
 			}),
 		},
@@ -2086,12 +2085,12 @@ func TestEngine_historySnipBetweenRounds(t *testing.T) {
 	t.Setenv(features.EnvHistorySnipMaxBytes, "280")
 	t.Setenv(features.EnvHistorySnipMaxRounds, "2")
 	long := strings.Repeat("z", 350)
-	seq := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
-		{Text: long, ToolUses: []querydeps.ToolUseCall{{ID: "1", Name: "bash", Input: json.RawMessage(`{}`)}}},
+	seq := &query.SequenceTurnAssistant{Turns: []query.TurnResult{
+		{Text: long, ToolUses: []query.ToolUseCall{{ID: "1", Name: "bash", Input: json.RawMessage(`{}`)}}},
 		{Text: "end"},
 	}}
 	e := New(context.Background(), &Config{
-		Deps:  querydeps.Deps{Turn: seq, Tools: querydeps.BashStubToolRunner{}},
+		Deps:  query.Deps{Turn: seq, Tools: query.BashStubToolRunner{}},
 		Model: "m", MaxTokens: 8,
 	})
 	e.Submit("hi")
@@ -2123,8 +2122,8 @@ func TestEngine_SnipRemovalLogForPersistence_includesRestored(t *testing.T) {
 	prev := []query.SnipRemovalEntry{{ID: "r1", Kind: query.SnipRemovalKindSnipCompact, RemovedMessageCount: 2}}
 	e := New(context.Background(), &Config{
 		RestoredSnipRemovalLog: prev,
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "ok", nil
 			}),
 		},
@@ -2142,8 +2141,8 @@ func TestEngine_LastAssistantAtForPersistence_restoredAndUpdated(t *testing.T) {
 	restored := time.Date(2025, 11, 10, 15, 30, 0, 0, time.UTC)
 	e := New(context.Background(), &Config{
 		RestoredSessionLastAssistantAt: restored,
-		Deps: querydeps.Deps{
-			Turn: querydeps.StreamAsTurnAssistant(querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Turn: query.StreamAsTurnAssistant(query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "hi", nil
 			})),
 		},
@@ -2168,12 +2167,12 @@ func TestEngine_SnipCompactBetweenRounds(t *testing.T) {
 	t.Setenv(features.EnvSnipCompactMaxBytes, "280")
 	t.Setenv(features.EnvSnipCompactMaxRounds, "2")
 	long := strings.Repeat("s", 350)
-	seq := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
-		{Text: long, ToolUses: []querydeps.ToolUseCall{{ID: "1", Name: "bash", Input: json.RawMessage(`{}`)}}},
+	seq := &query.SequenceTurnAssistant{Turns: []query.TurnResult{
+		{Text: long, ToolUses: []query.ToolUseCall{{ID: "1", Name: "bash", Input: json.RawMessage(`{}`)}}},
 		{Text: "end"},
 	}}
 	e := New(context.Background(), &Config{
-		Deps:  querydeps.Deps{Turn: seq, Tools: querydeps.BashStubToolRunner{}},
+		Deps:  query.Deps{Turn: seq, Tools: query.BashStubToolRunner{}},
 		Model: "m", MaxTokens: 8,
 	})
 	e.Submit("hi")
@@ -2200,26 +2199,26 @@ func TestEngine_SnipCompactBetweenRounds(t *testing.T) {
 
 type cacheBreakFireTurn struct{}
 
-func (cacheBreakFireTurn) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (querydeps.TurnResult, error) {
+func (cacheBreakFireTurn) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (query.TurnResult, error) {
 	_ = model
 	_ = maxTokens
 	_ = msgs
-	if cb, ok := querydeps.OnPromptCacheBreakFromContext(ctx); ok && cb != nil {
+	if cb, ok := query.OnPromptCacheBreakFromContext(ctx); ok && cb != nil {
 		cb()
 	}
-	return querydeps.TurnResult{Text: "ok"}, nil
+	return query.TurnResult{Text: "ok"}, nil
 }
 
 type failOncePromptCacheBreakTurn struct {
 	n int
 }
 
-func (f *failOncePromptCacheBreakTurn) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (querydeps.TurnResult, error) {
+func (f *failOncePromptCacheBreakTurn) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (query.TurnResult, error) {
 	f.n++
 	if f.n == 1 {
-		return querydeps.TurnResult{}, anthropic.ErrPromptCacheBreakDetected
+		return query.TurnResult{}, anthropic.ErrPromptCacheBreakDetected
 	}
-	return querydeps.TurnResult{Text: "ok"}, nil
+	return query.TurnResult{Text: "ok"}, nil
 }
 
 func TestEngine_promptCacheBreakAutoCompact_recovery(t *testing.T) {
@@ -2228,7 +2227,7 @@ func TestEngine_promptCacheBreakAutoCompact_recovery(t *testing.T) {
 	t.Setenv(features.EnvPromptCacheBreakAutoCompact, "1")
 	var sawCompactRetry bool
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
+		Deps: query.Deps{
 			Turn: &failOncePromptCacheBreakTurn{},
 		},
 		CompactExecutor: func(ctx context.Context, phase compact.RunPhase, transcriptJSON []byte) (string, []byte, error) {
@@ -2266,15 +2265,15 @@ type failTwicePromptCacheBreakThenOK struct {
 	t *testing.T
 }
 
-func (f *failTwicePromptCacheBreakThenOK) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (querydeps.TurnResult, error) {
+func (f *failTwicePromptCacheBreakThenOK) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (query.TurnResult, error) {
 	f.n++
 	if f.n <= 2 {
-		return querydeps.TurnResult{}, anthropic.ErrPromptCacheBreakDetected
+		return query.TurnResult{}, anthropic.ErrPromptCacheBreakDetected
 	}
 	if !bytes.Contains(msgs, []byte("seed2")) {
 		f.t.Fatalf("AssistantTurn call %d: want transcript from second compact, got %s", f.n, msgs)
 	}
-	return querydeps.TurnResult{Text: "h1-two-compacts"}, nil
+	return query.TurnResult{Text: "h1-two-compacts"}, nil
 }
 
 func TestEngine_promptCacheBreak_twoCompactRetry_events(t *testing.T) {
@@ -2284,7 +2283,7 @@ func TestEngine_promptCacheBreak_twoCompactRetry_events(t *testing.T) {
 	var compactCalls, compactRetryEvents int
 	turn := &failTwicePromptCacheBreakThenOK{t: t}
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{Turn: turn},
+		Deps: query.Deps{Turn: turn},
 		CompactExecutor: func(ctx context.Context, phase compact.RunPhase, transcriptJSON []byte) (string, []byte, error) {
 			_ = ctx
 			_ = phase
@@ -2326,7 +2325,7 @@ func TestEngine_promptCacheBreakSuggestCompact(t *testing.T) {
 	t.Setenv(features.EnvPromptCacheBreakSuggestCompact, "true")
 	var sawSuggest bool
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
+		Deps: query.Deps{
 			Turn: cacheBreakFireTurn{},
 		},
 		CompactExecutor: compact.ExecuteStub,
@@ -2359,8 +2358,8 @@ func TestEngine_blockingLimit_ErrBlockingLimit(t *testing.T) {
 	t.Setenv(features.EnvAutoCompact, "")
 	t.Setenv(features.EnvBlockingLimitOverride, "1")
 	e := New(context.Background(), &Config{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				t.Fatal("StreamAssistant must not run when blocking limit trips first")
 				return "", nil
 			}),
@@ -2399,8 +2398,8 @@ func TestEngine_restoredAutoCompact_consecutiveFailuresAndSnapshot(t *testing.T)
 			TurnID:              "autocompact:9",
 			ConsecutiveFailures: &cf,
 		},
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "ok", nil
 			}),
 		},
@@ -2422,8 +2421,8 @@ func TestEngine_restoredAutoCompact_consecutiveFailuresAndSnapshot(t *testing.T)
 	}
 	e2 := New(context.Background(), &Config{
 		RestoredAutoCompactTracking: restored,
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
 				return "ok", nil
 			}),
 		},

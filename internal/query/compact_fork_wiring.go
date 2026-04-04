@@ -1,4 +1,4 @@
-package querydeps
+package query
 
 import (
 	"bytes"
@@ -20,13 +20,13 @@ func EnsureForkPartialFromForkCompactSummary(a *AnthropicAssistant) {
 		var arr []json.RawMessage
 		raw := bytes.TrimSpace(messagesJSON)
 		if len(raw) == 0 || string(raw) == "null" {
-			return "", errors.New("querydeps: partial fork: empty messages")
+			return "", errors.New("query: partial fork: empty messages")
 		}
 		if err := json.Unmarshal(raw, &arr); err != nil {
 			return "", err
 		}
 		if len(arr) < 2 {
-			return "", errors.New("querydeps: partial fork: need context messages and summary user")
+			return "", errors.New("query: partial fork: need context messages and summary user")
 		}
 		sumUser := append(json.RawMessage(nil), arr[len(arr)-1]...)
 		prefix, err := json.Marshal(arr[:len(arr)-1])

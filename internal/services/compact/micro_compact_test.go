@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// microcompactAPIStateMarker mirrors querydeps.MicrocompactAPIStateMarker (avoid compact_test → querydeps → compact cycle).
+// microcompactAPIStateMarker mirrors query.MicrocompactAPIStateMarker (avoid compact_test → query → compact cycle).
 type microcompactAPIStateMarker interface {
 	MarkToolsSentToAPIState()
 }

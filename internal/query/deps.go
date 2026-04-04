@@ -1,4 +1,4 @@
-package querydeps
+package query
 
 import (
 	"context"
@@ -33,7 +33,7 @@ func (NoopToolRunner) RunTool(context.Context, string, []byte) ([]byte, error) {
 }
 
 // ErrNoToolRunner means no tool layer is wired yet.
-var ErrNoToolRunner = errors.New("querydeps: no tool runner configured")
+var ErrNoToolRunner = errors.New("query: no tool runner configured")
 
 // NoopStreamAssistant returns empty assistant text (tests / bootstrap).
 type NoopStreamAssistant struct{}

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/2456868764/rabbit-code/internal/features"
-	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 	"github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
@@ -17,9 +16,9 @@ import (
 // ErrMaxTurnsExceeded is returned when LoopState.MaxTurns > 0 and the cap is hit before another assistant call.
 var ErrMaxTurnsExceeded = errors.New("query: max assistant turns exceeded")
 
-// LoopDriver runs assistant and tool steps against querydeps.Deps (query.ts loop seed).
+// LoopDriver runs assistant and tool steps against Deps (query.ts loop seed).
 type LoopDriver struct {
-	Deps      querydeps.Deps
+	Deps      Deps
 	Model     string
 	MaxTokens int
 	// AgentID optional subagent / analytics id (query.ts toolUseContext.agentId).
@@ -49,11 +48,11 @@ type LoopDriver struct {
 	MicrocompactEditBuffer *compact.MicrocompactEditBuffer
 }
 
-func (d *LoopDriver) streamer() querydeps.StreamAssistant {
+func (d *LoopDriver) streamer() StreamAssistant {
 	if d.Deps.Assistant != nil {
 		return d.Deps.Assistant
 	}
-	return querydeps.NoopStreamAssistant{}
+	return NoopStreamAssistant{}
 }
 
 func (d *LoopDriver) modelAndMax() (model string, maxTokens int) {
@@ -67,11 +66,11 @@ func (d *LoopDriver) modelAndMax() (model string, maxTokens int) {
 	return model, maxTokens
 }
 
-func (d *LoopDriver) turner() querydeps.TurnAssistant {
+func (d *LoopDriver) turner() TurnAssistant {
 	if d.Deps.Turn != nil {
 		return d.Deps.Turn
 	}
-	return querydeps.StreamAsTurnAssistant(d.Deps.Assistant)
+	return StreamAsTurnAssistant(d.Deps.Assistant)
 }
 
 // RunAssistantStep calls StreamAssistant and appends the assistant text message to the transcript JSON.
@@ -88,7 +87,7 @@ func (d *LoopDriver) RunAssistantStep(ctx context.Context, messagesJSON json.Raw
 // RunToolStep invokes Tools.RunTool and applies schedule/done transitions when st is non-nil.
 func (d *LoopDriver) RunToolStep(ctx context.Context, st *LoopState, name string, input []byte) ([]byte, error) {
 	if d.Deps.Tools == nil {
-		return nil, querydeps.ErrNoToolRunner
+		return nil, ErrNoToolRunner
 	}
 	if st != nil {
 		*st = ApplyTransition(*st, TranScheduleTools)
@@ -169,7 +168,7 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 		st.SetMessagesJSON(msgs)
 	}
 	model, max := d.modelAndMax()
-	var turn querydeps.TurnResult
+	var turn TurnResult
 	skipBlockingDueToContinuation := len(seedMsgs) > 0
 	firstAssistant := true
 	var snipTokensFreed int
@@ -309,7 +308,7 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 		}
 		if d.Deps.Tools == nil {
 			st.SetMessagesJSON(msgs)
-			return msgs, lastAssistantText, querydeps.ErrNoToolRunner
+			return msgs, lastAssistantText, ErrNoToolRunner
 		}
 		results := make([]ToolResultBlock, 0, len(turn.ToolUses))
 		for _, u := range turn.ToolUses {
@@ -421,19 +420,19 @@ type PromptCacheBreakRecovery func(ctx context.Context, msgs json.RawMessage) (n
 
 const maxPromptCacheBreakCompactRounds = 2
 
-func (d *LoopDriver) assistantTurnWithPromptCacheBreakHandling(ctx context.Context, st *LoopState, model string, max int, msgs json.RawMessage) (querydeps.TurnResult, json.RawMessage, error) {
+func (d *LoopDriver) assistantTurnWithPromptCacheBreakHandling(ctx context.Context, st *LoopState, model string, max int, msgs json.RawMessage) (TurnResult, json.RawMessage, error) {
 	turn, err := d.turner().AssistantTurn(ctx, model, max, msgs)
 	if err == nil {
 		return turn, msgs, nil
 	}
 	if !errors.Is(err, anthropic.ErrPromptCacheBreakDetected) {
-		return querydeps.TurnResult{}, msgs, err
+		return TurnResult{}, msgs, err
 	}
 
 	if features.PromptCacheBreakTrimResendEnabled() {
 		next, stripped, serr := StripCacheControlFromMessagesJSON(msgs)
 		if serr != nil {
-			return querydeps.TurnResult{}, msgs, serr
+			return TurnResult{}, msgs, serr
 		}
 		if stripped {
 			if st != nil {
@@ -460,7 +459,7 @@ func (d *LoopDriver) assistantTurnWithPromptCacheBreakHandling(ctx context.Conte
 			}
 			next, ok, rerr := d.PromptCacheBreakRecovery(ctx, msgs)
 			if rerr != nil {
-				return querydeps.TurnResult{}, msgs, rerr
+				return TurnResult{}, msgs, rerr
 			}
 			if !ok || len(bytes.TrimSpace(next)) == 0 {
 				break
@@ -482,5 +481,5 @@ func (d *LoopDriver) assistantTurnWithPromptCacheBreakHandling(ctx context.Conte
 		}
 	}
 
-	return querydeps.TurnResult{}, msgs, err
+	return TurnResult{}, msgs, err
 }

@@ -13,7 +13,7 @@ const (
 	BetaEffort                 = "effort-2025-11-24"
 	BetaTaskBudgets            = "task-budgets-2026-03-13"
 	BetaPromptCachingScope = "prompt-caching-scope-2026-01-05"
-	// BetaCachedMicrocompactBody is JSON-body anthropic_beta when RABBIT_CODE_CACHED_MICROCOMPACT is on (querydeps AnthropicAssistant, P5.F.8).
+	// BetaCachedMicrocompactBody is JSON-body anthropic_beta when RABBIT_CODE_CACHED_MICROCOMPACT is on (query.AnthropicAssistant, P5.F.8).
 	// Alias until cache-editing exposes a dedicated frozen name in parity docs (see microCompact.ts).
 	BetaCachedMicrocompactBody = BetaPromptCachingScope
 	BetaFastMode               = "fast-mode-2026-02-01"

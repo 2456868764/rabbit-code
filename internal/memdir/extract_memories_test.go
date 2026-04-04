@@ -10,7 +10,6 @@ import (
 
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query"
-	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 )
 
 func TestCountModelVisibleMessagesSince_and_HasMemoryWritesSince(t *testing.T) {
@@ -90,8 +89,8 @@ func TestRunForkedExtractMemory_writesUnderMemdir(t *testing.T) {
 		"file_path": target,
 		"content":   "hello",
 	})
-	turn := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
-		{ToolUses: []querydeps.ToolUseCall{{ID: "w1", Name: "Write", Input: inWrite}}},
+	turn := &query.SequenceTurnAssistant{Turns: []query.TurnResult{
+		{ToolUses: []query.ToolUseCall{{ID: "w1", Name: "Write", Input: inWrite}}},
 		{Text: "done"},
 	}}
 	parent, _ := query.InitialUserMessagesJSON("user turn")

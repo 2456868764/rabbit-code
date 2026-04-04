@@ -1,4 +1,4 @@
-package querydeps
+package query
 
 import (
 	"context"
@@ -14,9 +14,9 @@ type ToolUseCall struct {
 
 // TurnResult is one assistant model response (text + optional tool uses).
 type TurnResult struct {
-	Text        string
-	ToolUses    []ToolUseCall
-	StopReason  string // e.g. end_turn, tool_use (from message_delta when present)
+	Text       string
+	ToolUses   []ToolUseCall
+	StopReason string // e.g. end_turn, tool_use (from message_delta when present)
 }
 
 // TurnAssistant performs one assistant turn and may return tool calls (P5.1.2 / AC5-3).

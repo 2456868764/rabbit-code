@@ -3,8 +3,6 @@ package query
 import (
 	"bytes"
 	"encoding/json"
-
-	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 )
 
 // ToolResultBlock is one tool_result in a user message (Messages API shape).
@@ -14,7 +12,7 @@ type ToolResultBlock struct {
 }
 
 // AppendAssistantTurnMessage appends an assistant message with optional text and tool_use blocks.
-func AppendAssistantTurnMessage(messagesJSON json.RawMessage, text string, uses []querydeps.ToolUseCall) (json.RawMessage, error) {
+func AppendAssistantTurnMessage(messagesJSON json.RawMessage, text string, uses []ToolUseCall) (json.RawMessage, error) {
 	var content []any
 	if text != "" {
 		content = append(content, map[string]string{"type": "text", "text": text})

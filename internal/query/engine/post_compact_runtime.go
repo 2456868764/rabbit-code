@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/2456868764/rabbit-code/internal/query/querydeps"
+	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 	"github.com/2456868764/rabbit-code/internal/tools/filereadtool"
 )
@@ -206,7 +206,7 @@ func (e *Engine) PostCompactAttachmentsForNextTranscript(ctx context.Context, tr
 }
 
 // AttachPostCompactToStreamingConfig merges PostCompactAttachmentsForNextTranscript into cfg.PostCompactAttachmentsJSON (prepend engine attachments).
-func (e *Engine) AttachPostCompactToStreamingConfig(cfg *querydeps.StreamingCompactExecutorConfig) {
+func (e *Engine) AttachPostCompactToStreamingConfig(cfg *query.StreamingCompactExecutorConfig) {
 	if e == nil || cfg == nil {
 		return
 	}

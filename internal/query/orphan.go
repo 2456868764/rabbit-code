@@ -1,4 +1,4 @@
-package querydeps
+package query
 
 import (
 	"errors"
@@ -6,7 +6,7 @@ import (
 )
 
 // ErrOrphanPermission marks a tool failure caused by a permission / orphan tool_use (P5.3.3 bridge for Phase 6).
-var ErrOrphanPermission = errors.New("querydeps: orphan permission")
+var ErrOrphanPermission = errors.New("query: orphan permission")
 
 // OrphanPermissionError wraps ErrOrphanPermission with the tool_use id.
 type OrphanPermissionError struct {
@@ -17,7 +17,7 @@ func (e *OrphanPermissionError) Error() string {
 	if e == nil {
 		return ""
 	}
-	return fmt.Sprintf("querydeps: orphan permission: id=%s", e.ToolUseID)
+	return fmt.Sprintf("query: orphan permission: id=%s", e.ToolUseID)
 }
 
 func (e *OrphanPermissionError) Unwrap() error { return ErrOrphanPermission }

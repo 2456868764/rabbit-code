@@ -16,7 +16,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/2456868764/rabbit-code/internal/query/querydeps"
+	"github.com/2456868764/rabbit-code/internal/query"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -387,15 +387,15 @@ func secretRuleIDToLabel(ruleID string) string {
 
 // TeamMemSecretGuardRunner blocks Write/Edit when content matches teamMemSecretScan (teamMemSecretGuard.ts).
 type TeamMemSecretGuardRunner struct {
-	Inner      querydeps.ToolRunner
+	Inner      query.ToolRunner
 	AutoMemDir string
 	Enabled    bool
 }
 
-// RunTool implements querydeps.ToolRunner.
+// RunTool implements query.ToolRunner.
 func (w *TeamMemSecretGuardRunner) RunTool(ctx context.Context, name string, inputJSON []byte) ([]byte, error) {
 	if w.Inner == nil {
-		return nil, querydeps.ErrNoToolRunner
+		return nil, query.ErrNoToolRunner
 	}
 	if w.Enabled && w.AutoMemDir != "" {
 		if fp, content, ok := toolWritePathAndContent(name, inputJSON); ok && content != "" {

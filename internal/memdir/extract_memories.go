@@ -13,7 +13,6 @@ import (
 
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query"
-	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 )
 
 // IsExtractReadOnlyBash is a conservative subset of BashTool.isReadOnly for the memory-extraction fork (extractMemories createAutoMemCanUseTool).
@@ -152,14 +151,14 @@ func singleSegmentReadOnly(seg string) bool {
 
 // AutoMemToolRunner wraps a ToolRunner and enforces createAutoMemCanUseTool rules (extractMemories.ts).
 type AutoMemToolRunner struct {
-	Inner     querydeps.ToolRunner
+	Inner     query.ToolRunner
 	MemoryDir string
 }
 
-// RunTool implements querydeps.ToolRunner.
+// RunTool implements query.ToolRunner.
 func (w *AutoMemToolRunner) RunTool(ctx context.Context, name string, inputJSON []byte) ([]byte, error) {
 	if w.Inner == nil {
-		return nil, querydeps.ErrNoToolRunner
+		return nil, query.ErrNoToolRunner
 	}
 	memRoot := strings.TrimSpace(w.MemoryDir)
 	n := strings.TrimSpace(name)
@@ -536,8 +535,8 @@ type ForkedExtractParams struct {
 
 // ForkedExtractDeps supplies model and backends (same Deps as main engine).
 type ForkedExtractDeps struct {
-	Tools     querydeps.ToolRunner
-	Turn      querydeps.TurnAssistant
+	Tools     query.ToolRunner
+	Turn      query.TurnAssistant
 	Model     string
 	MaxTokens int
 }
@@ -555,7 +554,7 @@ type ForkedExtractResult struct {
 func RunForkedExtractMemory(ctx context.Context, dep ForkedExtractDeps, p ForkedExtractParams) (ForkedExtractResult, error) {
 	var out ForkedExtractResult
 	if dep.Turn == nil || dep.Tools == nil {
-		return out, querydeps.ErrNoToolRunner
+		return out, query.ErrNoToolRunner
 	}
 	memDir := strings.TrimSpace(p.MemoryDir)
 	if memDir == "" {
@@ -575,7 +574,7 @@ func RunForkedExtractMemory(ctx context.Context, dep ForkedExtractDeps, p Forked
 	}
 	wrapped := &AutoMemToolRunner{Inner: inner, MemoryDir: memDir}
 	d := query.LoopDriver{
-		Deps: querydeps.Deps{
+		Deps: query.Deps{
 			Tools: wrapped,
 			Turn:  dep.Turn,
 		},
@@ -636,7 +635,7 @@ type ExtractHookArgs struct {
 	Merged         map[string]interface{}
 	NonInteractive bool
 	AgentID        string
-	Deps           querydeps.Deps
+	Deps           query.Deps
 	Model          string
 	MaxTokens      int
 	OnMemorySaved  func(memoryPaths []string, teamCount int)

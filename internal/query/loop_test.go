@@ -10,14 +10,13 @@ import (
 	"testing"
 
 	"github.com/2456868764/rabbit-code/internal/features"
-	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 	"github.com/2456868764/rabbit-code/internal/services/api"
 )
 
 func TestLoopDriver_RunAssistantChain_sequence(t *testing.T) {
-	seq := &querydeps.SequenceAssistant{Replies: []string{"first", "second"}}
+	seq := &SequenceAssistant{Replies: []string{"first", "second"}}
 	d := LoopDriver{
-		Deps:      querydeps.Deps{Assistant: seq},
+		Deps:      Deps{Assistant: seq},
 		Model:     "m",
 		MaxTokens: 16,
 	}
@@ -35,7 +34,7 @@ func TestLoopDriver_RunAssistantChain_sequence(t *testing.T) {
 
 func TestLoopDriver_RunToolStep_state(t *testing.T) {
 	var tools mockToolRunner
-	d := LoopDriver{Deps: querydeps.Deps{Tools: tools}}
+	d := LoopDriver{Deps: Deps{Tools: tools}}
 	st := LoopState{}
 	out, err := d.RunToolStep(context.Background(), &st, "bash", []byte(`{}`))
 	if err != nil {
@@ -62,7 +61,7 @@ func (errToolRunner) RunTool(context.Context, string, []byte) ([]byte, error) {
 }
 
 func TestLoopDriver_RunToolStep_toolErrorUndoesSchedule(t *testing.T) {
-	d := LoopDriver{Deps: querydeps.Deps{Tools: errToolRunner{}}}
+	d := LoopDriver{Deps: Deps{Tools: errToolRunner{}}}
 	st := LoopState{}
 	_, err := d.RunToolStep(context.Background(), &st, "bash", []byte(`{}`))
 	if err == nil {
@@ -86,16 +85,16 @@ func TestLoopContinue_recordAndClear(t *testing.T) {
 }
 
 func TestLoopDriver_RunTurnLoop_setsNextTurnContinueAfterTools(t *testing.T) {
-	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+	turns := &SequenceTurnAssistant{Turns: []TurnResult{
 		{
 			Text:     "t",
-			ToolUses: []querydeps.ToolUseCall{{ID: "1", Name: "bash", Input: json.RawMessage(`{}`)}},
+			ToolUses: []ToolUseCall{{ID: "1", Name: "bash", Input: json.RawMessage(`{}`)}},
 		},
 		{Text: "done"},
 	}}
 	d := LoopDriver{
-		Deps: querydeps.Deps{
-			Tools: querydeps.BashStubToolRunner{},
+		Deps: Deps{
+			Tools: BashStubToolRunner{},
 			Turn:  turns,
 		},
 		Model: "m", MaxTokens: 8,
@@ -133,16 +132,16 @@ func TestResetLoopStateFieldsForNextQueryIteration_clearsRecoveryAndOverride(t *
 }
 
 func TestLoopDriver_RunTurnLoop_resetsRecoveryFieldsAfterToolRound(t *testing.T) {
-	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+	turns := &SequenceTurnAssistant{Turns: []TurnResult{
 		{
 			Text:     "t",
-			ToolUses: []querydeps.ToolUseCall{{ID: "1", Name: "bash", Input: json.RawMessage(`{}`)}},
+			ToolUses: []ToolUseCall{{ID: "1", Name: "bash", Input: json.RawMessage(`{}`)}},
 		},
 		{Text: "done"},
 	}}
 	d := LoopDriver{
-		Deps: querydeps.Deps{
-			Tools: querydeps.BashStubToolRunner{},
+		Deps: Deps{
+			Tools: BashStubToolRunner{},
 			Turn:  turns,
 		},
 		Model: "m", MaxTokens: 8,
@@ -169,8 +168,8 @@ func TestLoopDriver_RunTurnLoop_resetsRecoveryFieldsAfterToolRound(t *testing.T)
 }
 
 func TestLoopDriver_RunTurnLoop_noTools_doesNotSetNextTurn(t *testing.T) {
-	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{{Text: "only"}}}
-	d := LoopDriver{Deps: querydeps.Deps{Turn: turns}, Model: "m", MaxTokens: 8}
+	turns := &SequenceTurnAssistant{Turns: []TurnResult{{Text: "only"}}}
+	d := LoopDriver{Deps: Deps{Turn: turns}, Model: "m", MaxTokens: 8}
 	st := LoopState{}
 	_, _, err := d.RunTurnLoop(context.Background(), &st, "hi")
 	if err != nil {
@@ -201,17 +200,17 @@ func (c *countingToolRunner) count() int {
 
 func TestLoopDriver_RunTurnLoop_toolThenText_AC5_3(t *testing.T) {
 	tr := &countingToolRunner{}
-	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+	turns := &SequenceTurnAssistant{Turns: []TurnResult{
 		{
 			Text: "invoke",
-			ToolUses: []querydeps.ToolUseCall{
+			ToolUses: []ToolUseCall{
 				{ID: "id1", Name: "bash", Input: json.RawMessage(`{"cmd":"ls"}`)},
 			},
 		},
 		{Text: "done"},
 	}}
 	d := LoopDriver{
-		Deps: querydeps.Deps{
+		Deps: Deps{
 			Tools: tr,
 			Turn:  turns,
 		},
@@ -249,17 +248,17 @@ func TestLoopDriver_RunTurnLoop_toolThenText_AC5_3(t *testing.T) {
 }
 
 func TestLoopDriver_RunTurnLoop_maxTurns_blocksSecondAssistantAfterTools(t *testing.T) {
-	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+	turns := &SequenceTurnAssistant{Turns: []TurnResult{
 		{
 			Text: "need_tool",
-			ToolUses: []querydeps.ToolUseCall{
+			ToolUses: []ToolUseCall{
 				{ID: "t1", Name: "bash", Input: json.RawMessage(`{}`)},
 			},
 		},
 		{Text: "never"},
 	}}
 	tr := &countingToolRunner{}
-	d := LoopDriver{Deps: querydeps.Deps{Tools: tr, Turn: turns}, Model: "m", MaxTokens: 8}
+	d := LoopDriver{Deps: Deps{Tools: tr, Turn: turns}, Model: "m", MaxTokens: 8}
 	st := LoopState{MaxTurns: 1}
 	_, _, err := d.RunTurnLoop(context.Background(), &st, "x")
 	if !errors.Is(err, ErrMaxTurnsExceeded) {
@@ -278,11 +277,11 @@ func TestLoopDriver_RunTurnLoopFromMessages_equivalentToRunTurnLoop(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	mk := func() *querydeps.SequenceTurnAssistant {
-		return &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{{Text: "reply"}}}
+	mk := func() *SequenceTurnAssistant {
+		return &SequenceTurnAssistant{Turns: []TurnResult{{Text: "reply"}}}
 	}
-	d1 := LoopDriver{Deps: querydeps.Deps{Turn: mk()}, Model: "m", MaxTokens: 8}
-	d2 := LoopDriver{Deps: querydeps.Deps{Turn: mk()}, Model: "m", MaxTokens: 8}
+	d1 := LoopDriver{Deps: Deps{Turn: mk()}, Model: "m", MaxTokens: 8}
+	d2 := LoopDriver{Deps: Deps{Turn: mk()}, Model: "m", MaxTokens: 8}
 	st1, st2 := LoopState{}, LoopState{}
 	out1, _, err := d1.RunTurnLoop(context.Background(), &st1, "hi")
 	if err != nil {
@@ -301,7 +300,7 @@ func TestLoopDriver_RunTurnLoopFromMessages_equivalentToRunTurnLoop(t *testing.T
 }
 
 func TestLoopDriver_RunTurnLoopFromMessages_emptySeed(t *testing.T) {
-	d := LoopDriver{Deps: querydeps.Deps{Turn: &querydeps.SequenceTurnAssistant{}}, Model: "m", MaxTokens: 8}
+	d := LoopDriver{Deps: Deps{Turn: &SequenceTurnAssistant{}}, Model: "m", MaxTokens: 8}
 	_, _, err := d.RunTurnLoopFromMessages(context.Background(), &LoopState{}, json.RawMessage(`   `))
 	if err == nil {
 		t.Fatal("want error")
@@ -316,9 +315,9 @@ func TestLoopDriver_RunTurnLoop_blockingLimitBeforeAssistant(t *testing.T) {
 	t.Setenv(features.EnvAutoCompact, "")
 	t.Setenv(features.EnvBlockingLimitOverride, "1")
 	var calls int
-	seq := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{{Text: "ok"}}}
+	seq := &SequenceTurnAssistant{Turns: []TurnResult{{Text: "ok"}}}
 	d := LoopDriver{
-		Deps: querydeps.Deps{
+		Deps: Deps{
 			Turn: &countingTurnAssistant{inner: seq, after: func() { calls++ }},
 		},
 		Model:               "m",
@@ -336,11 +335,11 @@ func TestLoopDriver_RunTurnLoop_blockingLimitBeforeAssistant(t *testing.T) {
 }
 
 type countingTurnAssistant struct {
-	inner querydeps.TurnAssistant
+	inner TurnAssistant
 	after func()
 }
 
-func (c *countingTurnAssistant) AssistantTurn(ctx context.Context, model string, maxTokens int, messagesJSON []byte) (querydeps.TurnResult, error) {
+func (c *countingTurnAssistant) AssistantTurn(ctx context.Context, model string, maxTokens int, messagesJSON []byte) (TurnResult, error) {
 	if c.after != nil {
 		c.after()
 	}
@@ -355,9 +354,9 @@ func TestLoopDriver_RunTurnLoopFromMessages_skipsBlockingLimit(t *testing.T) {
 	t.Setenv(features.EnvAutoCompact, "")
 	t.Setenv(features.EnvBlockingLimitOverride, "1")
 	var calls int
-	seq := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{{Text: "ok"}}}
+	seq := &SequenceTurnAssistant{Turns: []TurnResult{{Text: "ok"}}}
 	d := LoopDriver{
-		Deps: querydeps.Deps{
+		Deps: Deps{
 			Turn: &countingTurnAssistant{inner: seq, after: func() { calls++ }},
 		},
 		Model:               "m",
@@ -382,8 +381,8 @@ func TestLoopDriver_RunTurnLoop_preCanceledContext_setsAbortMirror(t *testing.T)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	d := LoopDriver{
-		Deps: querydeps.Deps{
-			Assistant: querydeps.StreamAssistantFunc(func(ctx context.Context, _ string, _ int, _ []byte) (string, error) {
+		Deps: Deps{
+			Assistant: StreamAssistantFunc(func(ctx context.Context, _ string, _ int, _ []byte) (string, error) {
 				return "", ctx.Err()
 			}),
 		},
@@ -453,15 +452,15 @@ type stripVerifyTurnAssistant struct {
 	t *testing.T
 }
 
-func (s *stripVerifyTurnAssistant) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (querydeps.TurnResult, error) {
+func (s *stripVerifyTurnAssistant) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (TurnResult, error) {
 	s.n++
 	if s.n == 1 {
-		return querydeps.TurnResult{}, anthropic.ErrPromptCacheBreakDetected
+		return TurnResult{}, anthropic.ErrPromptCacheBreakDetected
 	}
 	if len(msgs) == 0 || bytes.Contains(msgs, []byte("cache_control")) {
 		s.t.Fatalf("call %d: expected stripped messages, got %s", s.n, msgs)
 	}
-	return querydeps.TurnResult{Text: "ok"}, nil
+	return TurnResult{Text: "ok"}, nil
 }
 
 func TestRunTurnLoop_promptCacheBreak_trimResend(t *testing.T) {
@@ -469,7 +468,7 @@ func TestRunTurnLoop_promptCacheBreak_trimResend(t *testing.T) {
 	t.Setenv(features.EnvPromptCacheBreakTrimResend, "1")
 	seed := json.RawMessage(`[{"role":"user","content":[{"type":"text","text":"hi","cache_control":{"type":"ephemeral"}}]}]`)
 	d := LoopDriver{
-		Deps: querydeps.Deps{
+		Deps: Deps{
 			Turn: &stripVerifyTurnAssistant{t: t},
 		},
 		Model: "m", MaxTokens: 8,
@@ -488,12 +487,12 @@ type failOnceCacheBreakTurn struct {
 	n int
 }
 
-func (f *failOnceCacheBreakTurn) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (querydeps.TurnResult, error) {
+func (f *failOnceCacheBreakTurn) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (TurnResult, error) {
 	f.n++
 	if f.n == 1 {
-		return querydeps.TurnResult{}, anthropic.ErrPromptCacheBreakDetected
+		return TurnResult{}, anthropic.ErrPromptCacheBreakDetected
 	}
-	return querydeps.TurnResult{Text: "recovered"}, nil
+	return TurnResult{Text: "recovered"}, nil
 }
 
 func TestRunTurnLoop_promptCacheBreak_compactRecovery(t *testing.T) {
@@ -502,7 +501,7 @@ func TestRunTurnLoop_promptCacheBreak_compactRecovery(t *testing.T) {
 	t.Setenv(features.EnvPromptCacheBreakAutoCompact, "1")
 	nextTranscript := []byte(`[{"role":"user","content":[{"type":"text","text":"compact-seed"}]}]`)
 	d := LoopDriver{
-		Deps: querydeps.Deps{
+		Deps: Deps{
 			Turn: &failOnceCacheBreakTurn{},
 		},
 		Model: "m", MaxTokens: 8,
@@ -526,8 +525,8 @@ func TestRunTurnLoop_promptCacheBreak_compactRecovery(t *testing.T) {
 
 type stripErrorTurnAssistant struct{}
 
-func (stripErrorTurnAssistant) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (querydeps.TurnResult, error) {
-	return querydeps.TurnResult{}, anthropic.ErrPromptCacheBreakDetected
+func (stripErrorTurnAssistant) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (TurnResult, error) {
+	return TurnResult{}, anthropic.ErrPromptCacheBreakDetected
 }
 
 func TestRunTurnLoop_promptCacheBreak_stripJSONError(t *testing.T) {
@@ -535,7 +534,7 @@ func TestRunTurnLoop_promptCacheBreak_stripJSONError(t *testing.T) {
 	t.Setenv(features.EnvPromptCacheBreakTrimResend, "1")
 	seed := json.RawMessage(`not-a-json-array`)
 	d := LoopDriver{
-		Deps: querydeps.Deps{
+		Deps: Deps{
 			Turn: stripErrorTurnAssistant{},
 		},
 		Model: "m", MaxTokens: 8,
@@ -552,18 +551,18 @@ type trimThenCompactTurnAssistant struct {
 	t *testing.T
 }
 
-func (a *trimThenCompactTurnAssistant) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (querydeps.TurnResult, error) {
+func (a *trimThenCompactTurnAssistant) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (TurnResult, error) {
 	a.n++
 	switch a.n {
 	case 1:
-		return querydeps.TurnResult{}, anthropic.ErrPromptCacheBreakDetected
+		return TurnResult{}, anthropic.ErrPromptCacheBreakDetected
 	case 2:
 		if bytes.Contains(msgs, []byte("cache_control")) {
 			a.t.Fatalf("call 2: expected stripped msgs")
 		}
-		return querydeps.TurnResult{}, anthropic.ErrPromptCacheBreakDetected
+		return TurnResult{}, anthropic.ErrPromptCacheBreakDetected
 	default:
-		return querydeps.TurnResult{Text: "after-compact"}, nil
+		return TurnResult{Text: "after-compact"}, nil
 	}
 }
 
@@ -574,7 +573,7 @@ func TestRunTurnLoop_promptCacheBreak_trimThenCompact_chain(t *testing.T) {
 	seed := json.RawMessage(`[{"role":"user","content":[{"type":"text","text":"x","cache_control":{"type":"ephemeral"}}]}]`)
 	turn := &trimThenCompactTurnAssistant{t: t}
 	d := LoopDriver{
-		Deps: querydeps.Deps{
+		Deps: Deps{
 			Turn: turn,
 		},
 		Model: "m", MaxTokens: 8,
@@ -602,15 +601,15 @@ type failTwiceCacheBreakThenOK struct {
 	t *testing.T
 }
 
-func (f *failTwiceCacheBreakThenOK) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (querydeps.TurnResult, error) {
+func (f *failTwiceCacheBreakThenOK) AssistantTurn(ctx context.Context, model string, maxTokens int, msgs []byte) (TurnResult, error) {
 	f.n++
 	if f.n <= 2 {
-		return querydeps.TurnResult{}, anthropic.ErrPromptCacheBreakDetected
+		return TurnResult{}, anthropic.ErrPromptCacheBreakDetected
 	}
 	if !bytes.Contains(msgs, []byte("seed2")) {
 		f.t.Fatalf("call %d: expected second compact transcript, got %s", f.n, msgs)
 	}
-	return querydeps.TurnResult{Text: "ok-second-compact"}, nil
+	return TurnResult{Text: "ok-second-compact"}, nil
 }
 
 func TestRunTurnLoop_promptCacheBreak_secondCompactRound(t *testing.T) {
@@ -620,7 +619,7 @@ func TestRunTurnLoop_promptCacheBreak_secondCompactRound(t *testing.T) {
 	var recoveryCalls int
 	turn := &failTwiceCacheBreakThenOK{t: t}
 	d := LoopDriver{
-		Deps:  querydeps.Deps{Turn: turn},
+		Deps:  Deps{Turn: turn},
 		Model: "m", MaxTokens: 8,
 		PromptCacheBreakRecovery: func(ctx context.Context, msgs json.RawMessage) (json.RawMessage, bool, error) {
 			recoveryCalls++
@@ -656,11 +655,11 @@ func TestLoopDriver_SnipTokensFreedAccum_onHistorySnip(t *testing.T) {
 	}
 	seed := json.RawMessage("[" + strings.Join(parts, ",") + "]")
 	// assistantTurnWithPromptCacheBreakHandling may call AssistantTurn more than once when cache-break recovery is active in the environment.
-	turns := &querydeps.SequenceTurnAssistant{Turns: []querydeps.TurnResult{
+	turns := &SequenceTurnAssistant{Turns: []TurnResult{
 		{Text: "done"}, {Text: "done"}, {Text: "done"},
 	}}
 	d := LoopDriver{
-		Deps:                 querydeps.Deps{Turn: turns},
+		Deps:                 Deps{Turn: turns},
 		Model:                "m",
 		MaxTokens:            8,
 		HistorySnipMaxBytes:  500,

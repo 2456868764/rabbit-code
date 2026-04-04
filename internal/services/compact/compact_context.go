@@ -14,7 +14,7 @@ type ExecutorSuggestMeta struct {
 	ReactiveCompact bool
 }
 
-// ContextWithExecutorSuggestMeta attaches meta for querydeps / app CompactExecutor closures.
+// ContextWithExecutorSuggestMeta attaches meta for query / app CompactExecutor closures.
 func ContextWithExecutorSuggestMeta(ctx context.Context, m ExecutorSuggestMeta) context.Context {
 	return context.WithValue(ctx, executorSuggestKey{}, m)
 }

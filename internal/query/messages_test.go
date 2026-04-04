@@ -3,8 +3,6 @@ package query
 import (
 	"encoding/json"
 	"testing"
-
-	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 )
 
 func TestAppendUserThenAssistant(t *testing.T) {
@@ -34,7 +32,7 @@ func TestAppendAssistantTurnMessage_toolUseShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := AppendAssistantTurnMessage(base, "t", []querydeps.ToolUseCall{
+	out, err := AppendAssistantTurnMessage(base, "t", []ToolUseCall{
 		{ID: "x", Name: "bash", Input: json.RawMessage(`{"k":1}`)},
 	})
 	if err != nil {

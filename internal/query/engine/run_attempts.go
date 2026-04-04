@@ -8,7 +8,6 @@ import (
 
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query"
-	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 	"github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
@@ -17,7 +16,7 @@ const maxSubmitContinuationRounds = 32
 
 func (e *Engine) loopDriver() query.LoopDriver {
 	d := query.LoopDriver{
-		Deps: querydeps.Deps{
+		Deps: query.Deps{
 			Tools:     e.deps.Tools,
 			Assistant: e.deps.Assistant,
 			Turn:      e.deps.Turn,

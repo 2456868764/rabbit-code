@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/query/engine"
-	"github.com/2456868764/rabbit-code/internal/query/querydeps"
 )
 
 func TestApplyEngineCompactIntegration_bridgesForkPartial(t *testing.T) {
-	a := &querydeps.AnthropicAssistant{
+	a := &query.AnthropicAssistant{
 		ForkCompactSummary: func(context.Context, []byte, []byte) (string, error) { return "x", nil },
 	}
 	ApplyEngineCompactIntegration(nil, &engine.Config{}, a)

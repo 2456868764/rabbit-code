@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/2456868764/rabbit-code/internal/query/querydeps"
+	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
@@ -72,7 +72,7 @@ func TestEngine_PostCompact_skillsPersistAcrossCompact(t *testing.T) {
 
 func TestEngine_AttachPostCompactToStreamingConfig(t *testing.T) {
 	e := NewEngine(context.Background())
-	var cfg querydeps.StreamingCompactExecutorConfig
+	var cfg query.StreamingCompactExecutorConfig
 	e.AttachPostCompactToStreamingConfig(&cfg)
 	if cfg.PostCompactAttachmentsJSON == nil {
 		t.Fatal()

@@ -1,4 +1,4 @@
-package querydeps
+package query
 
 import "context"
 
