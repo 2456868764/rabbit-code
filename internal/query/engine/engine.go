@@ -136,7 +136,7 @@ type Config struct {
 	// InitialAutocompactConsecutiveFailures seeds the autocompact circuit when restoring a session (autoCompact.ts tracking).
 	InitialAutocompactConsecutiveFailures int
 	// RestoredAutoCompactTracking optional; cloned into each Submit's LoopState and used to seed consecutive failure count.
-	RestoredAutoCompactTracking *query.AutoCompactTracking
+	RestoredAutoCompactTracking *compact.AutoCompactTracking
 	// RestoredSnipRemovalLog optional; prepended into each Submit's LoopState.SnipRemovalLog for session continuity (H7).
 	RestoredSnipRemovalLog []query.SnipRemovalEntry
 	// ExtractMemoriesSaved runs after a successful forked extract when new topic files were written (extractMemories appendSystemMessage analogue).
@@ -188,8 +188,8 @@ type Engine struct {
 	// autoCompactConsecutiveFailures counts failed proactive auto compact executor runs across Submits (H3 / autoCompact.ts);
 	// mirrored onto st.AutoCompactTracking.ConsecutiveFailures when st != nil.
 	autoCompactConsecutiveFailures int
-	restoredAutoCompactTracking    *query.AutoCompactTracking
-	lastAutoCompactTracking        *query.AutoCompactTracking // snapshot after last Submit for persistence
+	restoredAutoCompactTracking    *compact.AutoCompactTracking
+	lastAutoCompactTracking        *compact.AutoCompactTracking // snapshot after last Submit for persistence
 	lastSnipRemovalLog             []query.SnipRemovalEntry   // snapshot after last Submit (H7)
 	restoredSnipRemovalLog         []query.SnipRemovalEntry
 	// streamOutputTotal accumulates UsageDelta.OutputTokens via chained Anthropic OnStreamUsage (H5.5).
@@ -302,7 +302,7 @@ func New(parent context.Context, cfg *Config) *Engine {
 		if t := cfg.RestoredAutoCompactTracking; t != nil && t.ConsecutiveFailures != nil {
 			e.autoCompactConsecutiveFailures = *t.ConsecutiveFailures
 		}
-		e.restoredAutoCompactTracking = query.CloneAutoCompactTracking(cfg.RestoredAutoCompactTracking)
+		e.restoredAutoCompactTracking = compact.CloneAutoCompactTracking(cfg.RestoredAutoCompactTracking)
 		e.restoredSnipRemovalLog = query.CloneSnipRemovalLog(cfg.RestoredSnipRemovalLog)
 		e.extractMemoriesSavedFn = cfg.ExtractMemoriesSaved
 	}
@@ -659,12 +659,12 @@ func (e *Engine) runTurnLoop(userText string) {
 
 	st := &query.LoopState{}
 	if e.restoredAutoCompactTracking != nil {
-		st.AutoCompactTracking = query.CloneAutoCompactTracking(e.restoredAutoCompactTracking)
+		st.AutoCompactTracking = compact.CloneAutoCompactTracking(e.restoredAutoCompactTracking)
 	}
 	query.MirrorAutocompactConsecutiveFailures(st, e.autoCompactConsecutiveFailures)
 	var loopErr error
 	defer func() {
-		e.lastAutoCompactTracking = query.CloneAutoCompactTracking(st.AutoCompactTracking)
+		e.lastAutoCompactTracking = compact.CloneAutoCompactTracking(st.AutoCompactTracking)
 		e.lastSnipRemovalLog = query.CloneSnipRemovalLog(st.SnipRemovalLog)
 		e.invokeStopHooks(st, loopErr)
 	}()
@@ -905,7 +905,7 @@ func (e *Engine) runTurnLoop(userText string) {
 	}
 	cw = features.ApplyAutoCompactWindowCap(cw)
 	if !e.autoCompactCircuitTripped() &&
-		query.ProactiveAutoCompactSuggestedWithSource(msgs, e.model, e.maxTokens, cw, 0, st.ToolUseContext.QuerySource) {
+		compact.ProactiveAutoCompactSuggestedWithSource(msgs, e.model, e.maxTokens, cw, 0, st.ToolUseContext.QuerySource) {
 		auto = true
 	}
 	if query.TranscriptReactiveCompactSuggested(st, msgs, features.ReactiveCompactMinTranscriptBytes(), features.ReactiveCompactMinEstimatedTokens()) {
@@ -913,7 +913,7 @@ func (e *Engine) runTurnLoop(userText string) {
 	}
 
 	if auto && e.sessionMemoryCompact != nil {
-		th := query.AutoCompactThresholdForProactive(e.model, e.maxTokens, cw)
+		th := compact.AutoCompactThresholdForProactive(e.model, e.maxTokens, cw)
 		if th > 0 {
 			next, ok, smErr := e.sessionMemoryCompact(e.ctx, st.ToolUseContext.AgentID, e.model, th, msgs)
 			switch {
@@ -997,7 +997,7 @@ func (e *Engine) afterCompactSuccess(st *query.LoopState) {
 }
 
 func (e *Engine) autoCompactCircuitTripped() bool {
-	return e.autoCompactConsecutiveFailures >= query.MaxConsecutiveAutocompactFailures
+	return e.autoCompactConsecutiveFailures >= compact.MaxConsecutiveAutocompactFailures
 }
 
 // noteAutoCompactExecutorOutcome updates the session-level circuit when the compact suggest included proactive auto.
@@ -1024,8 +1024,8 @@ func (e *Engine) trySend(ev EngineEvent) bool {
 
 // AutoCompactTrackingForPersistence returns a deep copy of autocompact tracking after the last completed Submit
 // (for session save). Nil if no Submit has finished.
-func (e *Engine) AutoCompactTrackingForPersistence() *query.AutoCompactTracking {
-	return query.CloneAutoCompactTracking(e.lastAutoCompactTracking)
+func (e *Engine) AutoCompactTrackingForPersistence() *compact.AutoCompactTracking {
+	return compact.CloneAutoCompactTracking(e.lastAutoCompactTracking)
 }
 
 // SnipRemovalLogForPersistence returns a deep copy of the snip removal log after the last completed Submit (H7 session sidecar).

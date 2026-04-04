@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/2456868764/rabbit-code/internal/query"
+	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
 // resetLoopStateForRetryAttempt mirrors the prior partial preserve of *st before a second RunTurnLoop,
@@ -18,7 +19,7 @@ func resetLoopStateForRetryAttempt(st *query.LoopState) {
 		RecoveryAttempts:              p.RecoveryAttempts,
 		RecoveryPhase:                 p.RecoveryPhase,
 		LoopContinue:                  p.LoopContinue,
-		AutoCompactTracking:           query.CloneAutoCompactTracking(p.AutoCompactTracking),
+		AutoCompactTracking:           compact.CloneAutoCompactTracking(p.AutoCompactTracking),
 		MaxOutputTokensRecoveryCount:  p.MaxOutputTokensRecoveryCount,
 		HasAttemptedReactiveCompact:   p.HasAttemptedReactiveCompact,
 		MaxOutputTokensOverrideActive: p.MaxOutputTokensOverrideActive,

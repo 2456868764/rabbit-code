@@ -5,6 +5,8 @@ import (
 	"errors"
 )
 
+// Deps and interfaces below extend the narrow src/query/deps.ts QueryDeps pattern for headless I/O injection.
+
 // ToolRunner runs one tool invocation (Phase 6 wires real tools).
 type ToolRunner interface {
 	RunTool(ctx context.Context, name string, inputJSON []byte) (resultJSON []byte, err error)

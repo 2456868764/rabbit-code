@@ -7,7 +7,9 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query/querydeps"
+	"github.com/2456868764/rabbit-code/internal/services/api"
 )
 
 // ErrMaxTurnsExceeded is returned when LoopState.MaxTurns > 0 and the cap is hit before another assistant call.
@@ -307,4 +309,137 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 	}
 	st.SetMessagesJSON(msgs)
 	return msgs, lastAssistantText, nil
+}
+
+// LoopObservers receives optional callbacks for engine / TUI wiring (Phase 5).
+type LoopObservers struct {
+	OnAssistantText            func(text string)
+	OnToolStart                func(name, toolUseID string, input []byte)
+	OnToolDone                 func(name, toolUseID string, result []byte)
+	OnToolError                func(name, toolUseID string, err error)
+	OnHistorySnip              func(bytesBefore, bytesAfter, rounds int, snipID string)
+	OnSnipCompact              func(bytesBefore, bytesAfter, rounds int, snipID string)
+	OnPromptCacheBreakRecovery func(phase string)
+}
+
+// ErrBlockingLimit is returned before the first assistant API call when transcript usage is at or past the
+// manual-compact buffer limit (query.ts calculateTokenWarningState / isAtBlockingLimit synthetic PTL).
+var ErrBlockingLimit = errors.New("query: blocking limit exceeded")
+
+// BlockingLimitPreCheckApplies mirrors query.ts gates before the blocking-limit check (lines 628–635).
+func BlockingLimitPreCheckApplies(querySource string, skipDueToPostCompactContinuation bool) bool {
+	if skipDueToPostCompactContinuation {
+		return false
+	}
+	qs := strings.TrimSpace(querySource)
+	if qs == QuerySourceSessionMemory || qs == QuerySourceCompact || qs == QuerySourceExtractMemories {
+		return false
+	}
+	if features.ReactiveCompactEnabled() && features.IsAutoCompactEnabled() {
+		return false
+	}
+	if features.ContextCollapseEnabled() && features.IsAutoCompactEnabled() {
+		return false
+	}
+	return true
+}
+
+// CheckBlockingLimitPreAssistant runs the numeric blocking ladder (auto_compact.ts calculateTokenWarningState).
+func CheckBlockingLimitPreAssistant(
+	model string,
+	maxOutputTokens int,
+	contextWindowTokens int,
+	transcriptJSON []byte,
+	snipTokensFreed int,
+	querySource string,
+	skipDueToPostCompactContinuation bool,
+) error {
+	if !BlockingLimitPreCheckApplies(querySource, skipDueToPostCompactContinuation) {
+		return nil
+	}
+	tokenUsage := EstimateTranscriptJSONTokens(transcriptJSON) - snipTokensFreed
+	if tokenUsage < 0 {
+		tokenUsage = 0
+	}
+	if n, err := EstimateMessageTokensFromTranscriptJSON(transcriptJSON); err == nil && n > 0 {
+		tokenUsage = n - snipTokensFreed
+		if tokenUsage < 0 {
+			tokenUsage = 0
+		}
+	}
+	r := BuildHeadlessContextReport(transcriptJSON, model, maxOutputTokens, contextWindowTokens, tokenUsage, querySource)
+	if r.TokenWarning.IsAtBlockingLimit {
+		return ErrBlockingLimit
+	}
+	return nil
+}
+
+// PromptCacheBreakRecovery optionally produces a new transcript after trim+resend still returns
+// ErrPromptCacheBreakDetected (H1: compact coordination).
+type PromptCacheBreakRecovery func(ctx context.Context, msgs json.RawMessage) (next json.RawMessage, ok bool, err error)
+
+const maxPromptCacheBreakCompactRounds = 2
+
+func (d *LoopDriver) assistantTurnWithPromptCacheBreakHandling(ctx context.Context, st *LoopState, model string, max int, msgs json.RawMessage) (querydeps.TurnResult, json.RawMessage, error) {
+	turn, err := d.turner().AssistantTurn(ctx, model, max, msgs)
+	if err == nil {
+		return turn, msgs, nil
+	}
+	if !errors.Is(err, anthropic.ErrPromptCacheBreakDetected) {
+		return querydeps.TurnResult{}, msgs, err
+	}
+
+	if features.PromptCacheBreakTrimResendEnabled() {
+		next, stripped, serr := StripCacheControlFromMessagesJSON(msgs)
+		if serr != nil {
+			return querydeps.TurnResult{}, msgs, serr
+		}
+		if stripped {
+			if st != nil {
+				RecordLoopContinue(st, LoopContinue{Reason: ContinueReasonPromptCacheBreakTrimResend})
+			}
+			if o := d.Observe; o != nil && o.OnPromptCacheBreakRecovery != nil {
+				o.OnPromptCacheBreakRecovery("trim_resend")
+			}
+			msgs = next
+			if st != nil {
+				st.SetMessagesJSON(msgs)
+			}
+			turn, err = d.turner().AssistantTurn(ctx, model, max, msgs)
+			if err == nil {
+				return turn, msgs, nil
+			}
+		}
+	}
+
+	if errors.Is(err, anthropic.ErrPromptCacheBreakDetected) && d.PromptCacheBreakRecovery != nil && features.PromptCacheBreakAutoCompactEnabled() {
+		for round := 0; round < maxPromptCacheBreakCompactRounds; round++ {
+			if !errors.Is(err, anthropic.ErrPromptCacheBreakDetected) {
+				break
+			}
+			next, ok, rerr := d.PromptCacheBreakRecovery(ctx, msgs)
+			if rerr != nil {
+				return querydeps.TurnResult{}, msgs, rerr
+			}
+			if !ok || len(bytes.TrimSpace(next)) == 0 {
+				break
+			}
+			if st != nil {
+				RecordLoopContinue(st, LoopContinue{Reason: ContinueReasonPromptCacheBreakCompactRetry})
+			}
+			if o := d.Observe; o != nil && o.OnPromptCacheBreakRecovery != nil {
+				o.OnPromptCacheBreakRecovery("compact_retry")
+			}
+			msgs = json.RawMessage(append([]byte(nil), next...))
+			if st != nil {
+				st.SetMessagesJSON(msgs)
+			}
+			turn, err = d.turner().AssistantTurn(ctx, model, max, msgs)
+			if err == nil {
+				return turn, msgs, nil
+			}
+		}
+	}
+
+	return querydeps.TurnResult{}, msgs, err
 }

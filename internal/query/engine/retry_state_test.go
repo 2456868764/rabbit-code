@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/2456868764/rabbit-code/internal/query"
+	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
 func TestResetLoopStateForRetryAttempt_preservesH6Fields(t *testing.T) {
@@ -17,7 +18,7 @@ func TestResetLoopStateForRetryAttempt_preservesH6Fields(t *testing.T) {
 		RecoveryAttempts:              2,
 		RecoveryPhase:                 query.RecoveryPendingCompact,
 		LoopContinue:                  query.LoopContinue{Reason: query.ContinueReasonSubmitRecoverRetry},
-		AutoCompactTracking:           &query.AutoCompactTracking{TurnID: "x", ConsecutiveFailures: &v},
+		AutoCompactTracking:           &compact.AutoCompactTracking{TurnID: "x", ConsecutiveFailures: &v},
 		MaxOutputTokensRecoveryCount:  1,
 		HasAttemptedReactiveCompact:   true,
 		MaxOutputTokensOverrideActive: true,

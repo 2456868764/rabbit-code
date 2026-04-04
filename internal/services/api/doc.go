@@ -4,7 +4,7 @@
 //
 // Phase 4 scope (this module + app wiring): outbound, signing (Bedrock/Vertex), preconnect, Client
 // factories, usage hook, retry/stream behavior, services/api probe shapes (AC4-7 best-effort paths),
-// and env flags in internal/features/rabbit_env.go. Foundry
+// and env flags in internal/features/env.go. Foundry
 // outbound Azure AD signing is excluded. Main-process Messages loop is Phase 5.
 // Parallel Keychain/OAuth prefetch in Bootstrap is an optional Phase 4 tail if product AC requires
 // full main.tsx-style warmup (see package features doc and app.ParallelPrefetch).

@@ -2255,7 +2255,7 @@ func TestEngine_restoredAutoCompact_consecutiveFailuresAndSnapshot(t *testing.T)
 	cf := 2
 	e := New(context.Background(), &Config{
 		InitialAutocompactConsecutiveFailures: 99,
-		RestoredAutoCompactTracking: &query.AutoCompactTracking{
+		RestoredAutoCompactTracking: &compact.AutoCompactTracking{
 			Compacted:           true,
 			TurnCounter:         5,
 			TurnID:              "autocompact:9",
@@ -2274,11 +2274,11 @@ func TestEngine_restoredAutoCompact_consecutiveFailuresAndSnapshot(t *testing.T)
 	if e.AutoCompactTrackingForPersistence() == nil {
 		t.Fatal("expected snapshot after Submit")
 	}
-	data, err := query.MarshalAutoCompactTrackingJSON(e.AutoCompactTrackingForPersistence())
+	data, err := compact.MarshalAutoCompactTrackingJSON(e.AutoCompactTrackingForPersistence())
 	if err != nil {
 		t.Fatal(err)
 	}
-	restored, err := query.UnmarshalAutoCompactTrackingJSON(data)
+	restored, err := compact.UnmarshalAutoCompactTrackingJSON(data)
 	if err != nil {
 		t.Fatal(err)
 	}
