@@ -2,6 +2,12 @@
 // a Go port of claude-code src/utils/messages.ts: messages.go holds disk + types.Message
 // helpers; messages_ts_*.go holds TSMsg (map[string]any) parity for the TS Message union.
 //
+// Non-exhaustive map of TS exports: NormalizeMessages → NormalizeMessages; normalizeMessagesForAPI →
+// NormalizeMessagesForAPI / NormalizeMessagesForAPIGeneric; mergeUserContentBlocks → MergeUserContentBlocks;
+// mergeUserMessages → MergeUserMessagesMap; reorderAttachmentsForAPI → ReorderAttachmentsForAPIGeneric;
+// stripPromptXMLTags → StripPromptXMLTags; ensureToolResultPairing → EnsureToolResultPairing;
+// handleMessageFromStream → HandleMessageFromStream; buildMessageLookups → BuildMessageLookups.
+//
 // Feature gates use env vars where TS used GrowthBook/Statsig: RABBIT_AUTO_MEMORY,
 // RABBIT_AMBER_PRISM, RABBIT_BASH_CLASSIFIER, RABBIT_TOOL_SEARCH, RABBIT_HISTORY_SNIP,
 // RABBIT_KAIROS, RABBIT_KAIROS_CHANNELS, RABBIT_AGENT_SWARMS, RABBIT_EXPERIMENTAL_SKILL_SEARCH,
