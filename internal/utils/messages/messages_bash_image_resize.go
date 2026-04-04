@@ -1,4 +1,4 @@
-// Bash shell image handling: TS resizeShellImageOutput + maybeResizeAndDownsampleImageBuffer (simplified).
+// Bash shell image handling: TS resizeShellImageOutput + maybeResizeAndDownsampleImageBuffer.
 package messages
 
 import (
@@ -6,14 +6,16 @@ import (
 	"encoding/base64"
 	"fmt"
 	"image"
+	"image/color/palette"
 	"image/draw"
 	_ "image/gif"
 	"image/jpeg"
-	_ "image/png"
+	"image/png"
 	"os"
 	"strings"
 
 	xdraw "golang.org/x/image/draw"
+	_ "golang.org/x/image/webp"
 )
 
 const (
@@ -72,52 +74,105 @@ func bashMaybeResizeImageBuffer(raw []byte) ([]byte, string, error) {
 		return nil, "", err
 	}
 	b := img.Bounds()
-	w, h := b.Dx(), b.Dy()
-	if w <= 0 || h <= 0 {
+	origW, origH := b.Dx(), b.Dy()
+	if origW <= 0 || origH <= 0 {
 		return nil, "", fmt.Errorf("empty bounds")
 	}
+	origSize := len(raw)
 	outMT := imageFormatToMIME(format)
-	if w <= imageMaxDimension && h <= imageMaxDimension && len(raw) <= imageTargetRawBytes {
+	isPng := format == "png"
+	needsDim := origW > imageMaxDimension || origH > imageMaxDimension
+
+	// Fits as-is (TS: dimensions + raw size under target)
+	if !needsDim && origW <= imageMaxDimension && origH <= imageMaxDimension && origSize <= imageTargetRawBytes {
 		return raw, outMT, nil
 	}
 
-	nw, nh := w, h
-	if w > imageMaxDimension || h > imageMaxDimension {
-		scale := minFloat64(float64(imageMaxDimension)/float64(w), float64(imageMaxDimension)/float64(h))
-		nw = max(1, int(float64(w)*scale+0.5))
-		nh = max(1, int(float64(h)*scale+0.5))
-	}
+	rgbaFull := imageToRGBA(img)
 
-	var rgba *image.RGBA
-	if nw != w || nh != h {
-		rgba = image.NewRGBA(image.Rect(0, 0, nw, nh))
-		xdraw.CatmullRom.Scale(rgba, rgba.Bounds(), img, b, xdraw.Over, nil)
-	} else {
-		rgba = imageToRGBA(img)
-	}
-
-	out := rgbaToBytesJPEG(rgba, 80)
-	if len(out) <= imageTargetRawBytes {
-		return out, "image/jpeg", nil
-	}
-	for _, q := range []int{60, 40, 20} {
-		out = rgbaToBytesJPEG(rgba, q)
-		if len(out) <= imageTargetRawBytes {
-			return out, "image/jpeg", nil
+	// Dimensions OK but payload too large: PNG palette + best compression, then JPEG qualities (TS order).
+	if !needsDim && origSize > imageTargetRawBytes {
+		if isPng {
+			if buf := bashTryPNGPaletteBest(img); len(buf) > 0 && len(buf) <= imageTargetRawBytes {
+				return buf, "image/png", nil
+			}
+		}
+		if buf := bashTryJPEGQualities(rgbaFull); buf != nil {
+			return buf, "image/jpeg", nil
 		}
 	}
-	// Dimension shrink then retry
+
+	// Dimension resize (TS fit inside)
+	nw, nh := origW, origH
+	if needsDim {
+		scale := minFloat64(float64(imageMaxDimension)/float64(origW), float64(imageMaxDimension)/float64(origH))
+		nw = max(1, int(float64(origW)*scale+0.5))
+		nh = max(1, int(float64(origH)*scale+0.5))
+	}
+	rgbaScaled := image.NewRGBA(image.Rect(0, 0, nw, nh))
+	xdraw.CatmullRom.Scale(rgbaScaled, rgbaScaled.Bounds(), img, b, xdraw.Over, nil)
+
+	if isPng {
+		if pngBytes := bashEncodePNGBytes(rgbaScaled, true); len(pngBytes) > 0 && len(pngBytes) <= imageTargetRawBytes {
+			return pngBytes, "image/png", nil
+		}
+	}
+	if buf := bashTryJPEGQualities(rgbaScaled); buf != nil {
+		return buf, "image/jpeg", nil
+	}
+
+	// Further shrink dimensions (TS fallthrough)
 	for nw > 256 && nh > 256 {
 		nw = max(1, nw/2)
 		nh = max(1, nh/2)
-		rgba = image.NewRGBA(image.Rect(0, 0, nw, nh))
-		xdraw.CatmullRom.Scale(rgba, rgba.Bounds(), img, b, xdraw.Over, nil)
-		out = rgbaToBytesJPEG(rgba, 20)
-		if len(out) <= imageTargetRawBytes {
-			return out, "image/jpeg", nil
+		rgbaScaled = image.NewRGBA(image.Rect(0, 0, nw, nh))
+		xdraw.CatmullRom.Scale(rgbaScaled, rgbaScaled.Bounds(), img, b, xdraw.Over, nil)
+		if buf := bashTryJPEGQualities(rgbaScaled); buf != nil {
+			return buf, "image/jpeg", nil
 		}
 	}
+	out := rgbaToBytesJPEG(rgbaScaled, 20)
 	return out, "image/jpeg", nil
+}
+
+// bashTryPNGPaletteBest mirrors sharp png({ compressionLevel: 9, palette: true }) using Plan9 palette + Floyd–Steinberg.
+func bashTryPNGPaletteBest(src image.Image) []byte {
+	rgba := imageToRGBA(src)
+	pm := image.NewPaletted(rgba.Bounds(), palette.Plan9)
+	draw.FloydSteinberg.Draw(pm, rgba.Bounds(), rgba, rgba.Bounds().Min)
+	return bashEncodePalettedPNG(pm)
+}
+
+func bashEncodePalettedPNG(pm *image.Paletted) []byte {
+	var buf bytes.Buffer
+	enc := &png.Encoder{CompressionLevel: png.BestCompression}
+	if err := enc.Encode(&buf, pm); err != nil {
+		return nil
+	}
+	return buf.Bytes()
+}
+
+func bashEncodePNGBytes(img image.Image, best bool) []byte {
+	var buf bytes.Buffer
+	cl := png.DefaultCompression
+	if best {
+		cl = png.BestCompression
+	}
+	enc := &png.Encoder{CompressionLevel: cl}
+	if err := enc.Encode(&buf, img); err != nil {
+		return nil
+	}
+	return buf.Bytes()
+}
+
+func bashTryJPEGQualities(rgba *image.RGBA) []byte {
+	for _, q := range []int{80, 60, 40, 20} {
+		out := rgbaToBytesJPEG(rgba, q)
+		if len(out) <= imageTargetRawBytes {
+			return out
+		}
+	}
+	return nil
 }
 
 func imageFormatToMIME(format string) string {
@@ -128,6 +183,8 @@ func imageFormatToMIME(format string) string {
 		return "image/png"
 	case "gif":
 		return "image/gif"
+	case "webp":
+		return "image/webp"
 	default:
 		return "image/png"
 	}
