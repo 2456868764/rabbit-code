@@ -41,3 +41,20 @@ func truncateJSStringToMaxUTF16(s string, maxUnits int) (prefix, suffix string) 
 	}
 	return s, ""
 }
+
+// lastNewlineUTF16Index returns the UTF-16 code unit index of the last '\n' in s, or -1 if none.
+func lastNewlineUTF16Index(s string) int {
+	last := -1
+	u := 0
+	for _, r := range s {
+		if r == '\n' {
+			last = u
+		}
+		if r > 0xffff {
+			u += 2
+		} else {
+			u++
+		}
+	}
+	return last
+}

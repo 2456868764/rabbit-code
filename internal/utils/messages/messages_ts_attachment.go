@@ -72,14 +72,8 @@ func NormalizeAttachmentForAPI(attachment map[string]any) ([]TSMsg, error) {
 			} else {
 				body = DefaultFormatTeammateMailboxMessagesForAPI(raw)
 			}
-			body = strings.TrimSpace(body)
-			if body == "" && len(raw) > 0 {
-				// Malformed entries: surface raw JSON for debugging (TS formatTeammateMessages skips non-objects).
-				body = fmt.Sprintf("Teammate mailbox (%d message(s); unparseable or empty fields):\n%s",
-					len(raw), tsJSONString(raw))
-			}
-			if body == "" {
-				body = "[teammate_mailbox] empty messages"
+			if strings.TrimSpace(body) == "" {
+				return nil, nil
 			}
 			return []TSMsg{CreateUserMessage(CreateUserMessageOpts{
 				Content: body,
@@ -149,7 +143,10 @@ Read the team config to discover your teammates' names. Check the task list peri
 	case "directory":
 		path, _ := attachment["path"].(string)
 		return WrapMessagesInSystemReminder([]TSMsg{
-			metaToolUseMessage(ToolNameBash, map[string]any{"command": fmt.Sprintf("ls %q", path), "description": fmt.Sprintf("Lists files in %s", path)}),
+			metaToolUseMessage(ToolNameBash, map[string]any{
+				"command":     fmt.Sprintf("ls %s", ShellQuoteSingleArg(path)),
+				"description": fmt.Sprintf("Lists files in %s", path),
+			}),
 			BashToolResultMetaMessage(ToolNameBash, attachment),
 		}), nil
 
@@ -195,8 +192,10 @@ Read the team config to discover your teammates' names. Check the task list peri
 		ls, _ := attachment["lineStart"].(float64)
 		le, _ := attachment["lineEnd"].(float64)
 		cont, _ := attachment["content"].(string)
-		if len(cont) > 2000 {
-			cont = cont[:2000] + "\n... (truncated)"
+		const selectedLinesMaxUTF16 = 2000
+		if jsStringUTF16Len(cont) > selectedLinesMaxUTF16 {
+			prefix, _ := truncateJSStringToMaxUTF16(cont, selectedLinesMaxUTF16)
+			cont = prefix + "\n... (truncated)"
 		}
 		return WrapMessagesInSystemReminder([]TSMsg{CreateUserMessage(CreateUserMessageOpts{
 			Content: fmt.Sprintf(

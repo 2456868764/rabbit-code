@@ -8,20 +8,26 @@
 // stripPromptXMLTags → StripPromptXMLTags; ensureToolResultPairing → EnsureToolResultPairing;
 // handleMessageFromStream → HandleMessageFromStream; buildMessageLookups → BuildMessageLookups.
 //
-// Feature gates use env vars where TS used GrowthBook/Statsig: RABBIT_AUTO_MEMORY,
-// RABBIT_AMBER_PRISM, RABBIT_BASH_CLASSIFIER, RABBIT_TOOL_SEARCH, RABBIT_HISTORY_SNIP,
-// RABBIT_KAIROS, RABBIT_KAIROS_CHANNELS, RABBIT_AGENT_SWARMS, RABBIT_EXPERIMENTAL_SKILL_SEARCH,
-// RABBIT_TODO_V2, RABBIT_PLAN_MODE_INTERVIEW, RABBIT_STRICT_TOOL_PAIRING, RABBIT_TENGU_CHAIR_SERMON,
-// RABBIT_TENGU_TOOLREF_DEFER, RABBIT_NON_INTERACTIVE (API error strip-target copy), RABBIT_CONNECTOR_TEXT,
-// RABBIT_SNIP_RUNTIME_ENABLED (0 disables snip merge/[id:] runtime), RABBIT_SNIP_NUDGE_TEXT, RABBIT_KAIROS_BRIEF,
-// RABBIT_FEATURE_KAIROS (Brief alias), RABBIT_ANT_UNKNOWN_ATTACHMENT (log unknown attachment types like TS logAntError),
-// RABBIT_OUTPUT_STYLE_NAMES_JSON (inline style display map), RABBIT_OUTPUT_STYLE_CONFIG_PATH (JSON file like OUTPUT_STYLE_CONFIG),
-// RABBIT_OUTPUT_STYLE_SCAN_DIRS (path list of dirs with *.md styles, like .claude/output-styles),
-// RABBIT_OUTPUT_STYLE_PLUGINS_PATH / RABBIT_OUTPUT_STYLE_PLUGINS_JSON (JSON array of {plugin,dir} for recursive *.md, TS loadPluginOutputStyles),
-// RABBIT_SETTINGS_OUTPUT_STYLE / RABBIT_CLAUDE_SETTINGS_PATH (settings outputStyle fallback when attachment.style is empty/default),
-// RABBIT_BASH_MAX_OUTPUT_LENGTH (notebook text truncation / TS BASH_MAX_OUTPUT_LENGTH, default 30000 cap 150000),
-// RABBIT_TASK_OUTPUT_DIR (Bash background output path when transcript omits backgroundTaskOutputPath),
-// RABBIT_MCP_RESOURCE_DEBUG (log empty MCP resource render), etc.
+//   - output_style: Go resolves display via env/SCAN/PLUGINS/settings — a superset vs messages.ts static
+//     OUTPUT_STYLE_CONFIG only (TS also merges dynamic styles elsewhere; Go folds resolution into one path).
+//
+//   - Plugin styles: RABBIT_OUTPUT_STYLE_PLUGINS_PATH / RABBIT_OUTPUT_STYLE_PLUGINS_JSON are a manual stand-in for
+//     TS loadPluginOutputStyles.
+//
+//   - Feature gates (env ↔ behavior): RABBIT_AGENT_SWARMS=isAgentSwarms; RABBIT_EXPERIMENTAL_SKILL_SEARCH=EXPERIMENTAL_SKILL_SEARCH;
+//     RABBIT_PLAN_MODE_INTERVIEW=plan interview; RABBIT_AUTO_MEMORY; RABBIT_BASH_CLASSIFIER; RABBIT_TOOL_SEARCH; RABBIT_NON_INTERACTIVE;
+//     RABBIT_CONNECTOR_TEXT; RABBIT_SNIP_RUNTIME_ENABLED, RABBIT_SNIP_NUDGE_TEXT; RABBIT_KAIROS, RABBIT_KAIROS_CHANNELS, RABBIT_KAIROS_BRIEF,
+//     RABBIT_FEATURE_KAIROS; RABBIT_TODO_V2; RABBIT_STRICT_TOOL_PAIRING; RABBIT_TENGU_CHAIR_SERMON, RABBIT_TENGU_TOOLREF_DEFER; RABBIT_AMBER_PRISM;
+//     RABBIT_HISTORY_SNIP; RABBIT_ANT_UNKNOWN_ATTACHMENT; RABBIT_ATTACHMENT_UNKNOWN_LOG; RABBIT_OUTPUT_STYLE_NAMES_JSON,
+//     RABBIT_OUTPUT_STYLE_CONFIG_PATH, RABBIT_OUTPUT_STYLE_SCAN_DIRS, RABBIT_SETTINGS_OUTPUT_STYLE, RABBIT_CLAUDE_SETTINGS_PATH,
+//     RABBIT_BASH_MAX_OUTPUT_LENGTH, RABBIT_TASK_OUTPUT_DIR, RABBIT_MCP_RESOURCE_DEBUG, etc.
+//
+//   - File attachment: inner types parts/file_unchanged are Go extensions vs restored TS inner switch (image/text/notebook/pdf only).
+//
+//   - StripToolResultSignature: not used in messages.ts; passthrough for transcript JSON — not assistant signature blocks
+//     (see StripSignatureBlocks).
+//
+// Parity checklist vs restored TS tree: see MESSAGES_TS_PARITY.md in this package.
 package messages
 
 import (
@@ -193,7 +199,8 @@ func normalizeContent(in []types.ContentPiece, opt NormalizeOptions) []types.Con
 	return out
 }
 
-// StripToolResultSignature is a no-op placeholder for signature stripping (parity with TS).
+// StripToolResultSignature returns raw unchanged. Restored claude-code src has no matching
+// raw-json signature strip for tool results (distinct from StripSignatureBlocks on assistant blocks).
 func StripToolResultSignature(raw json.RawMessage) json.RawMessage { return raw }
 
 // --- File refs --------------------------------------------------------------

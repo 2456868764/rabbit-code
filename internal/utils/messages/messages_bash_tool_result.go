@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	bashPreviewMaxBytes             = 2000 // TS PREVIEW_SIZE_BYTES
-	bashAssistantBlockingBudgetSec  = 15   // ASSISTANT_BLOCKING_BUDGET_MS / 1000
+	// bashPreviewMaxUTF16 = 2000 (TS PREVIEW_SIZE_BYTES uses String.length / UTF-16 code units).
+	bashPreviewMaxUTF16            = 2000
+	bashAssistantBlockingBudgetSec = 15 // ASSISTANT_BLOCKING_BUDGET_MS / 1000
 	persistedOutputTag              = "<persisted-output>"
 	persistedOutputClosingTag       = "</persisted-output>"
 	notebookCellOutputTruncateBytes = 10000 // TS notebook LARGE_OUTPUT_THRESHOLD (text+image heuristic)
@@ -91,17 +92,18 @@ func bashDefaultTaskOutputPath(taskID string) string {
 	return filepath.Join(dir, taskID+".output")
 }
 
-func bashGeneratePreview(content string, maxBytes int) (preview string, hasMore bool) {
-	if len(content) <= maxBytes {
+func bashGeneratePreview(content string, maxUTF16 int) (preview string, hasMore bool) {
+	if jsStringUTF16Len(content) <= maxUTF16 {
 		return content, false
 	}
-	truncated := content[:maxBytes]
-	lastNL := strings.LastIndexByte(truncated, '\n')
-	cutPoint := maxBytes
-	if lastNL > maxBytes/2 {
-		cutPoint = lastNL
+	truncated, _ := truncateJSStringToMaxUTF16(content, maxUTF16)
+	lastNL := lastNewlineUTF16Index(truncated)
+	cutUTF16 := maxUTF16
+	if lastNL > maxUTF16/2 {
+		cutUTF16 = lastNL
 	}
-	return content[:cutPoint], true
+	preview, _ = truncateJSStringToMaxUTF16(content, cutUTF16)
+	return preview, true
 }
 
 func bashBuildLargePersistedMessage(path string, originalSize int, preview string, hasMore bool) string {
@@ -109,7 +111,7 @@ func bashBuildLargePersistedMessage(path string, originalSize int, preview strin
 	b.WriteString(persistedOutputTag)
 	b.WriteByte('\n')
 	fmt.Fprintf(&b, "Output too large (%s). Full output saved to: %s\n\n", formatFileSizeForAPI(originalSize), path)
-	fmt.Fprintf(&b, "Preview (first %s):\n", formatFileSizeForAPI(bashPreviewMaxBytes))
+	fmt.Fprintf(&b, "Preview (first %s):\n", formatFileSizeForAPI(bashPreviewMaxUTF16))
 	b.WriteString(preview)
 	if hasMore {
 		b.WriteString("\n...\n")
@@ -146,7 +148,7 @@ func bashPlaintextToolResultBody(src, att map[string]any, primaryStdout string) 
 		if orig <= 0 && processed != "" {
 			orig = len(processed)
 		}
-		prev, more := bashGeneratePreview(processed, bashPreviewMaxBytes)
+		prev, more := bashGeneratePreview(processed, bashPreviewMaxUTF16)
 		processed = bashBuildLargePersistedMessage(path, orig, prev, more)
 	}
 

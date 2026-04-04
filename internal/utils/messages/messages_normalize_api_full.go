@@ -1,4 +1,7 @@
 // Full TS normalizeMessagesForAPI parity on map-shaped messages (see src/utils/messages.ts).
+//
+// Parity baseline path: src/utils/messages.ts (upstream Claude Code). Intentional diffs: no analytics
+// logEvent; stream event union follows the ported snapshot in this repo.
 package messages
 
 import (
