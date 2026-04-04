@@ -8,7 +8,8 @@
 // RABBIT_TODO_V2, RABBIT_PLAN_MODE_INTERVIEW, RABBIT_STRICT_TOOL_PAIRING, RABBIT_TENGU_CHAIR_SERMON,
 // RABBIT_TENGU_TOOLREF_DEFER, RABBIT_NON_INTERACTIVE (API error strip-target copy), RABBIT_CONNECTOR_TEXT,
 // RABBIT_SNIP_RUNTIME_ENABLED (0 disables snip merge/[id:] runtime), RABBIT_SNIP_NUDGE_TEXT, RABBIT_KAIROS_BRIEF,
-// RABBIT_FEATURE_KAIROS (Brief alias), RABBIT_ANT_UNKNOWN_ATTACHMENT (log unknown attachment types like TS logAntError), etc.
+// RABBIT_FEATURE_KAIROS (Brief alias), RABBIT_ANT_UNKNOWN_ATTACHMENT (log unknown attachment types like TS logAntError),
+// RABBIT_OUTPUT_STYLE_NAMES_JSON (plugin style display names), RABBIT_MCP_RESOURCE_DEBUG (log empty MCP resource render), etc.
 package messages
 
 import (

@@ -46,6 +46,18 @@ func DefaultFormatTeammateMailboxMessagesForAPI(messages []any) string {
 // LogNormalizeAttachmentUnknownType mirrors TS logAntError for unknown attachment types; if nil and RABBIT_ATTACHMENT_UNKNOWN_LOG=1, uses log.Printf.
 var LogNormalizeAttachmentUnknownType func(attachmentType string, attachment map[string]any)
 
+// LogMCPResourceNoDisplayable mirrors TS logMCPDebug when an MCP resource has no displayable text/binary summary.
+var LogMCPResourceNoDisplayable func(server, uri string)
+
+func invokeLogMCPResourceNoDisplayable(server, uri string) {
+	if LogMCPResourceNoDisplayable != nil {
+		LogMCPResourceNoDisplayable(server, uri)
+	}
+	if os.Getenv("RABBIT_MCP_RESOURCE_DEBUG") == "1" {
+		log.Printf("messages: mcp_resource no displayable content server=%q uri=%q", server, uri)
+	}
+}
+
 // NormalizeAttachmentForAPI mirrors TS normalizeAttachmentForAPI(attachment).
 func NormalizeAttachmentForAPI(attachment map[string]any) ([]TSMsg, error) {
 	ty, _ := attachment["type"].(string)
@@ -434,6 +446,7 @@ Treat this as a fresh planning session. Do not assume the existing plan is relev
 		if len(blocks) > 0 {
 			return WrapMessagesInSystemReminder([]TSMsg{CreateUserMessage(CreateUserMessageOpts{Content: blocks, IsMeta: true})}), nil
 		}
+		invokeLogMCPResourceNoDisplayable(srv, uri)
 		return WrapMessagesInSystemReminder([]TSMsg{CreateUserMessage(CreateUserMessageOpts{
 			Content: fmt.Sprintf(`<mcp-resource server=%q uri=%q>(No displayable content)</mcp-resource>`, srv, uri),
 			IsMeta:  true,
@@ -1061,6 +1074,9 @@ func outputStyleName(style string) string {
 var ExtraOutputStyleNames map[string]string
 
 func outputStyleDisplayName(style string) string {
+	if n, ok := outputStyleNameFromEnv(style); ok {
+		return n
+	}
 	if ExtraOutputStyleNames != nil {
 		if n, ok := ExtraOutputStyleNames[style]; ok && strings.TrimSpace(n) != "" {
 			return n

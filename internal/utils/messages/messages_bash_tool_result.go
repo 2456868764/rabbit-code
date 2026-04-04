@@ -74,6 +74,11 @@ func BashAttachmentToolResultContentString(att map[string]any) string {
 		stdout, _ = src["content"].(string)
 	}
 
+	// TS mapToolResult: isImage → image blocks; meta string path cannot embed blocks — marker only.
+	if truthy(src["isImage"]) && strings.TrimSpace(stdout) != "" {
+		return "[Image output from Bash — omitted in attachment string preview; full API uses image content blocks]"
+	}
+
 	processed := bashToolStdoutNormalize(stdout)
 
 	if path := strings.TrimSpace(strField(src, "persistedOutputPath")); path != "" {

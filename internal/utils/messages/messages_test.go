@@ -608,6 +608,25 @@ func TestDefaultFormatTeammateMailboxMessagesForAPI(t *testing.T) {
 	}
 }
 
+func TestBashAttachmentToolResultContentString_isImageMarker(t *testing.T) {
+	s := BashAttachmentToolResultContentString(map[string]any{
+		"bash": map[string]any{
+			"stdout":  "AAA",
+			"isImage": true,
+		},
+	})
+	if !strings.Contains(s, "Image output") {
+		t.Fatalf("got %q", s)
+	}
+}
+
+func TestOutputStyleDisplayName_fromEnvJSON(t *testing.T) {
+	t.Setenv("RABBIT_OUTPUT_STYLE_NAMES_JSON", `{"Acme":"Acme Mode"}`)
+	if n := outputStyleDisplayName("Acme"); n != "Acme Mode" {
+		t.Fatalf("got %q", n)
+	}
+}
+
 func TestBashAttachmentToolResultContentString(t *testing.T) {
 	s := BashAttachmentToolResultContentString(map[string]any{
 		"content": "  \n\nhello",
