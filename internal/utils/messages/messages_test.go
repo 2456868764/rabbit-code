@@ -553,6 +553,20 @@ func TestNotebookFormatOutputTruncated(t *testing.T) {
 	}
 }
 
+func TestOutputStyleDisplayName_scanDirs(t *testing.T) {
+	t.Setenv("RABBIT_OUTPUT_STYLE_NAMES_JSON", "")
+	t.Setenv("RABBIT_OUTPUT_STYLE_CONFIG_PATH", "")
+	t.Setenv("RABBIT_OUTPUT_STYLE_SCAN_DIRS", "")
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "FooStyle.md"), []byte("---\nname: Foo From MD\ndescription: x\n---\nbody"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("RABBIT_OUTPUT_STYLE_SCAN_DIRS", dir)
+	if n := outputStyleDisplayName("Foo From MD"); n != "Foo From MD" {
+		t.Fatalf("got %q", n)
+	}
+}
+
 func TestBashResizeShellImageOutput_decodesTinyPNG(t *testing.T) {
 	b64 := "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 	uri := "data:image/png;base64," + b64
