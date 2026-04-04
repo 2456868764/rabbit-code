@@ -351,3 +351,21 @@ func shouldIncludeFileReadMitigation() bool {
 	}
 	return !strings.Contains(m, "opus-4-6")
 }
+
+// bashMaxOutputLength mirrors TS getMaxOutputLength (BASH_MAX_OUTPUT_LENGTH / RABBIT_BASH_MAX_OUTPUT_LENGTH).
+func bashMaxOutputLength() int {
+	const def = 30000
+	const upper = 150000
+	s := strings.TrimSpace(os.Getenv("RABBIT_BASH_MAX_OUTPUT_LENGTH"))
+	if s == "" {
+		return def
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return def
+	}
+	if v > upper {
+		return upper
+	}
+	return v
+}

@@ -523,6 +523,45 @@ func TestNotebookMapCellsToToolResultBlocks_mergesAdjacentText(t *testing.T) {
 	}
 }
 
+func TestNotebookCellToBlocks_largeOutputsJqHint(t *testing.T) {
+	long := strings.Repeat("x", 11000)
+	cell := map[string]any{
+		"cell_type": "code",
+		"source":    "x",
+		"outputs": []any{map[string]any{
+			"output_type": "stream",
+			"text":        long,
+		}},
+	}
+	blocks := notebookCellToBlocksOpts(cell, 3, NotebookCellsOpts{Filename: "/nb.ipynb", IncludeLargeOutputs: false})
+	var joined string
+	for _, b := range blocks {
+		if mapStr(b, "type") == "text" {
+			joined += mapStr(b, "text")
+		}
+	}
+	if !strings.Contains(joined, `cat "/nb.ipynb"`) || !strings.Contains(joined, "jq") || !strings.Contains(joined, ".cells[3].outputs") {
+		t.Fatalf("expected jq hint, got %q", joined)
+	}
+}
+
+func TestNotebookFormatOutputTruncated(t *testing.T) {
+	t.Setenv("RABBIT_BASH_MAX_OUTPUT_LENGTH", "100")
+	s := notebookFormatOutputTruncated(strings.Repeat("a", 200))
+	if !strings.Contains(s, "lines truncated") {
+		t.Fatalf("got %q", s)
+	}
+}
+
+func TestBashResizeShellImageOutput_decodesTinyPNG(t *testing.T) {
+	b64 := "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+	uri := "data:image/png;base64," + b64
+	out, ok := bashResizeShellImageOutput(uri, map[string]any{})
+	if !ok || (!strings.HasPrefix(out, "data:image/png;base64,") && !strings.HasPrefix(out, "data:image/jpeg;base64,")) {
+		t.Fatalf("got ok=%v out=%q", ok, out)
+	}
+}
+
 func TestNotebookReadToolResultMessage_withImageNoResultPrefix(t *testing.T) {
 	blocks := []map[string]any{
 		{"type": "text", "text": "hi"},

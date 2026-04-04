@@ -757,7 +757,10 @@ func fileAttachmentMessages(attachment map[string]any) ([]TSMsg, error) {
 		txt := fileReadTextToolResultString(fc)
 		msgs = append(msgs, metaToolResultMessage(ToolNameRead, txt))
 	case "notebook":
-		blocks := notebookMapCellsToToolResultBlocks(fc)
+		blocks := notebookMapCellsToToolResultBlocksOpts(fc, NotebookCellsOpts{
+			Filename:            fn,
+			IncludeLargeOutputs: false,
+		})
 		msgs = append(msgs, notebookReadToolResultMessage(ToolNameRead, blocks))
 	case "pdf":
 		body := fileReadPDFResultBody(fc)
@@ -817,9 +820,19 @@ func fileReadImageBlock(fc map[string]any) map[string]any {
 	return imgBlock
 }
 
+// NotebookCellsOpts mirrors TS readNotebook(includeLargeOutputs) and path for the jq hint.
+type NotebookCellsOpts struct {
+	Filename            string
+	IncludeLargeOutputs bool
+}
+
 // notebookMapCellsToToolResultBlocks mirrors TS mapNotebookCellsToToolResult (utils/notebook.ts):
-// flatten cells → text/image blocks, merge adjacent text blocks.
+// flatten cells → text/image blocks, merge adjacent text blocks. Default: include large outputs (tests / single-cell).
 func notebookMapCellsToToolResultBlocks(fc map[string]any) []map[string]any {
+	return notebookMapCellsToToolResultBlocksOpts(fc, NotebookCellsOpts{IncludeLargeOutputs: true})
+}
+
+func notebookMapCellsToToolResultBlocksOpts(fc map[string]any, opts NotebookCellsOpts) []map[string]any {
 	cells := notebookExtractCells(fc)
 	if len(cells) == 0 {
 		return []map[string]any{}
@@ -830,7 +843,7 @@ func notebookMapCellsToToolResultBlocks(fc map[string]any) []map[string]any {
 		if !ok {
 			continue
 		}
-		flat = append(flat, notebookCellToBlocks(cm, i)...)
+		flat = append(flat, notebookCellToBlocksOpts(cm, i, opts)...)
 	}
 	return mergeAdjacentNotebookTextBlocks(flat)
 }
@@ -920,7 +933,7 @@ func notebookExtractImageFromJupyterData(data map[string]any) map[string]any {
 	return nil
 }
 
-func notebookProcessOutputTextPlain(v any) string {
+func notebookJoinOutputText(v any) string {
 	switch x := v.(type) {
 	case nil:
 		return ""
@@ -939,6 +952,21 @@ func notebookProcessOutputTextPlain(v any) string {
 	}
 }
 
+// notebookFormatOutputTruncated mirrors TS formatOutput (BashTool utils) for non-image text.
+func notebookFormatOutputTruncated(content string) string {
+	s := strings.TrimSpace(content)
+	if bashDataURIRe.MatchString(s) {
+		return content
+	}
+	maxLen := bashMaxOutputLength()
+	if len(content) <= maxLen {
+		return content
+	}
+	truncatedPart := content[:maxLen]
+	remainingLines := strings.Count(content[maxLen:], "\n") + 1
+	return fmt.Sprintf("%s\n\n... [%d lines truncated] ...", truncatedPart, remainingLines)
+}
+
 // notebookProcessRawOutput mirrors TS processOutput for raw Jupyter cell.outputs[].
 func notebookProcessRawOutput(om map[string]any) map[string]any {
 	ot, _ := om["output_type"].(string)
@@ -946,13 +974,13 @@ func notebookProcessRawOutput(om map[string]any) map[string]any {
 	case "stream":
 		return map[string]any{
 			"output_type": ot,
-			"text":        notebookProcessOutputTextPlain(om["text"]),
+			"text":        notebookFormatOutputTruncated(notebookJoinOutputText(om["text"])),
 		}
 	case "execute_result", "display_data":
 		data, _ := om["data"].(map[string]any)
 		text := ""
 		if data != nil {
-			text = notebookProcessOutputTextPlain(data["text/plain"])
+			text = notebookFormatOutputTruncated(notebookJoinOutputText(data["text/plain"]))
 		}
 		out := map[string]any{"output_type": ot, "text": text}
 		if img := notebookExtractImageFromJupyterData(data); img != nil {
@@ -971,7 +999,7 @@ func notebookProcessRawOutput(om map[string]any) map[string]any {
 			}
 		}
 		raw := fmt.Sprintf("%s: %s\n%s", ename, evalue, strings.Join(lines, "\n"))
-		return map[string]any{"output_type": ot, "text": raw}
+		return map[string]any{"output_type": ot, "text": notebookFormatOutputTruncated(raw)}
 	default:
 		return om
 	}
@@ -1009,6 +1037,31 @@ func notebookOutputBlocks(om map[string]any) []map[string]any {
 }
 
 func notebookCellToBlocks(m map[string]any, index int) []map[string]any {
+	return notebookCellToBlocksOpts(m, index, NotebookCellsOpts{IncludeLargeOutputs: true})
+}
+
+func notebookProcessedOutputsTooLarge(outputs []map[string]any) bool {
+	total := 0
+	for _, o := range outputs {
+		total += len(strField(o, "text"))
+		if im, ok := o["image"].(map[string]any); ok {
+			total += len(strField(im, "image_data"))
+		}
+		if total > notebookCellOutputTruncateBytes {
+			return true
+		}
+	}
+	return false
+}
+
+func notebookLargeCellOutputHint(notebookPath string, cellIndex int) string {
+	if strings.TrimSpace(notebookPath) == "" {
+		return fmt.Sprintf("Outputs are too large to include. Use %s with: cat <notebook_path> | jq '.cells[%d].outputs'", ToolNameBash, cellIndex)
+	}
+	return fmt.Sprintf("Outputs are too large to include. Use %s with: cat %q | jq '.cells[%d].outputs'", ToolNameBash, notebookPath, cellIndex)
+}
+
+func notebookCellToBlocksOpts(m map[string]any, index int, opts NotebookCellsOpts) []map[string]any {
 	cellType := strField(m, "cellType")
 	if cellType == "" {
 		cellType = strField(m, "cell_type")
@@ -1025,6 +1078,7 @@ func notebookCellToBlocks(m map[string]any, index int) []map[string]any {
 
 	out := []map[string]any{notebookCellContentBlock(cellType, source, cellID, language)}
 	if arr, ok := m["outputs"].([]any); ok {
+		var processed []map[string]any
 		for _, o := range arr {
 			om, ok := o.(map[string]any)
 			if !ok {
@@ -1033,7 +1087,18 @@ func notebookCellToBlocks(m map[string]any, index int) []map[string]any {
 			if notebookIsRawJupyterOutput(om) {
 				om = notebookProcessRawOutput(om)
 			}
-			out = append(out, notebookOutputBlocks(om)...)
+			processed = append(processed, om)
+		}
+		if !opts.IncludeLargeOutputs && notebookProcessedOutputsTooLarge(processed) {
+			single := map[string]any{
+				"output_type": "stream",
+				"text":        notebookLargeCellOutputHint(opts.Filename, index),
+			}
+			out = append(out, notebookOutputBlocks(single)...)
+		} else {
+			for _, om := range processed {
+				out = append(out, notebookOutputBlocks(om)...)
+			}
 		}
 	}
 	return out
