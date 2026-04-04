@@ -2025,6 +2025,31 @@ func TestEngine_SnipRemovalLogForPersistence_includesRestored(t *testing.T) {
 	}
 }
 
+func TestEngine_LastAssistantAtForPersistence_restoredAndUpdated(t *testing.T) {
+	restored := time.Date(2025, 11, 10, 15, 30, 0, 0, time.UTC)
+	e := New(context.Background(), &Config{
+		RestoredSessionLastAssistantAt: restored,
+		Deps: querydeps.Deps{
+			Turn: querydeps.StreamAsTurnAssistant(querydeps.StreamAssistantFunc(func(context.Context, string, int, []byte) (string, error) {
+				return "hi", nil
+			})),
+		},
+	})
+	if !e.LastAssistantAtForPersistence().Equal(restored) {
+		t.Fatalf("before submit: got %v want %v", e.LastAssistantAtForPersistence(), restored)
+	}
+	e.Submit("hello")
+	drainUntilTerminal(t, e.Events())
+	e.Wait()
+	after := e.LastAssistantAtForPersistence()
+	if after.IsZero() {
+		t.Fatal("expected non-zero after assistant turn")
+	}
+	if !after.After(restored) {
+		t.Fatalf("expected updated wall clock after submit, got %v (restored %v)", after, restored)
+	}
+}
+
 func TestEngine_SnipCompactBetweenRounds(t *testing.T) {
 	t.Setenv(features.EnvSnipCompact, "true")
 	t.Setenv(features.EnvSnipCompactMaxBytes, "280")

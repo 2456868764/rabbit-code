@@ -18,8 +18,9 @@
 // timeBasedMCConfig.ts                               time_based_mc_config.go — GetTimeBasedMCConfig (via features env)
 //
 // Related TS outside services/compact/:
-//   - services/api/promptCacheBreakDetection.ts      api_microcompact.go — PromptCacheBreakActive (via features)
+//   - services/api/promptCacheBreakDetection.ts      api_microcompact.go — PromptCacheBreakActive (via features); notifyCacheDeletion (cacheDeletionsPending) not ported — no Go phase-2 cache-read comparison yet
 //   - internal/query — blocking ladder / strip cache_control — query/loop.go, query/transcript.go (prompt cache break path)
+//   - internal/query/engine — time-based MC on API transcript; LastAssistantAtForPersistence / RestoredSessionLastAssistantAt for session sidecars
 //
 // Package query imports compact for LoopState.AutoCompactTracking and BuildHeadlessContextReport; compact must not import query.
 //

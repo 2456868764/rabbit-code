@@ -139,6 +139,8 @@ type Config struct {
 	RestoredAutoCompactTracking *compact.AutoCompactTracking
 	// RestoredSnipRemovalLog optional; prepended into each Submit's LoopState.SnipRemovalLog for session continuity (H7).
 	RestoredSnipRemovalLog []query.SnipRemovalEntry
+	// RestoredSessionLastAssistantAt optional; seeds time-based microcompact wall-clock across process restarts (RFC3339 in JSON at app boundary).
+	RestoredSessionLastAssistantAt time.Time
 	// ExtractMemoriesSaved runs after a successful forked extract when new topic files were written (extractMemories appendSystemMessage analogue).
 	ExtractMemoriesSaved func(memoryPaths []string, teamMemoryCount int)
 }
@@ -305,6 +307,9 @@ func New(parent context.Context, cfg *Config) *Engine {
 		}
 		e.restoredAutoCompactTracking = compact.CloneAutoCompactTracking(cfg.RestoredAutoCompactTracking)
 		e.restoredSnipRemovalLog = query.CloneSnipRemovalLog(cfg.RestoredSnipRemovalLog)
+		if !cfg.RestoredSessionLastAssistantAt.IsZero() {
+			e.sessionLastAssistantAt = cfg.RestoredSessionLastAssistantAt
+		}
 		e.extractMemoriesSavedFn = cfg.ExtractMemoriesSaved
 	}
 	e.stopHooks = append(e.stopHooks, e.stopHookExtractMemories)
@@ -1041,6 +1046,13 @@ func (e *Engine) AutoCompactTrackingForPersistence() *compact.AutoCompactTrackin
 // SnipRemovalLogForPersistence returns a deep copy of the snip removal log after the last completed Submit (H7 session sidecar).
 func (e *Engine) SnipRemovalLogForPersistence() []query.SnipRemovalEntry {
 	return query.CloneSnipRemovalLog(e.lastSnipRemovalLog)
+}
+
+// LastAssistantAtForPersistence returns the wall-clock time of the last model assistant message used for
+// time-based microcompact (session carry-over). Populated from RestoredSessionLastAssistantAt at engine init
+// and updated after each successful Submit that records an assistant turn. Zero means unknown / never set.
+func (e *Engine) LastAssistantAtForPersistence() time.Time {
+	return e.sessionLastAssistantAt
 }
 
 // Cancel stops in-flight Submit work (idempotent). In-flight HTTP streams should respect the same context when wired through RunTurnLoop.
