@@ -52,6 +52,63 @@ func TestGetAPIContextManagement_thinkingOnly(t *testing.T) {
 	if m["type"] != "clear_thinking_20251015" {
 		t.Fatalf("%v", m)
 	}
+	keep, _ := m["keep"].(string)
+	if keep != "all" {
+		t.Fatalf("keep: %v", m["keep"])
+	}
+}
+
+func TestGetAPIContextManagement_thinkingClearAllIdle(t *testing.T) {
+	t.Setenv(features.EnvUserType, "")
+	cfg := GetAPIContextManagement(APIContextManagementOptions{
+		HasThinking:      true,
+		ClearAllThinking: true,
+	})
+	if cfg == nil || len(cfg.Edits) != 1 {
+		t.Fatalf("%+v", cfg)
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(cfg.Edits[0], &m); err != nil {
+		t.Fatal(err)
+	}
+	keep, _ := m["keep"].(map[string]interface{})
+	if keep["type"] != "thinking_turns" || int(keep["value"].(float64)) != 1 {
+		t.Fatalf("keep: %v", m["keep"])
+	}
+}
+
+func TestGetAPIContextManagement_redactThinkingSkipsEdit(t *testing.T) {
+	t.Setenv(features.EnvUserType, "")
+	cfg := GetAPIContextManagement(APIContextManagementOptions{
+		HasThinking:            true,
+		IsRedactThinkingActive: true,
+	})
+	if cfg != nil {
+		t.Fatalf("expected nil when redact-thinking active, got %+v", cfg)
+	}
+}
+
+func TestGetAPIContextManagement_antClearUsesExcludeTools(t *testing.T) {
+	t.Setenv(features.EnvUserType, "ant")
+	t.Setenv(features.EnvUseAPIClearToolResults, "")
+	t.Setenv(features.EnvUseAPIClearToolUses, "1")
+	t.Setenv(features.EnvAPIMaxInputTokens, "")
+	t.Setenv(features.EnvAPITargetInputTokens, "")
+	cfg := GetAPIContextManagement(APIContextManagementOptions{})
+	if cfg == nil || len(cfg.Edits) != 1 {
+		t.Fatalf("%+v", cfg)
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(cfg.Edits[0], &m); err != nil {
+		t.Fatal(err)
+	}
+	if m["type"] != "clear_tool_uses_20250919" {
+		t.Fatal(m["type"])
+	}
+	ex, ok := m["exclude_tools"].([]interface{})
+	if !ok || len(ex) < 2 {
+		t.Fatalf("exclude_tools: %v", m["exclude_tools"])
+	}
 }
 
 func TestGetAPIContextManagement_antClearResults(t *testing.T) {
