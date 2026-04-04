@@ -136,10 +136,9 @@ Read the team config to discover your teammates' names. Check the task list peri
 	switch ty {
 	case "directory":
 		path, _ := attachment["path"].(string)
-		dirContent, _ := attachment["content"].(string)
 		return WrapMessagesInSystemReminder([]TSMsg{
 			metaToolUseMessage(ToolNameBash, map[string]any{"command": fmt.Sprintf("ls %q", path), "description": fmt.Sprintf("Lists files in %s", path)}),
-			metaToolResultMessage(ToolNameBash, bashToolStdoutNormalize(dirContent)),
+			metaToolResultMessage(ToolNameBash, BashAttachmentToolResultContentString(attachment)),
 		}), nil
 
 	case "edited_text_file":
@@ -340,7 +339,7 @@ Read the team config to discover your teammates' names. Check the task list peri
 		if style == "" || style == "default" {
 			return nil, nil
 		}
-		name := outputStyleName(style)
+		name := outputStyleDisplayName(style)
 		if name == "" {
 			return nil, nil
 		}
@@ -468,8 +467,9 @@ Treat this as a fresh planning session. Do not assume the existing plan is relev
 		total, _ := attachment["total"].(float64)
 		rem, _ := attachment["remaining"].(float64)
 		return []TSMsg{CreateUserMessage(CreateUserMessageOpts{
-			Content: WrapInSystemReminder(fmt.Sprintf("Token usage: %.0f/%.0f; %.0f remaining", used, total, rem)),
-			IsMeta:  true,
+			Content: WrapInSystemReminder(fmt.Sprintf("Token usage: %s/%s; %s remaining",
+				formatAttachmentNumberForTemplate(used), formatAttachmentNumberForTemplate(total), formatAttachmentNumberForTemplate(rem))),
+			IsMeta: true,
 		})}, nil
 
 	case "budget_usd":
@@ -477,8 +477,9 @@ Treat this as a fresh planning session. Do not assume the existing plan is relev
 		total, _ := attachment["total"].(float64)
 		rem, _ := attachment["remaining"].(float64)
 		return []TSMsg{CreateUserMessage(CreateUserMessageOpts{
-			Content: WrapInSystemReminder(fmt.Sprintf("USD budget: $%.2f/$%.2f; $%.2f remaining", used, total, rem)),
-			IsMeta:  true,
+			Content: WrapInSystemReminder(fmt.Sprintf("USD budget: $%s/$%s; $%s remaining",
+				formatAttachmentUSDNumber(used), formatAttachmentUSDNumber(total), formatAttachmentUSDNumber(rem))),
+			IsMeta: true,
 		})}, nil
 
 	case "output_token_usage":
@@ -691,6 +692,10 @@ func logNormalizeAttachmentUnknown(ty string, attachment map[string]any) {
 		LogNormalizeAttachmentUnknownType(ty, attachment)
 		return
 	}
+	if os.Getenv("RABBIT_ANT_UNKNOWN_ATTACHMENT") == "1" {
+		log.Printf("messages: normalizeAttachmentForAPI unknown attachment type %q", ty)
+		return
+	}
 	if os.Getenv("RABBIT_ATTACHMENT_UNKNOWN_LOG") == "1" {
 		log.Printf("messages: normalizeAttachmentForAPI unknown attachment type %q", ty)
 	}
@@ -864,9 +869,19 @@ func notebookCellContentBlock(cellType, source, cellID, language string) map[str
 	return map[string]any{"type": "text", "text": text}
 }
 
+func notebookTruncateApproxOutputText(s string) string {
+	if len(s) <= notebookCellOutputTruncateBytes {
+		return s
+	}
+	tail := s[notebookCellOutputTruncateBytes:]
+	extraLines := strings.Count(tail, "\n") + 1
+	return s[:notebookCellOutputTruncateBytes] + fmt.Sprintf("\n\n... [%d lines truncated] ...", extraLines)
+}
+
 func notebookOutputBlocks(om map[string]any) []map[string]any {
 	var blocks []map[string]any
 	if t := strField(om, "text"); t != "" {
+		t = notebookTruncateApproxOutputText(t)
 		blocks = append(blocks, map[string]any{"type": "text", "text": "\n" + t})
 	}
 	if im, ok := om["image"].(map[string]any); ok {
@@ -1040,6 +1055,18 @@ func outputStyleName(style string) string {
 	default:
 		return ""
 	}
+}
+
+// ExtraOutputStyleNames maps attachment style keys to display names (TS plugin/custom output styles).
+var ExtraOutputStyleNames map[string]string
+
+func outputStyleDisplayName(style string) string {
+	if ExtraOutputStyleNames != nil {
+		if n, ok := ExtraOutputStyleNames[style]; ok && strings.TrimSpace(n) != "" {
+			return n
+		}
+	}
+	return outputStyleName(style)
 }
 
 func planModeMessages(att map[string]any) []TSMsg {

@@ -8,6 +8,9 @@ import (
 
 const apiImageMaxBase64Size = 5 * 1024 * 1024 // API_IMAGE_MAX_BASE64_SIZE
 
+// LogImageAPIValidationFailed mirrors TS logEvent('tengu_image_api_validation_failed'); optional.
+var LogImageAPIValidationFailed func(base64SizeBytes, maxBytes int)
+
 // OversizedImage mirrors TS OversizedImage.
 type OversizedImage struct {
 	Index int
@@ -82,6 +85,9 @@ func ValidateImagesForAPIMap(messages []map[string]any) error {
 			src, _ := b["source"].(map[string]any)
 			data, _ := src["data"].(string)
 			if len(data) > apiImageMaxBase64Size {
+				if LogImageAPIValidationFailed != nil {
+					LogImageAPIValidationFailed(len(data), apiImageMaxBase64Size)
+				}
 				oversized = append(oversized, OversizedImage{Index: imageIndex, Size: len(data)})
 			}
 		}

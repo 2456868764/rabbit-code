@@ -58,7 +58,8 @@ func legacyToolNameAliases() map[string]string {
 		"AgentOutputTool":  ToolNameTaskOutput,
 		"BashOutputTool":   ToolNameTaskOutput,
 	}
-	if os.Getenv("RABBIT_KAIROS") == "1" || os.Getenv("RABBIT_KAIROS_CHANNELS") == "1" || os.Getenv("RABBIT_KAIROS_BRIEF") == "1" {
+	if os.Getenv("RABBIT_FEATURE_KAIROS") == "1" ||
+		os.Getenv("RABBIT_KAIROS") == "1" || os.Getenv("RABBIT_KAIROS_CHANNELS") == "1" || os.Getenv("RABBIT_KAIROS_BRIEF") == "1" {
 		m["Brief"] = toolNameBriefCanonical
 	}
 	return m

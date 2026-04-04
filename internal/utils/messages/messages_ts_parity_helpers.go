@@ -218,13 +218,46 @@ func formatNumberCompact(n float64) string {
 		div, suf = 1_000_000_000, "b"
 	}
 	v := x / div
-	// TS uses minimumFractionDigits 1 for n >= 1000
+	// Align with Intl.NumberFormat compact rounding (1 significant fractional digit).
+	v = math.Round(v*10) / 10
 	txt := fmt.Sprintf("%.1f", v)
 	txt = strings.TrimRight(strings.TrimRight(txt, "0"), ".")
 	return sign + strings.ToLower(txt+suf)
 }
 
+// formatAttachmentNumberForTemplate mirrors TS `${number}` interpolation (integers without .0).
+func formatAttachmentNumberForTemplate(n float64) string {
+	if math.IsNaN(n) || math.IsInf(n, 0) {
+		return fmt.Sprintf("%g", n)
+	}
+	if n == math.Trunc(n) {
+		return strconv.FormatInt(int64(n), 10)
+	}
+	return strconv.FormatFloat(n, 'f', -1, 64)
+}
+
+func formatAttachmentUSDNumber(n float64) string {
+	if math.IsNaN(n) || math.IsInf(n, 0) {
+		return fmt.Sprintf("%g", n)
+	}
+	return strconv.FormatFloat(n, 'f', 2, 64)
+}
+
 var bashLeadingWhitespaceNewlines = regexp.MustCompile(`^(\s*\n)+`)
+
+// fileReadLineNumberPrefix matches cat -n style first column (tab or Unicode arrow →).
+var fileReadLineNumberPrefix = regexp.MustCompile(`^\s*\d+(\t|\x{2192})`)
+
+func fileContentAppearsLineNumbered(content string) bool {
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+	for _, line := range strings.Split(content, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		return fileReadLineNumberPrefix.MatchString(line)
+	}
+	return false
+}
 
 func bashToolStdoutNormalize(stdout string) string {
 	if stdout == "" {
@@ -283,8 +316,13 @@ func fileReadTextToolResultString(fc map[string]any) string {
 		}
 		return fmt.Sprintf("<system-reminder>Warning: the file exists but is shorter than the provided offset (%d). The file has %d lines.</system-reminder>", startLine, totalLines)
 	}
-	compact := os.Getenv("RABBIT_TENGU_COMPACT_LINE_PREFIX_KILL_SWITCH") != "1"
-	body := addLineNumbersForFileRead(content, startLine, compact)
+	var body string
+	if truthy(f["lineNumbersPresent"]) || truthy(f["contentLineNumbered"]) || fileContentAppearsLineNumbered(content) {
+		body = content
+	} else {
+		compact := os.Getenv("RABBIT_TENGU_COMPACT_LINE_PREFIX_KILL_SWITCH") != "1"
+		body = addLineNumbersForFileRead(content, startLine, compact)
+	}
 	if note := memoryFreshnessNoteFromFileMap(f); note != "" {
 		body = note + body
 	}

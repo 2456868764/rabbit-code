@@ -608,6 +608,60 @@ func TestDefaultFormatTeammateMailboxMessagesForAPI(t *testing.T) {
 	}
 }
 
+func TestBashAttachmentToolResultContentString(t *testing.T) {
+	s := BashAttachmentToolResultContentString(map[string]any{
+		"content": "  \n\nhello",
+		"stderr":  "warn",
+	})
+	if !strings.Contains(s, "hello") || !strings.Contains(s, "warn") {
+		t.Fatalf("got %q", s)
+	}
+	s2 := BashAttachmentToolResultContentString(map[string]any{
+		"bash": map[string]any{
+			"stdout":              "out",
+			"persistedOutputPath": "/tmp/x.txt",
+			"persistedOutputSize": float64(99999),
+		},
+	})
+	if !strings.Contains(s2, "<persisted-output>") || !strings.Contains(s2, "/tmp/x.txt") {
+		t.Fatalf("persisted: %q", s2)
+	}
+}
+
+func TestFileReadTextToolResultString_skipsDoubleLineNumbers(t *testing.T) {
+	fc := map[string]any{
+		"type": "text",
+		"file": map[string]any{
+			"content":   "1\u2192already-numbered",
+			"startLine": float64(1),
+		},
+	}
+	out := fileReadTextToolResultString(fc)
+	if !strings.Contains(out, "already-numbered") {
+		t.Fatalf("missing body: %q", out)
+	}
+	// If we wrongly ran addLineNumbers on top, first line would become "1<TAB>1→..." in compact mode.
+	if strings.Contains(out, "\t1\u2192") {
+		t.Fatalf("double line-number pass: %q", out)
+	}
+}
+
+func TestFormatAttachmentNumberForTemplate(t *testing.T) {
+	if formatAttachmentNumberForTemplate(3) != "3" {
+		t.Fatal()
+	}
+	if formatAttachmentNumberForTemplate(3.5) != "3.5" {
+		t.Fatal(formatAttachmentNumberForTemplate(3.5))
+	}
+}
+
+func TestNormalizeLegacyToolName_featureKairos(t *testing.T) {
+	t.Setenv("RABBIT_FEATURE_KAIROS", "1")
+	if NormalizeLegacyToolName("Brief") != "SendUserMessage" {
+		t.Fatal(NormalizeLegacyToolName("Brief"))
+	}
+}
+
 func TestNormalizeAttachmentForAPI_teammateMailbox_defaultFormat(t *testing.T) {
 	t.Setenv("RABBIT_AGENT_SWARMS", "1")
 	msgs, err := NormalizeAttachmentForAPI(map[string]any{
