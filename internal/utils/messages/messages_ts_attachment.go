@@ -1171,6 +1171,9 @@ func outputStyleDisplayName(style string) string {
 	if n, ok := outputStyleNameFromEnv(style); ok {
 		return n
 	}
+	if n, ok := outputStyleNameFromConfigFile(style); ok {
+		return n
+	}
 	if ExtraOutputStyleNames != nil {
 		if n, ok := ExtraOutputStyleNames[style]; ok && strings.TrimSpace(n) != "" {
 			return n

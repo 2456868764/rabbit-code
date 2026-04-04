@@ -9,7 +9,7 @@
 // RABBIT_TENGU_TOOLREF_DEFER, RABBIT_NON_INTERACTIVE (API error strip-target copy), RABBIT_CONNECTOR_TEXT,
 // RABBIT_SNIP_RUNTIME_ENABLED (0 disables snip merge/[id:] runtime), RABBIT_SNIP_NUDGE_TEXT, RABBIT_KAIROS_BRIEF,
 // RABBIT_FEATURE_KAIROS (Brief alias), RABBIT_ANT_UNKNOWN_ATTACHMENT (log unknown attachment types like TS logAntError),
-// RABBIT_OUTPUT_STYLE_NAMES_JSON (plugin style display names),
+// RABBIT_OUTPUT_STYLE_NAMES_JSON (inline style display map), RABBIT_OUTPUT_STYLE_CONFIG_PATH (JSON file like OUTPUT_STYLE_CONFIG),
 // RABBIT_TASK_OUTPUT_DIR (Bash background output path when transcript omits backgroundTaskOutputPath),
 // RABBIT_MCP_RESOURCE_DEBUG (log empty MCP resource render), etc.
 package messages

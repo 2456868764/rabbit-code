@@ -685,6 +685,19 @@ func TestOutputStyleDisplayName_fromEnvJSON(t *testing.T) {
 	}
 }
 
+func TestOutputStyleDisplayName_fromConfigFile(t *testing.T) {
+	t.Setenv("RABBIT_OUTPUT_STYLE_NAMES_JSON", "")
+	t.Setenv("RABBIT_OUTPUT_STYLE_CONFIG_PATH", "")
+	p := filepath.Join(t.TempDir(), "output-styles.json")
+	if err := os.WriteFile(p, []byte(`{"ZetaPlugin":{"name":"Zeta Display","description":"x"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("RABBIT_OUTPUT_STYLE_CONFIG_PATH", p)
+	if n := outputStyleDisplayName("ZetaPlugin"); n != "Zeta Display" {
+		t.Fatalf("got %q", n)
+	}
+}
+
 func TestBashBackgroundTaskOutputPath_fromEnv(t *testing.T) {
 	t.Setenv("RABBIT_TASK_OUTPUT_DIR", "/var/task-out")
 	s := BashAttachmentToolResultContentString(map[string]any{
