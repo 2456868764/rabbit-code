@@ -65,8 +65,8 @@ func TestResultPhaseAfterCompactExecutor(t *testing.T) {
 	}
 }
 
-// Expected names match restored-src/src/services/compact/microCompact.ts COMPACTABLE_TOOLS
-// (FILE_READ_TOOL_NAME, SHELL_TOOL_NAMES, GREP, GLOB, WEB_SEARCH, WEB_FETCH, FILE_EDIT, FILE_WRITE).
+// Expected names match restored-src/src/services/compact/microCompact.ts COMPACTABLE_TOOLS,
+// sourced from internal/tools/* and internal/utils/shell (mirrors src/tools + shellToolUtils).
 func TestCompactableToolNames_matchMicroCompactTS(t *testing.T) {
 	want := []string{
 		"Read", "Bash", "PowerShell", "Grep", "Glob",

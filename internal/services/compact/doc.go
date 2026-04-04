@@ -5,21 +5,24 @@
 //
 // TS module (restored-src/src/services/compact/)     Go file (this package)
 // -------------------------------------------------------------------------------------------------
-// apiMicrocompact.ts                                 api_microcompact.go — MicroCompactRequested; buffer notes on micro_compact.go
+// apiMicrocompact.ts                                 api_microcompact.go, api_context_management.go — MicroCompactRequested; getAPIContextManagement JSON
 // autoCompact.ts                                     auto_compact.go — thresholds, TokenWarningState, proactive gates, AutoCompactTracking JSON, RecompactionMeta
 // compact.ts                                         compact.go — RunPhase, ExecuteStub, FormatStubCompactSummary, ExecuteStubWithMeta
-// microCompact.ts                                    micro_compact.go — COMPACTABLE_TOOLS, collect IDs, main-thread source, microcompact buffer
+// microCompact.ts                                    micro_compact.go, time_based_trigger.go — COMPACTABLE_TOOLS, EvaluateTimeBasedTrigger, TIME_BASED_MC_CLEARED_MESSAGE
 // postCompactCleanup.ts                              post_compact_cleanup.go — main-thread post-compact source, reset microcompact state
-// prompt.ts                                          (not ported in this package)
-// grouping.ts                                        (not ported in this package)
-// compactWarningState.ts                             auto_compact.go — CalculateTokenWarningState (numeric core)
+// prompt.ts                                          prompt_compact.go — FormatCompactSummary (subset; full prompts TBD)
+// grouping.ts                                        grouping.go — GroupMessagesByApiRound, ApiRoundMessage
+// compactWarningState.ts                             auto_compact.go — CalculateTokenWarningState (numeric); compact_warning_state.go — suppress/clear store
 // compactWarningHook.ts                              (not ported in this package)
 // sessionMemoryCompact.ts                            internal/query/engine — Engine.SessionMemoryCompact callback wiring
-// timeBasedMCConfig.ts                               (not ported in this package)
+// timeBasedMCConfig.ts                               time_based_mc_config.go — GetTimeBasedMCConfig (via features env)
 //
 // Related TS outside services/compact/:
 //   - services/api/promptCacheBreakDetection.ts      api_microcompact.go — PromptCacheBreakActive (via features)
 //   - internal/query — blocking ladder / strip cache_control — query/loop.go, query/transcript.go (prompt cache break path)
 //
 // Package query imports compact for LoopState.AutoCompactTracking and BuildHeadlessContextReport; compact must not import query.
+//
+// Tool names for COMPACTABLE_TOOLS: internal/tools/* (mirrors src/tools/*/prompt.ts|constants.ts) and
+// internal/utils/shell.ShellToolNames (mirrors src/utils/shell/shellToolUtils.ts).
 package compact

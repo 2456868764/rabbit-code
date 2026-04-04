@@ -197,6 +197,65 @@ func AttributionHeaderPromptEnabled() bool {
 	return truthy(v)
 }
 
+// --- API context management (apiMicrocompact.ts; env names match upstream for Anthropic API paths) ---
+
+const (
+	EnvUserType               = "USER_TYPE"
+	EnvUserTypeRabbit         = "RABBIT_CODE_USER_TYPE"
+	EnvUseAPIClearToolResults = "USE_API_CLEAR_TOOL_RESULTS"
+	EnvUseAPIClearToolUses    = "USE_API_CLEAR_TOOL_USES"
+	EnvAPIMaxInputTokens      = "API_MAX_INPUT_TOKENS"
+	EnvAPITargetInputTokens   = "API_TARGET_INPUT_TOKENS"
+)
+
+// AntUserType is true when USER_TYPE or RABBIT_CODE_USER_TYPE equals "ant" (apiMicrocompact ant-only branches).
+func AntUserType() bool {
+	ut := strings.TrimSpace(os.Getenv(EnvUserTypeRabbit))
+	if ut == "" {
+		ut = strings.TrimSpace(os.Getenv(EnvUserType))
+	}
+	return strings.EqualFold(ut, "ant")
+}
+
+// UseAPIClearToolResults mirrors isEnvTruthy(USE_API_CLEAR_TOOL_RESULTS).
+func UseAPIClearToolResults() bool {
+	return truthy(os.Getenv(EnvUseAPIClearToolResults))
+}
+
+// UseAPIClearToolUses mirrors isEnvTruthy(USE_API_CLEAR_TOOL_USES).
+func UseAPIClearToolUses() bool {
+	return truthy(os.Getenv(EnvUseAPIClearToolUses))
+}
+
+const defaultAPIMaxInputTokens = 180_000
+const defaultAPITargetInputTokens = 40_000
+
+// APIMaxInputTokens mirrors API_MAX_INPUT_TOKENS parse with default 180_000.
+func APIMaxInputTokens() int {
+	s := strings.TrimSpace(os.Getenv(EnvAPIMaxInputTokens))
+	if s == "" {
+		return defaultAPIMaxInputTokens
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return defaultAPIMaxInputTokens
+	}
+	return v
+}
+
+// APITargetInputTokens mirrors API_TARGET_INPUT_TOKENS parse with default 40_000.
+func APITargetInputTokens() int {
+	s := strings.TrimSpace(os.Getenv(EnvAPITargetInputTokens))
+	if s == "" {
+		return defaultAPITargetInputTokens
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return defaultAPITargetInputTokens
+	}
+	return v
+}
+
 // --- Headless query / engine env (SOURCE_FEATURE_FLAGS.md P5.F.*; defaults off) ---
 
 const (
@@ -208,14 +267,18 @@ const (
 	EnvTokenSubmitEstimateMode = "RABBIT_CODE_TOKEN_SUBMIT_ESTIMATE_MODE"
 	EnvReactiveCompact         = "RABBIT_CODE_REACTIVE_COMPACT"
 	// EnvTenguCobaltRaccoon mirrors GrowthBook tengu_cobalt_raccoon (reactive-only mode under REACTIVE_COMPACT).
-	EnvTenguCobaltRaccoon             = "RABBIT_CODE_TENGU_COBALT_RACCOON"
-	EnvContextCollapse                = "RABBIT_CODE_CONTEXT_COLLAPSE"
-	EnvSessionRestore                 = "RABBIT_CODE_SESSION_RESTORE"
-	EnvUltrathink                     = "RABBIT_CODE_ULTRATHINK"
-	EnvUltraplan                      = "RABBIT_CODE_ULTRAPLAN"
-	EnvBreakCacheCommand              = "RABBIT_CODE_BREAK_CACHE_COMMAND"
-	EnvTemplates                      = "RABBIT_CODE_TEMPLATES"
-	EnvCachedMicrocompact             = "RABBIT_CODE_CACHED_MICROCOMPACT"
+	EnvTenguCobaltRaccoon = "RABBIT_CODE_TENGU_COBALT_RACCOON"
+	EnvContextCollapse    = "RABBIT_CODE_CONTEXT_COLLAPSE"
+	EnvSessionRestore     = "RABBIT_CODE_SESSION_RESTORE"
+	EnvUltrathink         = "RABBIT_CODE_ULTRATHINK"
+	EnvUltraplan          = "RABBIT_CODE_ULTRAPLAN"
+	EnvBreakCacheCommand  = "RABBIT_CODE_BREAK_CACHE_COMMAND"
+	EnvTemplates          = "RABBIT_CODE_TEMPLATES"
+	EnvCachedMicrocompact = "RABBIT_CODE_CACHED_MICROCOMPACT"
+	// Time-based microcompact (timeBasedMCConfig.ts; GrowthBook key tengu_slate_heron → env analogue).
+	EnvTimeBasedMicrocompact          = "RABBIT_CODE_TIME_BASED_MICROCOMPACT"
+	EnvTimeBasedMCGapMinutes          = "RABBIT_CODE_TIME_BASED_MC_GAP_MINUTES"
+	EnvTimeBasedMCKeepRecent          = "RABBIT_CODE_TIME_BASED_MC_KEEP_RECENT"
 	EnvHistorySnip                    = "RABBIT_CODE_HISTORY_SNIP"
 	EnvBashExec                       = "RABBIT_CODE_BASH_EXEC"
 	EnvSnipCompact                    = "RABBIT_CODE_SNIP_COMPACT"
@@ -676,9 +739,41 @@ func UltraplanEnabled() bool          { return truthy(os.Getenv(EnvUltraplan)) }
 func BreakCacheCommandEnabled() bool  { return truthy(os.Getenv(EnvBreakCacheCommand)) }
 func TemplatesEnabled() bool          { return truthy(os.Getenv(EnvTemplates)) }
 func CachedMicrocompactEnabled() bool { return truthy(os.Getenv(EnvCachedMicrocompact)) }
-func HistorySnipEnabled() bool        { return truthy(os.Getenv(EnvHistorySnip)) }
-func SnipCompactEnabled() bool        { return truthy(os.Getenv(EnvSnipCompact)) }
-func BashExecEnabled() bool           { return truthy(os.Getenv(EnvBashExec)) }
+
+// TimeBasedMicrocompactEnabled mirrors timeBasedMCConfig default enabled: false unless env truthy.
+func TimeBasedMicrocompactEnabled() bool {
+	return truthy(os.Getenv(EnvTimeBasedMicrocompact))
+}
+
+// TimeBasedMCGapThresholdMinutes default 60 (safe vs server cache TTL per TS comment).
+func TimeBasedMCGapThresholdMinutes() int {
+	s := strings.TrimSpace(os.Getenv(EnvTimeBasedMCGapMinutes))
+	if s == "" {
+		return 60
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 60
+	}
+	return v
+}
+
+// TimeBasedMCKeepRecent default 5 (most recent compactable tool results to keep).
+func TimeBasedMCKeepRecent() int {
+	s := strings.TrimSpace(os.Getenv(EnvTimeBasedMCKeepRecent))
+	if s == "" {
+		return 5
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 5
+	}
+	return v
+}
+
+func HistorySnipEnabled() bool { return truthy(os.Getenv(EnvHistorySnip)) }
+func SnipCompactEnabled() bool { return truthy(os.Getenv(EnvSnipCompact)) }
+func BashExecEnabled() bool    { return truthy(os.Getenv(EnvBashExec)) }
 
 func SnipCompactMaxBytes() int {
 	if !SnipCompactEnabled() {

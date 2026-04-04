@@ -4,6 +4,15 @@ import (
 	"encoding/json"
 	"strings"
 	"sync"
+
+	"github.com/2456868764/rabbit-code/internal/tools/fileedittool"
+	"github.com/2456868764/rabbit-code/internal/tools/filereadtool"
+	"github.com/2456868764/rabbit-code/internal/tools/filewritetool"
+	"github.com/2456868764/rabbit-code/internal/tools/globtool"
+	"github.com/2456868764/rabbit-code/internal/tools/greptool"
+	"github.com/2456868764/rabbit-code/internal/tools/webfetchtool"
+	"github.com/2456868764/rabbit-code/internal/tools/websearchtool"
+	"github.com/2456868764/rabbit-code/internal/utils/shell"
 )
 
 // PinnedCacheEdits mirrors microCompact.ts pin payload (user message index + cache_edits block JSON).
@@ -92,17 +101,23 @@ func (b *MicrocompactEditBuffer) ResetMicrocompactState() {
 	b.toolsSentToAPI = false
 }
 
-// Compactable tool names mirror microCompact.ts COMPACTABLE_TOOLS.
-var compactableTools = map[string]struct{}{
-	"Read":       {},
-	"Bash":       {},
-	"PowerShell": {},
-	"Grep":       {},
-	"Glob":       {},
-	"WebSearch":  {},
-	"WebFetch":   {},
-	"Edit":       {},
-	"Write":      {},
+// compactableTools mirrors microCompact.ts COMPACTABLE_TOOLS (assembled from src/tools/* constants).
+var compactableTools = buildCompactableToolSet()
+
+func buildCompactableToolSet() map[string]struct{} {
+	m := make(map[string]struct{})
+	add := func(s string) { m[s] = struct{}{} }
+	add(filereadtool.FileReadToolName)
+	for _, n := range shell.ShellToolNames() {
+		add(n)
+	}
+	add(greptool.GrepToolName)
+	add(globtool.GlobToolName)
+	add(websearchtool.WebSearchToolName)
+	add(webfetchtool.WebFetchToolName)
+	add(fileedittool.FileEditToolName)
+	add(filewritetool.FileWriteToolName)
+	return m
 }
 
 // IsCompactableToolName reports whether name is in the upstream COMPACTABLE_TOOLS set.

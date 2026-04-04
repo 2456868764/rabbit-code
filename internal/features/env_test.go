@@ -552,3 +552,35 @@ func TestContextWindowTokensForModel(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+func TestAntUserType(t *testing.T) {
+	t.Setenv(EnvUserType, "")
+	t.Setenv(EnvUserTypeRabbit, "")
+	if AntUserType() {
+		t.Fatal()
+	}
+	t.Setenv(EnvUserTypeRabbit, "ant")
+	if !AntUserType() {
+		t.Fatal()
+	}
+}
+
+func TestAPIMaxInputTokens_defaults(t *testing.T) {
+	t.Setenv(EnvAPIMaxInputTokens, "")
+	t.Setenv(EnvAPITargetInputTokens, "")
+	if APIMaxInputTokens() != 180_000 || APITargetInputTokens() != 40_000 {
+		t.Fatal()
+	}
+}
+
+func TestUseAPIClearToolFlags(t *testing.T) {
+	t.Setenv(EnvUseAPIClearToolResults, "")
+	t.Setenv(EnvUseAPIClearToolUses, "")
+	if UseAPIClearToolResults() || UseAPIClearToolUses() {
+		t.Fatal()
+	}
+	t.Setenv(EnvUseAPIClearToolResults, "1")
+	if !UseAPIClearToolResults() {
+		t.Fatal()
+	}
+}
