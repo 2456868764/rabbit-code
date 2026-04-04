@@ -759,3 +759,48 @@ func TestNormalizeAttachmentForAPI_teammateMailbox_defaultFormat(t *testing.T) {
 		t.Fatalf("unexpected content: %q", body)
 	}
 }
+
+func TestMergeUserContentBlocks_stringToolResultSmoosh(t *testing.T) {
+	t.Setenv("RABBIT_TENGU_CHAIR_SERMON", "")
+	a := []map[string]any{{
+		"type":    "tool_result",
+		"content": "base",
+	}}
+	b := []map[string]any{{"type": "text", "text": "extra"}}
+	out := MergeUserContentBlocks(a, b)
+	if len(out) != 1 {
+		t.Fatalf("len=%d %#v", len(out), out)
+	}
+	s, _ := out[0]["content"].(string)
+	if !strings.Contains(s, "base") || !strings.Contains(s, "extra") {
+		t.Fatalf("got %q", s)
+	}
+}
+
+func TestSanitizeErrorToolResultContentGeneric_stripsNonText(t *testing.T) {
+	msgs := []map[string]any{{
+		"type": "user",
+		"message": map[string]any{
+			"content": []any{map[string]any{
+				"type":     "tool_result",
+				"is_error": true,
+				"content": []any{
+					map[string]any{"type": "text", "text": "err"},
+					map[string]any{"type": "image", "source": map[string]any{"type": "base64", "data": "abc", "media_type": "image/png"}},
+				},
+			}},
+		},
+	}}
+	out := sanitizeErrorToolResultContentGeneric(msgs)
+	inner, _ := out[0]["message"].(map[string]any)
+	arr, _ := inner["content"].([]any)
+	tr, _ := arr[0].(map[string]any)
+	trc, _ := tr["content"].([]any)
+	if len(trc) != 1 {
+		t.Fatalf("got %#v", trc)
+	}
+	tb, _ := trc[0].(map[string]any)
+	if tb["type"] != "text" || tb["text"] != "err" {
+		t.Fatalf("got %#v", tb)
+	}
+}

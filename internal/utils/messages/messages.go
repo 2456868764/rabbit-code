@@ -735,6 +735,11 @@ func tenguChairSermonEnabled() bool {
 	return os.Getenv("RABBIT_TENGU_CHAIR_SERMON") == "1"
 }
 
+// MergeUserContentBlocks mirrors TS mergeUserContentBlocks (honors RABBIT_TENGU_CHAIR_SERMON).
+func MergeUserContentBlocks(a, b []map[string]any) []map[string]any {
+	return MergeUserContentBlocksMap(a, b, tenguChairSermonEnabled())
+}
+
 // MergeUserContentBlocksMap mirrors TS mergeUserContentBlocks for []map[string]any content blocks.
 func MergeUserContentBlocksMap(a, b []map[string]any, chairSermon bool) []map[string]any {
 	if len(a) == 0 {
