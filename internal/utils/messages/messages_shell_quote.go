@@ -3,9 +3,10 @@ package messages
 
 import "strings"
 
-// ShellQuoteSingleArg mirrors shell-quote's quote() for one string: safe characters
-// [A-Za-z0-9_@%+=:,./-] pass through unquoted; otherwise wrap in single quotes,
-// escaping embedded ' as '\''. Empty string yields "''".
+// ShellQuoteSingleArg mirrors npm shell-quote quote() for one string. Runes in
+// [A-Za-z0-9_@%+=:,./-] pass through unquoted; otherwise the string is wrapped in
+// single quotes with embedded single quotes escaped POSIX-style (quote-end, literal, quote-start).
+// Empty input yields the quoted-empty shell token (two 0x27 bytes in the output).
 func ShellQuoteSingleArg(s string) string {
 	if s == "" {
 		return "''"
