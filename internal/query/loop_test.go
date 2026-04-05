@@ -84,6 +84,62 @@ func TestLoopContinue_recordAndClear(t *testing.T) {
 	}
 }
 
+func TestLoopDriver_OnAfterToolResults_calledOnceAfterTools(t *testing.T) {
+	var calls int
+	turns := &SequenceTurnAssistant{Turns: []TurnResult{
+		{Text: "t", ToolUses: []ToolUseCall{{ID: "1", Name: "bash", Input: json.RawMessage(`{}`)}}},
+		{Text: "done"},
+	}}
+	d := LoopDriver{
+		Deps: Deps{
+			Tools: BashStubToolRunner{},
+			Turn:  turns,
+		},
+		Model: "m", MaxTokens: 8,
+		Observe: &LoopObservers{
+			OnAfterToolResults: func(ctx context.Context, st *LoopState, raw json.RawMessage) error {
+				_ = ctx
+				_ = st
+				calls++
+				if !strings.Contains(string(raw), "tool_result") {
+					t.Error("expected tool_result in transcript")
+				}
+				return nil
+			},
+		},
+	}
+	st := LoopState{}
+	_, _, err := d.RunTurnLoop(context.Background(), &st, "hi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatalf("want 1 OnAfterToolResults, got %d", calls)
+	}
+}
+
+func TestLoopDriver_OnAfterToolResults_errorStopsLoop(t *testing.T) {
+	boom := errors.New("hook")
+	turns := &SequenceTurnAssistant{Turns: []TurnResult{
+		{Text: "t", ToolUses: []ToolUseCall{{ID: "1", Name: "bash", Input: json.RawMessage(`{}`)}}},
+		{Text: "never"},
+	}}
+	d := LoopDriver{
+		Deps:  Deps{Tools: BashStubToolRunner{}, Turn: turns},
+		Model: "m", MaxTokens: 8,
+		Observe: &LoopObservers{
+			OnAfterToolResults: func(context.Context, *LoopState, json.RawMessage) error {
+				return boom
+			},
+		},
+	}
+	st := LoopState{}
+	_, _, err := d.RunTurnLoop(context.Background(), &st, "hi")
+	if !errors.Is(err, boom) {
+		t.Fatalf("got %v want %v", err, boom)
+	}
+}
+
 func TestLoopDriver_RunTurnLoop_setsNextTurnContinueAfterTools(t *testing.T) {
 	turns := &SequenceTurnAssistant{Turns: []TurnResult{
 		{

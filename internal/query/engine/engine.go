@@ -156,7 +156,22 @@ type Config struct {
 	// CommandLifecycleNotify optional; invoked as notifyCommandLifecycle(uuid, phase) for each ConsumedCommandUUID in SubmitWithOptions
 	// after EventKindDone (successful Submit), matching query.ts after query() returns normally.
 	CommandLifecycleNotify func(uuid string, phase string)
+	// ProcessUserInputHook optional; runs before memdir / template pipeline. When replace is true, newText is the submit body (QueryEngine.ts processUserInput analogue).
+	ProcessUserInputHook ProcessUserInputHook
+	// ExtraTemplateNames returns extra template basenames (no .md) merged with features.TemplateNames() for TEMPLATES appendix and EventKindTemplatesActive (classifier hook surface).
+	ExtraTemplateNames ExtraTemplateNames
+	// AfterToolResultsHook runs after each tool round appends user tool_result blocks, before next-turn state reset (query.ts post-tools collect hooks).
+	AfterToolResultsHook AfterToolResultsHook
 }
+
+// ProcessUserInputHook runs before memdir path resolution for each Submit (QueryEngine.ts processUserInput).
+type ProcessUserInputHook func(ctx context.Context, userText string) (newText string, replace bool, err error)
+
+// ExtraTemplateNames supplies template names keyed off resolved user text after memdir injection (before template appendix is applied).
+type ExtraTemplateNames func(resolvedUserText string) []string
+
+// AfterToolResultsHook observes the transcript immediately after tool results are merged (query.ts timing for skillPrefetch / taskSummary modules).
+type AfterToolResultsHook func(ctx context.Context, st *query.LoopState, transcriptJSON json.RawMessage) error
 
 // SubmitOptions optional per-submit fields (query.ts consumedCommandUuids + notifyCommandLifecycle).
 type SubmitOptions struct {
@@ -236,6 +251,9 @@ type Engine struct {
 	postCompactWorkspaceDir string
 
 	commandLifecycleNotify func(uuid string, phase string)
+	processUserInputHook   ProcessUserInputHook
+	extraTemplateNames     ExtraTemplateNames
+	afterToolResultsHook   AfterToolResultsHook
 }
 
 // NewEngine is equivalent to New(parent, nil) (stub assistant).
@@ -369,6 +387,9 @@ func New(parent context.Context, cfg *Config) *Engine {
 		}
 		e.extractMemoriesSavedFn = cfg.ExtractMemoriesSaved
 		e.commandLifecycleNotify = cfg.CommandLifecycleNotify
+		e.processUserInputHook = cfg.ProcessUserInputHook
+		e.extraTemplateNames = cfg.ExtraTemplateNames
+		e.afterToolResultsHook = cfg.AfterToolResultsHook
 	}
 	e.stopHooks = append(e.stopHooks, e.stopHookExtractMemories)
 	return e
@@ -379,6 +400,29 @@ func (e *Engine) templateAppendixDir() string {
 		return e.templateDir
 	}
 	return features.TemplateMarkdownDir()
+}
+
+func (e *Engine) mergedTemplateNames(resolvedUserText string) []string {
+	names := append([]string(nil), features.TemplateNames()...)
+	if e.extraTemplateNames != nil {
+		for _, n := range e.extraTemplateNames(resolvedUserText) {
+			n = strings.TrimSpace(n)
+			if n == "" {
+				continue
+			}
+			names = append(names, n)
+		}
+	}
+	seen := make(map[string]struct{})
+	out := make([]string, 0, len(names))
+	for _, n := range names {
+		if _, ok := seen[n]; ok {
+			continue
+		}
+		seen[n] = struct{}{}
+		out = append(out, n)
+	}
+	return out
 }
 
 // Events receives engine lifecycle events.
@@ -661,6 +705,12 @@ func (e *Engine) loopObservers() *query.LoopObservers {
 		OnPromptCacheBreakRecovery: func(phase string) {
 			e.trySend(EngineEvent{Kind: EventKindPromptCacheBreakRecovery, PhaseDetail: phase})
 		},
+		OnAfterToolResults: func(ctx context.Context, st *query.LoopState, raw json.RawMessage) error {
+			if e.afterToolResultsHook == nil {
+				return nil
+			}
+			return e.afterToolResultsHook(ctx, st, raw)
+		},
 	}
 }
 
@@ -737,11 +787,6 @@ func (e *Engine) runTurnLoop(userText string, consumedCommandUUIDs []string) {
 	e.refreshMemorySystemPromptForAssistant()
 	turnOutputBaseline := e.streamOutputTotal.Load()
 	budgetTracker := query.NewBudgetTracker()
-	parsedOutputBudget, haveOutputBudget := query.ParseTokenBudget(userText)
-	if !haveOutputBudget || parsedOutputBudget <= 0 {
-		parsedOutputBudget = 0
-		haveOutputBudget = false
-	}
 
 	st := &query.LoopState{}
 	if e.restoredAutoCompactTracking != nil {
@@ -757,13 +802,32 @@ func (e *Engine) runTurnLoop(userText string, consumedCommandUUIDs []string) {
 
 	st.SnipRemovalLog = query.CloneSnipRemovalLog(e.restoredSnipRemovalLog)
 
-	paths, err := e.memdirPathsForSubmit(userText)
+	submitBody := userText
+	if e.processUserInputHook != nil {
+		repl, use, err := e.processUserInputHook(e.ctx, userText)
+		if err != nil {
+			loopErr = err
+			e.trySend(EngineEvent{Kind: EventKindError, Err: err})
+			return
+		}
+		if use {
+			submitBody = repl
+		}
+	}
+
+	parsedOutputBudget, haveOutputBudget := query.ParseTokenBudget(submitBody)
+	if !haveOutputBudget || parsedOutputBudget <= 0 {
+		parsedOutputBudget = 0
+		haveOutputBudget = false
+	}
+
+	paths, err := e.memdirPathsForSubmit(submitBody)
 	if err != nil {
 		loopErr = err
 		e.trySend(EngineEvent{Kind: EventKindError, Err: err})
 		return
 	}
-	resolved, nFrag, injectRaw, err := e.applyMemdirWithPaths(userText, paths)
+	resolved, nFrag, injectRaw, err := e.applyMemdirWithPaths(submitBody, paths)
 	if err != nil {
 		loopErr = err
 		e.trySend(EngineEvent{Kind: EventKindError, Err: err})
@@ -781,7 +845,7 @@ func (e *Engine) runTurnLoop(userText string, consumedCommandUUIDs []string) {
 	}
 
 	if dir := e.templateAppendixDir(); dir != "" {
-		names := features.TemplateNames()
+		names := e.mergedTemplateNames(resolved)
 		if len(names) > 0 {
 			app, err := query.LoadTemplateMarkdownAppendix(dir, names)
 			if err != nil {
@@ -829,9 +893,8 @@ func (e *Engine) runTurnLoop(userText string, consumedCommandUUIDs []string) {
 	if features.BreakCacheCommandEnabled() {
 		e.trySend(EngineEvent{Kind: EventKindBreakCacheCommand, PhaseDetail: "submit"})
 	}
-	if features.TemplatesEnabled() {
-		names := features.TemplateNames()
-		e.trySend(EngineEvent{Kind: EventKindTemplatesActive, PhaseDetail: strings.Join(names, ",")})
+	if tplNames := e.mergedTemplateNames(resolved); len(tplNames) > 0 {
+		e.trySend(EngineEvent{Kind: EventKindTemplatesActive, PhaseDetail: strings.Join(tplNames, ",")})
 	}
 	if features.CachedMicrocompactEnabled() {
 		e.trySend(EngineEvent{Kind: EventKindCachedMicrocompactActive, PhaseDetail: anthropic.BetaCachedMicrocompactBody})

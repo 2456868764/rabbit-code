@@ -24,6 +24,9 @@ Authority tree: `claude-code-sourcemap/restored-src/src/`.
 | Compact executor + hooks wiring | `internal/query/streaming_compact_executor.go` |
 | Deps / turn types | `internal/query/deps.go`, `internal/types/assistant_turn.go` |
 | `notifyCommandLifecycle`（成功返回后） | `internal/query/engine` **`Config.CommandLifecycleNotify`**、**`SubmitWithOptions.ConsumedCommandUUIDs`** |
+| `skillPrefetch` / `taskSummary`（tool 结果后） | `internal/query/loop.go` **`LoopObservers.OnAfterToolResults`**；**`engine.Config.AfterToolResultsHook`** |
+| `jobClassifier` → 模板名 | **`engine.Config.ExtraTemplateNames`** + **`mergedTemplateNames`**（附录与 **`EventKindTemplatesActive`**） |
+| `processUserInput` | **`engine.Config.ProcessUserInputHook`**（`runTurnLoop` 内 memdir 之前） |
 
 ## `src/QueryEngine.ts`
 
@@ -31,6 +34,7 @@ Authority tree: `claude-code-sourcemap/restored-src/src/`.
 |----|-----|
 | 包整体 | `internal/query/engine/*.go` |
 | `taskBudget.total` | `engine.Config.TaskBudgetTotal` → `query.LoopDriver` → `anthropic.WithPerTurnTaskBudget`（`internal/services/api/task_budget_context.go`） |
+| `processUserInput` / 模板附录扩展 | `engine.Config.ProcessUserInputHook`、`ExtraTemplateNames`（`engine.go`） |
 
 ## Import rules (enforced)
 

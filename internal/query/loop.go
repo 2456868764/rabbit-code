@@ -362,6 +362,12 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 			return msgs, lastAssistantText, err
 		}
 		st.SetMessagesJSON(msgs)
+		if o := d.Observe; o != nil && o.OnAfterToolResults != nil {
+			if err := o.OnAfterToolResults(ctx, st, msgs); err != nil {
+				st.SetMessagesJSON(msgs)
+				return msgs, lastAssistantText, err
+			}
+		}
 		if st != nil {
 			ResetLoopStateFieldsForNextQueryIteration(st)
 			RecordLoopContinue(st, LoopContinue{Reason: ContinueReasonNextTurn})
@@ -373,10 +379,12 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 
 // LoopObservers receives optional callbacks for engine / TUI wiring (Phase 5).
 type LoopObservers struct {
-	OnAssistantText            func(text string)
-	OnToolStart                func(name, toolUseID string, input []byte)
-	OnToolDone                 func(name, toolUseID string, inputJSON, result []byte)
-	OnToolError                func(name, toolUseID string, err error)
+	OnAssistantText func(text string)
+	OnToolStart     func(name, toolUseID string, input []byte)
+	OnToolDone      func(name, toolUseID string, inputJSON, result []byte)
+	OnToolError     func(name, toolUseID string, err error)
+	// OnAfterToolResults runs after tool results are appended to the transcript and state is mirrored, before next-turn reset (query.ts skillPrefetch / taskSummary timing).
+	OnAfterToolResults         func(ctx context.Context, st *LoopState, transcriptJSON json.RawMessage) error
 	OnHistorySnip              func(bytesBefore, bytesAfter, rounds int, snipID string)
 	OnSnipCompact              func(bytesBefore, bytesAfter, rounds int, snipID string)
 	OnPromptCacheBreakRecovery func(phase string)

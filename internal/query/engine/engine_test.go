@@ -1985,6 +1985,130 @@ func TestEngine_headlessEnv_breakCacheTemplatesMicrocompactEvents(t *testing.T) 
 	}
 }
 
+func TestEngine_AfterToolResultsHook(t *testing.T) {
+	var calls int
+	turns := &query.SequenceTurnAssistant{Turns: []query.TurnResult{
+		{Text: "t", ToolUses: []query.ToolUseCall{{ID: "1", Name: "bash", Input: json.RawMessage(`{}`)}}},
+		{Text: "done"},
+	}}
+	e := New(context.Background(), &Config{
+		Deps:  query.Deps{Turn: turns, Tools: query.BashStubToolRunner{}},
+		Model: "m", MaxTokens: 8,
+		AfterToolResultsHook: func(ctx context.Context, st *query.LoopState, raw json.RawMessage) error {
+			_ = ctx
+			_ = st
+			calls++
+			return nil
+		},
+	})
+	e.Submit("hi")
+	ch := e.Events()
+	deadline := time.After(3 * time.Second)
+	for {
+		select {
+		case ev := <-ch:
+			switch ev.Kind {
+			case EventKindDone:
+				e.Wait()
+				if calls != 1 {
+					t.Fatalf("want 1 hook call, got %d", calls)
+				}
+				return
+			case EventKindError:
+				t.Fatal(ev.Err)
+			}
+		case <-deadline:
+			t.Fatal("timeout")
+		}
+	}
+}
+
+func TestEngine_ProcessUserInputHook_replace(t *testing.T) {
+	var captured string
+	e := New(context.Background(), &Config{
+		ProcessUserInputHook: func(_ context.Context, s string) (string, bool, error) {
+			if s != "ORIG" {
+				t.Fatalf("hook got %q", s)
+			}
+			return "REPLACED", true, nil
+		},
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+				captured = string(messagesJSON)
+				return "x", nil
+			}),
+		},
+	})
+	e.Submit("ORIG")
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindDone {
+				e.Wait()
+				if captured == "" || !strings.Contains(captured, "REPLACED") {
+					t.Fatalf("messages should contain replaced text: %q", captured)
+				}
+				return
+			}
+			if ev.Kind == EventKindError {
+				t.Fatal(ev.Err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
+func TestEngine_ExtraTemplateNames_mergedAppendixAndEvent(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.md"), []byte("AAA"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "x.md"), []byte("XXX"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(features.EnvTemplates, "true")
+	t.Setenv(features.EnvTemplateNames, "a")
+	var captured string
+	var tplDetail string
+	e := New(context.Background(), &Config{
+		TemplateDir: dir,
+		ExtraTemplateNames: func(string) []string {
+			return []string{"x"}
+		},
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+				captured = string(messagesJSON)
+				return "ok", nil
+			}),
+		},
+	})
+	e.Submit("u")
+	for {
+		select {
+		case ev := <-e.Events():
+			switch ev.Kind {
+			case EventKindTemplatesActive:
+				tplDetail = ev.PhaseDetail
+			case EventKindDone:
+				e.Wait()
+				if tplDetail != "a,x" {
+					t.Fatalf("TemplatesActive want a,x got %q", tplDetail)
+				}
+				if !strings.Contains(captured, "## Template a") || !strings.Contains(captured, "AAA") ||
+					!strings.Contains(captured, "## Template x") || !strings.Contains(captured, "XXX") {
+					t.Fatalf("messages %q", captured)
+				}
+				return
+			case EventKindError:
+				t.Fatal(ev.Err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
 func TestEngine_templateMarkdownAppendixFromDir(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "a.md"), []byte("BODY"), 0o600); err != nil {
