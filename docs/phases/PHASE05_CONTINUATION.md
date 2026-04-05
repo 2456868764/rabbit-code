@@ -28,6 +28,14 @@
 | 2 | ☑ | **`processUserInput`** headless：**`user_prompt_keywords`**、**`PlainPromptSignals`**；**`Config.TruncateProcessUserInputHookOutput`**；全量 slash/附件/**`processTextPrompt`** 仍 TUI | **`PARITY_T1_THINKING_PROCESSUSERINPUT.md`** |
 | 3 | ☑ | **`InterleavedAPIContextManagementOpts`** + **`ApplyEngineCompactIntegration`** 默认 **`APIContextManagementOpts`**；展示层仍 **H4** / T3 | **`PARITY_T1_THINKING_PROCESSUSERINPUT.md`** |
 
+### §3.0 T2 子计划（**TUI 表行 B**：`context` 类子命令）
+
+| 序 | 状态 | 项 | 验收 |
+|----|------|-----|------|
+| 1 | ☑ | **`internal/commands/contextcmd`**：**`rabbit-code context`** 路由 **`help`**、**`break-cache`** | **`go test ./internal/commands/contextcmd/... -short`** |
+| 2 | ☑ | **`context report`**：**stdin** Messages JSON + **`query.BuildHeadlessContextReport`** JSON | **`PARITY_T2_CONTEXT_CLI.md`** |
+| 3 | ☐ | Markdown 全表 / **`analyzeContextUsage`** 深度 parity；**`context.tsx`** 网格仍 TUI | **T2/T3** Follow-on |
+
 ---
 
 | # | 项 | 说明 | 目标 Phase / 状态 |
@@ -206,6 +214,11 @@
 - **Hook 截断**：**`internal/utils/processuserinput`** **`TruncateHookOutput`**（**`processUserInput.ts`** **`MAX_HOOK_OUTPUT_LENGTH`**）；宿主可另选自调用或开启 **`TruncateProcessUserInputHookOutput`**。
 - **PARITY**：**`docs/phases/PARITY_T1_THINKING_PROCESSUSERINPUT.md`**。
 
+#### T2 进度（**§3.0 T2 子计划**）
+
+- **序 1–2 ☑**：**`internal/commands/contextcmd`**（**`rabbit-code context`** **`help`** / **`break-cache`** / **`report`**）；**`report`** → **`query.BuildHeadlessContextReport`** JSON（stdin Messages JSON）。
+- **PARITY**：**`docs/phases/PARITY_T2_CONTEXT_CLI.md`**。
+
 ---
 
-更新本表时同步 **PARITY_PHASE5_DEFERRED.md**、**PARITY_H9_BASH_PERMISSIONS.md**（H9 迭代）、**PARITY_T1_THINKING_PROCESSUSERINPUT.md**（T1 迭代）、**PHASE05_SPEC_AND_ACCEPTANCE.md** §6，并与模块根 **README.md**（**`engine.Config` highlights / Phase 5 headless**）交叉核对。
+更新本表时同步 **PARITY_PHASE5_DEFERRED.md**、**PARITY_H9_BASH_PERMISSIONS.md**（H9 迭代）、**PARITY_T1_THINKING_PROCESSUSERINPUT.md**（T1 迭代）、**PARITY_T2_CONTEXT_CLI.md**（T2 迭代）、**PHASE05_SPEC_AND_ACCEPTANCE.md** §6，并与模块根 **README.md**（**`engine.Config` highlights / Phase 5 headless**）交叉核对。

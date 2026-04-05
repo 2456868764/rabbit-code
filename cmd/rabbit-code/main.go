@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	"github.com/2456868764/rabbit-code/internal/app"
-	"github.com/2456868764/rabbit-code/internal/commands/breakcache"
+	"github.com/2456868764/rabbit-code/internal/commands/contextcmd"
 	"github.com/2456868764/rabbit-code/internal/services/api/services"
 	"github.com/2456868764/rabbit-code/internal/version"
 )
@@ -36,13 +36,9 @@ func main() {
 			}
 			return
 		case "context":
-			if len(os.Args) < 3 || os.Args[2] != "break-cache" {
-				fmt.Fprintf(os.Stderr, "usage: rabbit-code context break-cache\n")
-				os.Exit(1)
-			}
-			if err := breakcache.WriteBreakCacheCommandJSON(os.Stdout); err != nil {
-				fmt.Fprintf(os.Stderr, "rabbit-code: context: %v\n", err)
-				os.Exit(1)
+			code := contextcmd.Run(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)
+			if code != 0 {
+				os.Exit(code)
 			}
 			return
 		}
@@ -82,7 +78,7 @@ func main() {
 		app.RunAPIPreconnect(ctx, rt)
 	}
 
-	fmt.Fprintf(os.Stderr, "rabbit-code — Phase 1 bootstrap OK. Commands: version | config dump | probe | context break-cache | set | wizard | sync | %s=1\n", app.ExitAfterInitEnv)
+	fmt.Fprintf(os.Stderr, "rabbit-code — Phase 1 bootstrap OK. Commands: version | config dump | probe | context (break-cache|report|help) | set | wizard | sync | %s=1\n", app.ExitAfterInitEnv)
 	app.QuitRuntime(rt, 0)
 }
 
