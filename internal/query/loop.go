@@ -16,6 +16,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/tools/filewritetool"
 	"github.com/2456868764/rabbit-code/internal/tools/globtool"
 	"github.com/2456868764/rabbit-code/internal/tools/greptool"
+	"github.com/2456868764/rabbit-code/internal/tools/notebookedittool"
 )
 
 // ErrMaxTurnsExceeded is returned when LoopState.MaxTurns > 0 and the cap is hit before another assistant call.
@@ -383,6 +384,10 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 				}
 			} else if u.Name == greptool.GrepToolName {
 				if s := greptool.MapGrepToolResultForMessagesAPI(out); s != "" {
+					content = s
+				}
+			} else if u.Name == notebookedittool.NotebookEditToolName {
+				if s := notebookedittool.MapNotebookEditToolResultForMessagesAPI(out); s != "" {
 					content = s
 				}
 			}

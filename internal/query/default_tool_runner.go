@@ -8,10 +8,11 @@ import (
 	"github.com/2456868764/rabbit-code/internal/tools/filewritetool"
 	"github.com/2456868764/rabbit-code/internal/tools/globtool"
 	"github.com/2456868764/rabbit-code/internal/tools/greptool"
+	"github.com/2456868764/rabbit-code/internal/tools/notebookedittool"
 	"github.com/2456868764/rabbit-code/internal/tools/registry"
 )
 
-// NewDefaultToolRunner returns a ToolRunner with Phase-6 builtins (Read, Write, Edit, Glob, Grep)
+// NewDefaultToolRunner returns a ToolRunner with Phase-6 builtins (Read, Write, Edit, Glob, Grep, NotebookEdit)
 // plus BashExecToolRunner for tool name "bash" when not handled by the registry.
 func NewDefaultToolRunner() ToolRunner {
 	reg := registry.New(
@@ -20,6 +21,7 @@ func NewDefaultToolRunner() ToolRunner {
 		fileedittool.New(),
 		globtool.New(),
 		greptool.New(),
+		notebookedittool.New(),
 	)
 	return &registryBashToolRunner{reg: reg}
 }
