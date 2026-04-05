@@ -631,6 +631,17 @@ func TestSkipWebFetchPreflight(t *testing.T) {
 	}
 }
 
+func TestHTTPUserAgent(t *testing.T) {
+	t.Setenv(EnvHTTPUserAgent, "")
+	if HTTPUserAgent() != DefaultHTTPUserAgent {
+		t.Fatalf("got %q", HTTPUserAgent())
+	}
+	t.Setenv(EnvHTTPUserAgent, "  my-agent/2  ")
+	if HTTPUserAgent() != "my-agent/2" {
+		t.Fatalf("got %q", HTTPUserAgent())
+	}
+}
+
 func TestUseAPIContextManagement(t *testing.T) {
 	t.Setenv(EnvUseAPIContextManagement, "")
 	if UseAPIContextManagement() {

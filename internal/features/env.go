@@ -83,6 +83,8 @@ const (
 	EnvOAuthBaseURL = "RABBIT_CODE_OAUTH_BASE_URL"
 	// EnvHTTPUserAgent overrides default User-Agent for API HTTP clients (utils/http.ts).
 	EnvHTTPUserAgent = "RABBIT_CODE_USER_AGENT"
+	// DefaultHTTPUserAgent is used when EnvHTTPUserAgent is unset (rabbit-code/api).
+	DefaultHTTPUserAgent = "rabbit-code/api"
 	// EnvStrictForeground529 sets DefaultPolicy().StrictForeground529 (withRetry.ts FOREGROUND_529_RETRY_SOURCES gate for HTTP 529).
 	EnvStrictForeground529 = "RABBIT_CODE_STRICT_FOREGROUND_529"
 	// EnvAttributionHeader when set to a falsy value disables the billing attribution system line (CLAUDE_CODE_ATTRIBUTION_HEADER); unset = enabled.
@@ -99,6 +101,15 @@ func UnattendedRetryEnabled() bool {
 // FastRetryEnabled mirrors withRetry.ts fast-mode backoff when CLAUDE_CODE_FAST_RETRY / RABBIT_CODE_FAST_RETRY is set.
 func FastRetryEnabled() bool {
 	return truthy(os.Getenv(EnvFastRetry))
+}
+
+// HTTPUserAgent returns the app HTTP User-Agent string (EnvHTTPUserAgent trimmed, else DefaultHTTPUserAgent).
+// Used by Anthropic API clients and WebFetch (utils/http.ts getUserAgent parity).
+func HTTPUserAgent() string {
+	if v := strings.TrimSpace(os.Getenv(EnvHTTPUserAgent)); v != "" {
+		return v
+	}
+	return DefaultHTTPUserAgent
 }
 
 // AdditionalProtectionHeader mirrors CLAUDE_CODE_ADDITIONAL_PROTECTION → x-anthropic-additional-protection.

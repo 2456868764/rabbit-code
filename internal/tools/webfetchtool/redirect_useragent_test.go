@@ -17,7 +17,7 @@ func TestRedirectCodeText(t *testing.T) {
 func TestWebFetchUserAgent_format(t *testing.T) {
 	t.Setenv(features.EnvHTTPUserAgent, "")
 	ua := WebFetchUserAgent()
-	if !strings.HasPrefix(ua, "Claude-User (") || !strings.Contains(ua, "rabbit-code/api") {
+	if !strings.HasPrefix(ua, "Claude-User (") || !strings.Contains(ua, features.DefaultHTTPUserAgent) {
 		t.Fatalf("%q", ua)
 	}
 }

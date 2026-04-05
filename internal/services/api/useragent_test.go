@@ -8,7 +8,7 @@ import (
 
 func TestUserAgent_Default(t *testing.T) {
 	t.Setenv(features.EnvHTTPUserAgent, "")
-	if got := UserAgent(); got != defaultUserAgent {
+	if got := UserAgent(); got != features.DefaultHTTPUserAgent {
 		t.Fatalf("got %q", got)
 	}
 }

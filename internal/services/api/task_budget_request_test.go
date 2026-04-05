@@ -46,7 +46,7 @@ func TestPostMessagesStream_TaskBudgetJSONAndBeta(t *testing.T) {
 			http.Error(w, "anthropic-version", http.StatusBadRequest)
 			return
 		}
-		if r.Header.Get("User-Agent") != defaultUserAgent {
+		if r.Header.Get("User-Agent") != features.DefaultHTTPUserAgent {
 			http.Error(w, "user-agent: "+r.Header.Get("User-Agent"), http.StatusBadRequest)
 			return
 		}
