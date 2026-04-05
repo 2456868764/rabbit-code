@@ -16,6 +16,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/query"
 	anthropic "github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
+	"github.com/2456868764/rabbit-code/internal/tools/todowritetool"
 	"github.com/2456868764/rabbit-code/internal/utils/processuserinput"
 	"github.com/2456868764/rabbit-code/internal/utils/thinking"
 )
@@ -260,6 +261,7 @@ type Engine struct {
 	truncateProcessUserInputHook bool
 	extraTemplateNames           ExtraTemplateNames
 	afterToolResultsHook         AfterToolResultsHook
+	todoStore                    *todowritetool.Store
 }
 
 // NewEngine is equivalent to New(parent, nil) (stub assistant).
@@ -294,6 +296,7 @@ func New(parent context.Context, cfg *Config) *Engine {
 			deps.Tools = query.NewDefaultToolRunner()
 		}
 		e.deps = deps
+		e.todoStore = todowritetool.NewStore()
 		if cfg.Model != "" {
 			e.model = cfg.Model
 		}

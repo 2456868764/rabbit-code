@@ -17,6 +17,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/tools/globtool"
 	"github.com/2456868764/rabbit-code/internal/tools/greptool"
 	"github.com/2456868764/rabbit-code/internal/tools/notebookedittool"
+	"github.com/2456868764/rabbit-code/internal/tools/todowritetool"
 )
 
 // ErrMaxTurnsExceeded is returned when LoopState.MaxTurns > 0 and the cap is hit before another assistant call.
@@ -56,6 +57,8 @@ type LoopDriver struct {
 	TaskBudgetTotal int
 	// SkipCacheWrite when true remaps prompt-cache breakpoints like query.ts skipCacheWrite (claude.ts addCacheBreakpoints).
 	SkipCacheWrite bool
+	// TodoStore optional in-memory todos for TodoWrite (engine sets one shared store per Engine).
+	TodoStore *todowritetool.Store
 }
 
 func (d *LoopDriver) streamer() StreamAssistant {
@@ -98,6 +101,14 @@ func (d *LoopDriver) RunAssistantStep(ctx context.Context, messagesJSON json.Raw
 func (d *LoopDriver) RunToolStep(ctx context.Context, st *LoopState, name string, input []byte) ([]byte, error) {
 	if d.Deps.Tools == nil {
 		return nil, ErrNoToolRunner
+	}
+	if st != nil {
+		ctx = todowritetool.WithRunContext(ctx, &todowritetool.RunContext{
+			SessionID:      st.ToolUseContext.SessionID,
+			AgentID:        st.ToolUseContext.AgentID,
+			NonInteractive: d.NonInteractive,
+			Store:          d.TodoStore,
+		})
 	}
 	if st != nil {
 		*st = ApplyTransition(*st, TranScheduleTools)
@@ -388,6 +399,10 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 				}
 			} else if u.Name == notebookedittool.NotebookEditToolName {
 				if s := notebookedittool.MapNotebookEditToolResultForMessagesAPI(out); s != "" {
+					content = s
+				}
+			} else if u.Name == todowritetool.TodoWriteToolName {
+				if s := todowritetool.MapTodoWriteToolResultForMessagesAPI(out); s != "" {
 					content = s
 				}
 			}

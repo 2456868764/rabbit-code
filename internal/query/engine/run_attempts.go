@@ -38,6 +38,7 @@ func (e *Engine) loopDriver() query.LoopDriver {
 		MicrocompactEditBuffer: e.microcompactEditBuffer,
 		TaskBudgetTotal:        e.taskBudgetTotal,
 		SkipCacheWrite:         e.skipCacheWrite,
+		TodoStore:              e.todoStore,
 	}
 	if features.PromptCacheBreakAutoCompactEnabled() && e.compactExecutor != nil {
 		d.PromptCacheBreakRecovery = e.promptCacheBreakCompactRecovery
