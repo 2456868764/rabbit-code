@@ -1,5 +1,8 @@
 package memdir
 
+// Corresponds to restored-src/src/services/compact/sessionMemoryCompact.ts for the file-backed hook surface only:
+// GetSessionMemoryContent / empty check / path footer wired to auto-mem MEMORY.md (full compaction logic lives in internal/services/compact).
+
 import (
 	"context"
 	"os"

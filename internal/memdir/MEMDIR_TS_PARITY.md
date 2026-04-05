@@ -1,110 +1,115 @@
-# `src/memdir/*.ts` ↔ `internal/memdir` parity
+# `src/memdir` 模块 ↔ `internal/memdir`（§3.1 模块级对齐）
 
-**Authority:** `claude-code-sourcemap/restored-src/src/memdir/`. **Rules:** `docs/phases/PHASE_ITERATION_RULES.md` §3.1 (one Go file per TS basename, snake_case).
+**规则**：`docs/phases/PHASE_ITERATION_RULES.md` **§3.1** — 以 **`restored-src/src/<area>/`** 整目录为交付边界；Go **`*.go`** 基名与 TS **`*.ts`** 一一 **`camelCase` → `snake_case`**；禁止把**同一 TS 文件**拆成多个按小功能命名的 `.go`；**多 TS 合并为一个 `.go`** 时须在本表写明且文件名取主模块。
 
-## File map
+---
 
-| TS module | Go file | Notes |
-|-----------|---------|--------|
-| `paths.ts` | `paths.go` | + `FindGitRoot`, `SanitizePath` (helpers for resolution) |
-| `memoryTypes.ts` | `memory_types.go` | `//go:embed promptdata/*.txt` for section bodies |
-| `memoryScan.ts` | `memory_scan.go` | |
-| `memoryAge.ts` | `memory_age.go` | + attachment header / session fragment helpers used by engine |
-| `memdir.ts` | `memdir.go` | `LoadMemorySystemPrompt`, `BuildMemoryPrompt` = TS `loadMemoryPrompt` / `buildMemoryPrompt` analogue |
-| `teamMemPaths.ts` | `team_mem_paths.go` | + secret scan / `TeamMemSecretGuardRunner` |
-| `teamMemPrompts.ts` | `team_mem_prompts.go` | |
-| `findRelevantMemories.ts` | `find_relevant_memories.go` | + `FindRelevantMemoryPaths`, LLM path, `RecallShapeHook` |
-| `extractMemories.ts` (+ prompts) | `extract_memories.go` | lives under `services/extractMemories` in TS; Go colocates in `memdir` to avoid cycles |
-| _(compact hooks)_ | `session_memory_compact_hooks.go` | file-backed `compact.SessionMemoryCompactHooks` |
+## §3.1-1 上游 TS 清单（`src/memdir/`，8 个，无子目录）
 
-## Export / symbol alignment
+| # | `restored-src/src/memdir/*.ts` |
+|---|--------------------------------|
+| 1 | `findRelevantMemories.ts` |
+| 2 | `memdir.ts` |
+| 3 | `memoryAge.ts` |
+| 4 | `memoryScan.ts` |
+| 5 | `memoryTypes.ts` |
+| 6 | `paths.ts` |
+| 7 | `teamMemPaths.ts` |
+| 8 | `teamMemPrompts.ts` |
 
-Legend: **[x]** behaviour matched or documented env analogue, **[~]** subset / different signature, **[ ]** not in `src/memdir` scope.
+---
+
+## §3.1-3 Go ↔ TS 文件名映射（1:1）
+
+| TS 基名 | Go 文件 |
+|---------|---------|
+| `findRelevantMemories.ts` | `find_relevant_memories.go` |
+| `memdir.ts` | `memdir.go` |
+| `memoryAge.ts` | `memory_age.go` |
+| `memoryScan.ts` | `memory_scan.go` |
+| `memoryTypes.ts` | `memory_types.go` |
+| `paths.ts` | `paths.go` |
+| `teamMemPaths.ts` | `team_mem_paths.go` |
+| `teamMemPrompts.ts` | `team_mem_prompts.go` |
+
+---
+
+## §3.1-3 多 TS → 单 Go（显式声明）
+
+| Go 文件 | 合并的上游 TS（主名取第一列） |
+|---------|-------------------------------|
+| **`extract_memories.go`** | **`services/extractMemories/extractMemories.ts`** + **`services/extractMemories/prompts.ts`** |
+
+（Go 放在 `internal/memdir` 以避免 query/compact/api import 环；行为见 `extract_memories.go` 注释。）
+
+---
+
+## 跨模块接线（文件名仍对齐主 TS）
+
+| Go 文件 | 主 TS 参考 | 说明 |
+|---------|------------|------|
+| **`session_memory_compact.go`** | **`services/compact/sessionMemoryCompact.ts`** | 仅实现读 auto-mem 下 **`MEMORY.md`** 的 **`compact.SessionMemoryCompactHooks`**；完整 session-memory compaction 在 **`internal/services/compact`**。 |
+
+---
+
+## 主要 export / 符号对齐（`src/memdir` 内）
+
+Legend：**[x]** 已对齐或 env 等价，**[~]** 子集/签名差异，**[ ]** 非本包范围。
 
 ### `paths.ts`
 
-| TS | Go | Status |
-|----|-----|--------|
-| `isAutoMemoryEnabled` | `features.AutoMemoryEnabled` / `AutoMemoryEnabledFromMerged` | **[~]** settings in `internal/features` + `config` |
-| `isExtractModeActive` | `IsExtractModeActive(nonInteractive bool)` | **[~]** GrowthBook → `RABBIT_CODE_EXTRACT_MEMORIES*` (`features.ExtractMemoriesAllowed`) |
+| TS | Go | 状态 |
+|----|-----|------|
+| `isAutoMemoryEnabled` | `features` + `config` | **[~]** |
+| `isExtractModeActive` | `IsExtractModeActive` | **[~]** GrowthBook → env |
 | `getMemoryBaseDir` | `MemoryBaseDir` | **[x]** |
-| `getAutoMemPath` | `ResolveAutoMemDir` / `ResolveAutoMemDirWithOptions` | **[~]** no lodash memoize; explicit options |
-| `getAutoMemDailyLogPath` | `AutoMemDailyLogPath` | **[x]** |
-| `getAutoMemEntrypoint` | `AutoMemEntrypointPath` | **[x]** |
+| `getAutoMemPath` | `ResolveAutoMemDir*` | **[~]** |
+| `getAutoMemDailyLogPath` | `AutoMemDailyLogPath*` | **[x]** |
+| `getAutoMemEntrypoint` | `AutoMemEntrypointPath*` | **[x]** |
 | `isAutoMemPath` | `IsAutoMemPath` | **[x]** |
 | `hasAutoMemPathOverride` | `HasAutoMemPathOverride` | **[x]** |
 
 ### `memoryTypes.ts`
 
-| TS | Go | Status |
-|----|-----|--------|
-| `MEMORY_TYPES` | `MemoryTypes` | **[x]** |
-| `parseMemoryType` | `ParseMemoryType` (returns `""` if unknown) | **[~]** TS returns `undefined` |
-| `TYPES_SECTION_*` | `TypesSectionCombined`, `TypesSectionIndividual` | **[x]** embed |
-| `WHAT_NOT_TO_SAVE_SECTION` | `WhatNotToSaveSection` | **[x]** |
-| `MEMORY_DRIFT_CAVEAT` | `MemoryDriftCaveat` + embedded in `WhenToAccessSection` | **[x]** |
-| `WHEN_TO_ACCESS_SECTION` | `WhenToAccessSection`, `WhenToAccessCombinedSection` | **[x]** |
-| `TRUSTING_RECALL_SECTION` | `TrustingRecallSection` | **[x]** |
-| `MEMORY_FRONTMATTER_EXAMPLE` | `MemoryFrontmatterExample`, `MemoryFrontmatterExampleBlock` | **[x]** |
+| TS | Go | 状态 |
+|----|-----|------|
+| `MEMORY_TYPES` / `parseMemoryType` | `MemoryTypes` / `ParseMemoryType` | **[x]** / **[~]** |
+| 各 `*_SECTION` | `TypesSection*`、`WhatNotToSaveSection` 等 | **[x]** embed |
+| `MEMORY_DRIFT_CAVEAT` | `MemoryDriftCaveat` | **[x]** |
 
-### `memoryScan.ts`
+### `memoryScan.ts` / `memoryAge.ts`
 
-| TS | Go | Status |
-|----|-----|--------|
-| `MemoryHeader` | `MemoryHeader` (`Description` empty string vs TS `null`) | **[~]** |
-| `scanMemoryFiles(dir, signal)` | `ScanMemoryFiles(ctx, dir)` | **[~]** context vs AbortSignal |
+| TS | Go | 状态 |
+|----|-----|------|
+| `MemoryHeader` / `scanMemoryFiles` | `MemoryHeader` / `ScanMemoryFiles` | **[~]** ctx vs AbortSignal |
 | `formatMemoryManifest` | `FormatMemoryManifest` | **[x]** |
-
-### `memoryAge.ts`
-
-| TS | Go | Status |
-|----|-----|--------|
-| `memoryAgeDays` | `MemoryAgeDays`, `MemoryAgeDaysAt` | **[x]** wall-clock injectable |
-| `memoryAge` / freshness | `MemoryAge`, `MemoryFreshnessText`, `MemoryFreshnessNote` (+ `*At`) | **[x]** |
-| _(attachments)_ | `MemoryAttachmentHeader`, `SessionFragmentsFromPaths*` | **[~]** TS in other modules |
+| `memoryAge*` | `MemoryAge*` 等 | **[x]** |
 
 ### `memdir.ts`
 
-| TS | Go | Status |
-|----|-----|--------|
-| `ENTRYPOINT_NAME` … `truncateEntrypointContent` | `EntrypointName`, `TruncateEntrypointContent` | **[x]** warning sizes use `formatFileSizeBytes` ≡ `formatFileSize` |
-| `DIR_EXISTS_GUIDANCE` | `DirExistsGuidance` | **[x]** |
-| `ensureMemoryDirExists` | `EnsureMemoryDirExists` | **[x]** |
-| `buildMemoryLines` | `BuildMemoryLinesAutoOnly` | **[x]** |
-| `buildMemoryPrompt` / `loadMemoryPrompt` | `BuildMemoryPrompt` / `LoadMemorySystemPrompt` | **[~]** async settings → struct input |
-| `buildSearchingPastContextSection` | `BuildSearchingPastContextSection(auto, project, useShellGrep)` | **[~]** TS uses feature + embedded grep detection |
-| KAIROS daily log | `BuildAssistantDailyLogMemoryPrompt` | **[~]** feature gate in `features` |
+| TS | Go | 状态 |
+|----|-----|------|
+| entrypoint / `truncateEntrypointContent` | `EntrypointName` / `TruncateEntrypointContent` | **[x]** |
+| `loadMemoryPrompt` / `buildMemoryPrompt` | `LoadMemorySystemPrompt` / `BuildMemoryPrompt` | **[~]** |
+| `buildSearchingPastContextSection` | `BuildSearchingPastContextSection` | **[~]** |
 
-### `teamMemPaths.ts`
+### `teamMemPaths.ts` / `teamMemPrompts.ts`
 
-| TS | Go | Status |
-|----|-----|--------|
-| `getTeamMemPath` | `GetTeamMemPath` / `TeamMemDirFromAutoMemDir` | **[x]** |
-| `isTeamMemPath` | `IsTeamMemPathUnderAutoMem` / `TeamMemPathResolved` | **[~]** naming |
-| `validateTeamMemWritePath` | `ValidateTeamMemWritePath`, `ValidateTeamMemWritePathFull` | **[~]** sync vs async |
-| `validateTeamMemKey` | `ValidateTeamMemKey` | **[~]** |
-| `isTeamMemFile` | `IsTeamMemFile`, `IsTeamMemFileActive` | **[x]** |
-| `isTeamMemoryEnabled` | `features.TeamMemoryEnabledFromMerged` | **[~]** |
-
-### `teamMemPrompts.ts`
-
-| TS | Go | Status |
-|----|-----|--------|
+| TS | Go | 状态 |
+|----|-----|------|
+| `getTeamMemPath` / `isTeamMemFile` | `GetTeamMemPath` / `IsTeamMemFile` | **[x]** |
 | `buildCombinedMemoryPrompt` | `BuildCombinedMemoryPrompt` | **[x]** |
 
 ### `findRelevantMemories.ts`
 
-| TS | Go | Status |
-|----|-----|--------|
-| `findRelevantMemories` | `FindRelevantMemoriesDetailed` / `FindRelevantMemories` | **[~]** opts struct vs positional args |
+| TS | Go | 状态 |
+|----|-----|------|
+| `findRelevantMemories` | `FindRelevantMemories*` | **[~]** opts 结构体 |
 | `RelevantMemory` | `RelevantMemory` | **[x]** |
-| `MEMORY_SHAPE_TELEMETRY` | `RecallShapeHook` | **[~]** callback, no analytics module |
 
-## Related TS outside `src/memdir/`
+---
 
-`claudemd.ts`, `utils/path.ts`, `services/teamMemorySync/*`, `services/extractMemories/*` — partial analogues in Go `memdir`, `engine`, `config`; see `docs/phases/PHASE05_CONTINUATION.md` §H8 and `PARITY_PHASE5_DEFERRED.md`.
-
-## Verification
+## 验收（§3.1-4）
 
 ```bash
 go test ./internal/memdir/... -count=1 -short

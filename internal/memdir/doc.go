@@ -1,24 +1,44 @@
-// Package memdir mirrors claude-code-sourcemap/restored-src/src/memdir for headless parity.
-// **Symbol-level table:** MEMDIR_TS_PARITY.md (TS export ↔ Go, [x]/[~]).
-// File naming follows docs/phases/PHASE_ITERATION_RULES.md §3.1: one Go file per TS module basename
-// (snake_case.go), whole-module conversion — not per-helper .go splits.
+// Package memdir implements the restored-src **src/memdir** module in Go (headless parity), plus documented
+// **§3.1 多 TS → 单 Go** extensions that live in this package for import-layering reasons.
 //
-// Go file layout (aligned with TS modules):
+// # PHASE_ITERATION_RULES.md §3.1（模块级强制）
 //
-//	paths.go                 — paths.ts (+ FindGitRoot, SanitizePath)
-//	memory_types.go          — memoryTypes.ts (taxonomy + //go:embed promptdata)
-//	memory_scan.go           — memoryScan.ts (scan + FormatMemoryManifest)
-//	memory_age.go            — memoryAge.ts (+ attachment headers, session file fragments)
-//	memdir.go                — memdir.ts (guidance, ensure dir, entrypoint, searching past context, LoadMemorySystemPrompt ≈ loadMemoryPrompt, BuildMemoryPrompt ≈ buildMemoryPrompt, SessionFragments stub)
-//	team_mem_paths.go        — teamMemPaths.ts (+ secret scan, Write/Edit guard runner)
-//	team_mem_prompts.go      — teamMemPrompts.ts (combined private+team prompt)
-//	find_relevant_memories.go — findRelevantMemories.ts (+ heuristic scoring, LLM JSON selection)
-//	extract_memories.go      — extractMemories.ts / prompts (fork, controller, transcript helpers, gated tools)
-//	session_memory_compact_hooks.go — file-backed compact.SessionMemoryCompactHooks (MEMORY.md under auto-mem dir)
+// **上游目录**：`claude-code-sourcemap/restored-src/src/memdir/`（平铺，无子目录）。
 //
-// Related: internal/features and rabbit env gates for auto-memory; engine wires FindRelevantMemories and extract stop hook.
-// Trusted autoMemoryDirectory: config.LoadTrustedAutoMemoryDirectory ↔ paths.ts getAutoMemPathSetting (policy → flag → local → user; no project).
+// **§3.1-1 TS 上游文件清单（逐文件，共 8）**
 //
-// Tests use the same basename as sources: paths_test.go, memory_types_test.go, memory_scan_test.go, memory_age_test.go,
-// memdir_test.go, team_mem_paths_test.go, team_mem_prompts_test.go, find_relevant_memories_test.go, extract_memories_test.go.
+//	findRelevantMemories.ts
+//	memdir.ts
+//	memoryAge.ts
+//	memoryScan.ts
+//	memoryTypes.ts
+//	paths.ts
+//	teamMemPaths.ts
+//	teamMemPrompts.ts
+//
+// **§3.1-3 Go 源文件 ↔ TS 基名（camelCase → snake_case，一一对应）**
+//
+//	find_relevant_memories.go  — findRelevantMemories.ts
+//	memdir.go                  — memdir.ts
+//	memory_age.go              — memoryAge.ts
+//	memory_scan.go             — memoryScan.ts
+//	memory_types.go            — memoryTypes.ts
+//	paths.go                   — paths.ts
+//	team_mem_paths.go          — teamMemPaths.ts
+//	team_mem_prompts.go        — teamMemPrompts.ts
+//
+// **§3.1-3 多 TS → 单 Go（须在 PARITY 写明；文件名取主模块）**
+//
+//	extract_memories.go — services/extractMemories/extractMemories.ts + services/extractMemories/prompts.ts
+//
+// **跨目录接线（非 src/memdir；文件名仍与主 TS 基名一致）**
+//
+//	session_memory_compact.go — services/compact/sessionMemoryCompact.ts（Go 侧仅为 SessionMemory 读 MEMORY.md 的 hooks 子集；完整 compact 在 internal/services/compact）
+//
+// **符号级对照表**：MEMDIR_TS_PARITY.md（export ↔ Go、[x]/[~]）。
+//
+// Related: internal/features（env 门控）；engine 接线 FindRelevantMemories、extract stop hook、SessionMemoryCompactHooks。
+// Trusted autoMemoryDirectory：config.LoadTrustedAutoMemoryDirectory ↔ paths.ts getAutoMemPathSetting。
+//
+// Tests：与源文件同基名 `*_test.go`（§3.1 验收：`go test ./internal/memdir/... -short`）。
 package memdir
