@@ -34,7 +34,7 @@
 |----|------|-----|------|
 | 1 | ☑ | **`internal/commands/contextcmd`**：**`rabbit-code context`** 路由 **`help`**、**`break-cache`** | **`go test ./internal/commands/contextcmd/... -short`** |
 | 2 | ☑ | **`context report`**：**stdin** Messages JSON + **`query.BuildHeadlessContextReport`** JSON | **`PARITY_T2_CONTEXT_CLI.md`** |
-| 3 | ☐ | Markdown 全表 / **`analyzeContextUsage`** 深度 parity；**`context.tsx`** 网格仍 TUI | **T2/T3** Follow-on |
+| 3 | ☑ | **`report-md`** + **`FormatHeadlessContextReportMarkdown`**；**`-microcompact`**；全量 **`analyzeContextUsage`** / Ink 网格仍 Follow-on | **`PARITY_T2_CONTEXT_CLI.md`** |
 
 ---
 
@@ -216,7 +216,7 @@
 
 #### T2 进度（**§3.0 T2 子计划**）
 
-- **序 1–2 ☑**：**`internal/commands/contextcmd`**（**`rabbit-code context`** **`help`** / **`break-cache`** / **`report`**）；**`report`** → **`query.BuildHeadlessContextReport`** JSON（stdin Messages JSON）。
+- **序 1–3 ☑**：**`contextcmd`**：**`report-md`**、**`query.FormatHeadlessContextReportMarkdown`**（对照 **`context-noninteractive.ts`** 表头 + 分类子集）；**`-microcompact`** → **`compact.MicrocompactMessagesAPIJSON`**。**§3.0 T2 三行全 ☑**；全量 **`analyzeContext.ts`** 分类 / **`context.tsx`** 仍 **PARITY** / **T3**。
 - **PARITY**：**`docs/phases/PARITY_T2_CONTEXT_CLI.md`**。
 
 ---

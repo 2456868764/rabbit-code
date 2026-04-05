@@ -26,7 +26,7 @@ func TestRun_help(t *testing.T) {
 	if code != 0 || errBuf.Len() != 0 {
 		t.Fatalf("code=%d err=%q", code, errBuf.String())
 	}
-	if !strings.Contains(out.String(), "report") {
+	if !strings.Contains(out.String(), "report-md") {
 		t.Fatalf("stdout: %q", out.String())
 	}
 }
@@ -70,5 +70,33 @@ func TestRun_unknownSubcommand(t *testing.T) {
 	code := Run([]string{"nope"}, strings.NewReader(""), &out, &errBuf)
 	if code != 2 {
 		t.Fatalf("code %d", code)
+	}
+}
+
+func TestRun_report_md_markdown(t *testing.T) {
+	in := strings.NewReader(`[{"role":"user","content":"hello"}]`)
+	var out, errBuf bytes.Buffer
+	code := Run([]string{"report-md", "-model", "claude-3-5-haiku-20241022"}, in, &out, &errBuf)
+	if code != 0 {
+		t.Fatalf("code=%d err=%q", code, errBuf.String())
+	}
+	s := out.String()
+	if !strings.Contains(s, "## Context Usage") || !strings.Contains(s, "claude-3-5-haiku") {
+		t.Fatalf("markdown: %q", s)
+	}
+	if !strings.Contains(s, "Estimated usage by category") {
+		t.Fatal("missing category table")
+	}
+}
+
+func TestRun_report_md_microcompactFlag(t *testing.T) {
+	in := strings.NewReader(`[{"role":"user","content":"x"}]`)
+	var out, errBuf bytes.Buffer
+	code := Run([]string{"report-md", "-microcompact", "-model", "claude-3-5-haiku-20241022"}, in, &out, &errBuf)
+	if code != 0 {
+		t.Fatalf("code=%d err=%q", code, errBuf.String())
+	}
+	if !strings.Contains(out.String(), "## Context Usage") {
+		t.Fatal(out.String())
 	}
 }

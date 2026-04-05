@@ -63,6 +63,35 @@ func TestBuildHeadlessContextReport_thresholdAndWarnings(t *testing.T) {
 	}
 }
 
+func TestFormatHeadlessContextReportMarkdown_headerAndTable(t *testing.T) {
+	t.Setenv(features.EnvContextWindowTokens, "100000")
+	t.Setenv(features.EnvDisableCompact, "")
+	t.Setenv(features.EnvDisableAutoCompact, "")
+	t.Setenv(features.EnvAutoCompact, "")
+	t.Setenv(features.EnvContextCollapse, "")
+	t.Setenv(features.EnvSuppressProactiveAutoCompact, "")
+	blob := []byte(`[{"role":"user","content":"hello world"}]`)
+	r := BuildHeadlessContextReport(blob, "claude-test", 1024, 0, 0, "")
+	md := FormatHeadlessContextReportMarkdown("claude-test", r)
+	if !strings.Contains(md, "## Context Usage") || !strings.Contains(md, "claude-test") {
+		t.Fatalf("%s", md)
+	}
+	if !strings.Contains(md, "Input (resolved estimate)") || !strings.Contains(md, "Free space") {
+		t.Fatalf("%s", md)
+	}
+}
+
+func TestHeadlessContextReport_ResolvedTokenUsage(t *testing.T) {
+	r := HeadlessContextReport{StructuredMessageTokens: 42, EstimatedTokens: 99}
+	if r.ResolvedTokenUsage() != 42 {
+		t.Fatal()
+	}
+	r2 := HeadlessContextReport{EstimatedTokens: 10}
+	if r2.ResolvedTokenUsage() != 10 {
+		t.Fatal()
+	}
+}
+
 func TestBuildHeadlessContextReport_sessionMemoryBlocked(t *testing.T) {
 	blob := []byte(`[]`)
 	t.Setenv(features.EnvContextWindowTokens, "50000")

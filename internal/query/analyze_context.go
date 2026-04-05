@@ -1,6 +1,11 @@
 package query
 
 import (
+	"fmt"
+	"math"
+	"strconv"
+	"strings"
+
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
@@ -45,6 +50,81 @@ type HeadlessContextReport struct {
 	AutoCompactThreshold        int
 	ProactiveAutoCompactBlocked bool
 	TokenWarning                compact.TokenWarningState
+}
+
+// ResolvedTokenUsage is the token count used for threshold math (structured estimate when present, else bytes÷4 heuristic).
+func (r HeadlessContextReport) ResolvedTokenUsage() int {
+	if r.StructuredMessageTokens > 0 {
+		return r.StructuredMessageTokens
+	}
+	return r.EstimatedTokens
+}
+
+// FormatHeadlessContextReportMarkdown mirrors context-noninteractive.ts formatContextAsMarkdownTable header + category table
+// for the headless subset (no MCP/agents/skills rows — those need full analyzeContextUsage).
+func FormatHeadlessContextReportMarkdown(model string, r HeadlessContextReport) string {
+	m := strings.TrimSpace(model)
+	if m == "" {
+		m = "(default)"
+	}
+	usage := r.ResolvedTokenUsage()
+	denom := r.EffectiveInputWindow
+	if denom <= 0 {
+		denom = 1
+	}
+	pct := int(math.Round(float64(usage) / float64(denom) * 100))
+	if pct > 100 {
+		pct = 100
+	}
+
+	var b strings.Builder
+	b.WriteString("## Context Usage\n\n")
+	b.WriteString("**Model:** ")
+	b.WriteString(m)
+	b.WriteString("  \n")
+	fmt.Fprintf(&b, "**Tokens:** %s / %s (%d%%)\n", formatTokenCount(usage), formatTokenCount(r.EffectiveInputWindow), pct)
+	fmt.Fprintf(&b, "**Context window (model cap):** %s\n", formatTokenCount(r.ContextWindowTokens))
+	fmt.Fprintf(&b, "**Transcript bytes:** %d\n", r.TranscriptBytes)
+	if r.AutoCompactThreshold > 0 {
+		fmt.Fprintf(&b, "**Proactive autocompact threshold:** %s\n", formatTokenCount(r.AutoCompactThreshold))
+	}
+	if r.ProactiveAutoCompactBlocked {
+		b.WriteString("**Proactive autocompact:** blocked (fork/source or feature gate)\n")
+	} else {
+		b.WriteString("**Proactive autocompact:** allowed\n")
+	}
+	tw := r.TokenWarning
+	b.WriteString("\n### Token warning state\n\n")
+	fmt.Fprintf(&b, "- percent left (vs threshold ladder): %d%%\n", tw.PercentLeft)
+	fmt.Fprintf(&b, "- above warning: %v\n", tw.IsAboveWarningThreshold)
+	fmt.Fprintf(&b, "- above error: %v\n", tw.IsAboveErrorThreshold)
+	fmt.Fprintf(&b, "- above autocompact threshold: %v\n", tw.IsAboveAutoCompactThreshold)
+	fmt.Fprintf(&b, "- at blocking limit: %v\n", tw.IsAtBlockingLimit)
+
+	b.WriteString("\n### Estimated usage by category\n\n")
+	b.WriteString("| Category | Tokens | Percentage |\n")
+	b.WriteString("|----------|--------|------------|\n")
+	free := r.EffectiveInputWindow - usage
+	if free < 0 {
+		free = 0
+	}
+	writeCat := func(name string, tok int) {
+		p := float64(tok) / float64(denom) * 100
+		fmt.Fprintf(&b, "| %s | %s | %.1f%% |\n", name, formatTokenCount(tok), p)
+	}
+	writeCat("Input (resolved estimate)", usage)
+	if r.StructuredMessageTokens > 0 && r.StructuredMessageTokens != r.EstimatedTokens {
+		writeCat("Heuristic (bytes÷4)", r.EstimatedTokens)
+	}
+	writeCat("Free space", free)
+	return b.String()
+}
+
+func formatTokenCount(n int) string {
+	if n < 0 {
+		n = 0
+	}
+	return strconv.Itoa(n)
 }
 
 // BuildHeadlessContextReport mirrors analyzeContext-style totals for a transcript JSON blob (heuristic tokens only).

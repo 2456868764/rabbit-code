@@ -10,7 +10,7 @@
 |----|------|-----|------|
 | 1 | ☑ | **`rabbit-code context`** 子命令路由：**`help`**、**`break-cache`**（委托 **`breakcache`**） | **`go test ./internal/commands/contextcmd/... -short`** |
 | 2 | ☑ | **`context report`**：stdin **Messages JSON** + flags → **`query.BuildHeadlessContextReport`** 输出 JSON（headless 子集，对照 **`context-noninteractive.ts`** **`collectContextData`** / **`get_context_usage`** 的数据深度，非 Markdown 全表） | 同上 + 单测 |
-| 3 | ☐ | Markdown / 分类表 / **`microcompactMessages`** 全链 parity；TUI 网格（**`context.tsx`**） | **T3** 穿插 |
+| 3 | ☑ | headless：**`FormatHeadlessContextReportMarkdown`** + **`context report-md`**；可选 **`-microcompact`** → **`MicrocompactMessagesAPIJSON`**；MCP/agents/全量 **`analyzeContextUsage`** 仍 Follow-on；**`context.tsx`** 网格 **T3** | **`go test ./internal/query/... ./internal/commands/contextcmd/... -short`** |
 
 ---
 
@@ -19,7 +19,8 @@
 | TS | Go | 状态 |
 |----|-----|------|
 | **`commands/context/index.ts`**（slash / local-jsx） | **`contextcmd`** 仅 **headless CLI** | **[~]** |
-| **`context-noninteractive.ts`** **`call` / `formatContextAsMarkdownTable`** | **`context report`** → **`HeadlessContextReport`** JSON | **[~]** 子集 |
+| **`context-noninteractive.ts`** **`call` / `formatContextAsMarkdownTable`** | **`context report`** JSON；**`context report-md`** + **`query.FormatHeadlessContextReportMarkdown`** | **[~]** headless 子集（无 MCP/agents/skills 表） |
+| **`microCompact.ts`** **`microcompactMessages`** | **`context report-md -microcompact`** → **`compact.MicrocompactMessagesAPIJSON`** | **[x]** CLI 链 |
 | **`commands/break-cache`**（TS stub） | **`breakcache`** + **`context break-cache`** | **[x]** headless |
 
 ---
