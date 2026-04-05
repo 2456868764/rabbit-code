@@ -1,6 +1,7 @@
 package notebookedittool
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -134,13 +135,26 @@ func marshalNotebookOutput(o map[string]any) ([]byte, error) {
 	return json.Marshal(o)
 }
 
+func parseNotebookEditInputJSON(b []byte) (notebookEditInput, error) {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+	var in notebookEditInput
+	if err := dec.Decode(&in); err != nil {
+		return notebookEditInput{}, err
+	}
+	if dec.More() {
+		return notebookEditInput{}, errors.New("notebookedittool: invalid json: extra data after input object")
+	}
+	return in, nil
+}
+
 // Run implements tools.Tool (NotebookEditTool.ts validateInput + call).
 func (n *NotebookEdit) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	var in notebookEditInput
-	if err := json.Unmarshal(inputJSON, &in); err != nil {
+	in, err := parseNotebookEditInputJSON(inputJSON)
+	if err != nil {
 		return nil, fmt.Errorf("notebookedittool: invalid json: %w", err)
 	}
 	path := strings.TrimSpace(in.NotebookPath)
@@ -313,11 +327,13 @@ func (n *NotebookEdit) applyEdit(
 			"cell_type":     cellTypeOut,
 			"language":      "python",
 			"edit_mode":     "replace",
-			"cell_id":       cid,
 			"error":         errMsg,
 			"notebook_path": abs,
 			"original_file": "",
 			"updated_file":  "",
+		}
+		if cid != "" {
+			o["cell_id"] = cid
 		}
 		return marshalNotebookOutput(o)
 	}
@@ -439,9 +455,13 @@ func (n *NotebookEdit) applyEdit(
 		})
 	}
 
-	outCellID := cellIDArg
-	if editMode == "insert" {
-		outCellID = newCellID
+	var outCellID string
+	if needsID {
+		if editMode == "insert" {
+			outCellID = newCellID
+		} else if cellIDArg != "" {
+			outCellID = cellIDArg
+		}
 	}
 
 	o := map[string]any{
@@ -453,7 +473,9 @@ func (n *NotebookEdit) applyEdit(
 		"original_file": originalNormalized,
 		"updated_file":  updatedStr,
 		"error":         "",
-		"cell_id":       outCellID,
+	}
+	if outCellID != "" {
+		o["cell_id"] = outCellID
 	}
 	return marshalNotebookOutput(o)
 }

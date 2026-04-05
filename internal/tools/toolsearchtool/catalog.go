@@ -31,7 +31,7 @@ func DefaultCatalog() []ToolEntry {
 		{Name: fileedittool.FileEditToolName, SearchHint: "modify file contents in place", Description: fileedittool.PromptDescription},
 		{Name: globtool.GlobToolName, SearchHint: "find files by name pattern or wildcard", Description: globtool.Description},
 		{Name: greptool.GrepToolName, SearchHint: "search file contents with regex (ripgrep)", Description: greptool.GetDescription()},
-		{Name: notebookedittool.NotebookEditToolName, SearchHint: "edit Jupyter notebook cells (.ipynb)", Description: "NotebookEdit: replace, insert, or delete cells in .ipynb notebooks."},
+		{Name: notebookedittool.NotebookEditToolName, SearchHint: "edit Jupyter notebook cells (.ipynb)", Description: notebookedittool.ToolDescription},
 		{Name: todowritetool.TodoWriteToolName, SearchHint: "manage the session task checklist", Description: "TodoWrite: create and update structured todo items for the session."},
 		{Name: webfetchtool.WebFetchToolName, SearchHint: "fetch and extract content from a URL", Description: webfetchtool.Description},
 		{Name: websearchtool.WebSearchToolName, SearchHint: websearchtool.SearchHint, Description: websearchtool.Description},

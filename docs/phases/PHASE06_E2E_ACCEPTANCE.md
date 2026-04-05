@@ -26,6 +26,7 @@ make test-phase6
 | **`internal/tools/registry`** | **`RegisterMCP` / `UnregisterMCP` / `ByName`（含 alias）/ `RunTool`**；实现 **`query.ToolRunner`**（见 **`registry_test.go`**）；含 **`Read`** 内置路由测 |
 | **`internal/tools/filereadtool`** | **`FileRead.Run`**：文本成功读、**`.ipynb`**、**`.png`**、**`MapReadResultForMessagesAPI`**（**`text`/`notebook`/`file_unchanged`/pdf/parts/image**）；坏 JSON/空路径、**`.exe`** 拒绝、**`/dev/zero`**（非 Windows）、**offset** 大于行数（空内容短回包） |
 | **`internal/tools/greptool`** | **`Grep.Run`**：严格 JSON、缺 **`pattern`** / 非法 **`output_mode`**；**`MapGrepToolResultForMessagesAPI`**（content/count/files、分页）；无 **`rg`** 时相关用例 **Skip** |
+| **`internal/tools/notebookedittool`** | **`NotebookEdit.Run`**：replace（按 **id** / **cell-N**）、insert 首部、**`ReadFileState`** 门禁、严格 JSON、旧 **nbformat**（minor 小于 5）成功响应省略 **`cell_id`**；**`MapNotebookEditToolResultForMessagesAPI`**；**`ParseCellId`** |
 
 ---
 
