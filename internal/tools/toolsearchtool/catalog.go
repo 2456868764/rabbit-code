@@ -15,8 +15,10 @@ import (
 )
 
 // ToolEntry is one tool for keyword scoring (name + searchHint + prompt/description body).
+// Aliases optional; select: resolution matches toolMatchesName upstream (name or alias, exact case).
 type ToolEntry struct {
 	Name        string
+	Aliases     []string
 	SearchHint  string
 	Description string
 }
@@ -24,17 +26,17 @@ type ToolEntry struct {
 // DefaultCatalog lists Phase-6 builtins + deferred tools (prompt bodies for scoring).
 func DefaultCatalog() []ToolEntry {
 	return []ToolEntry{
-		{filereadtool.FileReadToolName, "read files, images, PDFs, notebooks", "Read tool: read text files, images, PDFs, and Jupyter notebooks from disk."},
-		{filewritetool.FileWriteToolName, "create or overwrite files", "Write tool: create new files or overwrite existing file content."},
-		{fileedittool.FileEditToolName, "modify file contents in place", fileedittool.PromptDescription},
-		{globtool.GlobToolName, "find files by name pattern or wildcard", globtool.Description},
-		{greptool.GrepToolName, "search file contents with regex (ripgrep)", greptool.GetDescription()},
-		{notebookedittool.NotebookEditToolName, "edit Jupyter notebook cells (.ipynb)", "NotebookEdit: replace, insert, or delete cells in .ipynb notebooks."},
-		{todowritetool.TodoWriteToolName, "manage the session task checklist", "TodoWrite: create and update structured todo items for the session."},
-		{webfetchtool.WebFetchToolName, "fetch and extract content from a URL", "WebFetch: fetch a URL and return extracted readable content."},
-		{websearchtool.WebSearchToolName, "search the web for current information", "WebSearch: run a web search and return summarized results."},
-		{bashtool.BashToolName, "run shell commands", "Bash: execute shell commands in the project environment."},
-		{powershelltool.PowerShellToolName, "run PowerShell commands", "PowerShell: execute PowerShell commands on Windows."},
+		{Name: filereadtool.FileReadToolName, SearchHint: "read files, images, PDFs, notebooks", Description: "Read tool: read text files, images, PDFs, and Jupyter notebooks from disk."},
+		{Name: filewritetool.FileWriteToolName, SearchHint: "create or overwrite files", Description: "Write tool: create new files or overwrite existing file content."},
+		{Name: fileedittool.FileEditToolName, SearchHint: "modify file contents in place", Description: fileedittool.PromptDescription},
+		{Name: globtool.GlobToolName, SearchHint: "find files by name pattern or wildcard", Description: globtool.Description},
+		{Name: greptool.GrepToolName, SearchHint: "search file contents with regex (ripgrep)", Description: greptool.GetDescription()},
+		{Name: notebookedittool.NotebookEditToolName, SearchHint: "edit Jupyter notebook cells (.ipynb)", Description: "NotebookEdit: replace, insert, or delete cells in .ipynb notebooks."},
+		{Name: todowritetool.TodoWriteToolName, SearchHint: "manage the session task checklist", Description: "TodoWrite: create and update structured todo items for the session."},
+		{Name: webfetchtool.WebFetchToolName, SearchHint: "fetch and extract content from a URL", Description: "WebFetch: fetch a URL and return extracted readable content."},
+		{Name: websearchtool.WebSearchToolName, SearchHint: "search the web for current information", Description: "WebSearch: run a web search and return summarized results."},
+		{Name: bashtool.BashToolName, SearchHint: "run shell commands", Description: "Bash: execute shell commands in the project environment."},
+		{Name: powershelltool.PowerShellToolName, SearchHint: "run PowerShell commands", Description: "PowerShell: execute PowerShell commands on Windows."},
 	}
 }
 

@@ -217,32 +217,35 @@ func parseSelectQuery(query string) (names []string, ok bool) {
 	return names, len(names) > 0
 }
 
+// toolMatchesName mirrors Tool.ts toolMatchesName (exact primary name or alias).
+func toolMatchesName(e ToolEntry, name string) bool {
+	if e.Name == name {
+		return true
+	}
+	for _, a := range e.Aliases {
+		if a == name {
+			return true
+		}
+	}
+	return false
+}
+
+// findToolByName mirrors Tool.ts findToolByName on a slice of ToolEntry.
+func findToolByName(entries []ToolEntry, name string) string {
+	for _, e := range entries {
+		if toolMatchesName(e, name) {
+			return e.Name
+		}
+	}
+	return ""
+}
+
 func resolveSelect(names []string, deferred, all []ToolEntry) (found, missing []string) {
-	defBy := catalogByName(deferred)
-	allBy := catalogByName(all)
 	seen := make(map[string]struct{})
 	for _, raw := range names {
-		var hit string
-		if e, ok := defBy[raw]; ok {
-			hit = e.Name
-		} else if e, ok := allBy[raw]; ok {
-			hit = e.Name
-		} else {
-			// toolMatchesName-style: case-insensitive
-			for k, e := range defBy {
-				if strings.EqualFold(k, raw) {
-					hit = e.Name
-					break
-				}
-			}
-			if hit == "" {
-				for k, e := range allBy {
-					if strings.EqualFold(k, raw) {
-						hit = e.Name
-						break
-					}
-				}
-			}
+		hit := findToolByName(deferred, raw)
+		if hit == "" {
+			hit = findToolByName(all, raw)
 		}
 		if hit == "" {
 			missing = append(missing, raw)

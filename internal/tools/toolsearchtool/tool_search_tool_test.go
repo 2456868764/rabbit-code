@@ -40,6 +40,49 @@ func TestToolSearch_selectRead(t *testing.T) {
 	}
 }
 
+func TestToolSearch_selectExactCaseOnly(t *testing.T) {
+	t.Setenv("RABBIT_CODE_TOOL_SEARCH_OPTIMISTIC", "1")
+	t.Setenv("ENABLE_TOOL_SEARCH", "true")
+	out, err := New().Run(context.Background(), []byte(`{"query":"select:read"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m struct {
+		Matches []string `json:"matches"`
+	}
+	if err := json.Unmarshal(out, &m); err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Matches) != 0 {
+		t.Fatalf("expected no match for wrong-case name, got %v", m.Matches)
+	}
+}
+
+func TestToolSearch_selectByAlias(t *testing.T) {
+	t.Setenv("RABBIT_CODE_TOOL_SEARCH_OPTIMISTIC", "1")
+	t.Setenv("ENABLE_TOOL_SEARCH", "true")
+	rc := &RunContext{
+		FullCatalog: []ToolEntry{
+			{Name: "WebFetch", Aliases: []string{"FetchURL"}, SearchHint: "fetch", Description: "fetch url"},
+		},
+		DeferredToolNames: []string{"WebFetch"},
+	}
+	ctx := WithRunContext(context.Background(), rc)
+	out, err := New().Run(ctx, []byte(`{"query":"select:FetchURL"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m struct {
+		Matches []string `json:"matches"`
+	}
+	if err := json.Unmarshal(out, &m); err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Matches) != 1 || m.Matches[0] != "WebFetch" {
+		t.Fatalf("%+v", m)
+	}
+}
+
 func TestToolSearch_keywordNotebook(t *testing.T) {
 	t.Setenv("RABBIT_CODE_TOOL_SEARCH_OPTIMISTIC", "1")
 	t.Setenv("ENABLE_TOOL_SEARCH", "true")
