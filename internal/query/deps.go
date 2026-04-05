@@ -9,7 +9,7 @@ import (
 
 // ToolRunner runs one tool invocation (Phase 6 wires real tools).
 // Use *registry.Registry from internal/tools/registry when dispatching named tools + dynamic MCP registration.
-// NewDefaultToolRunner provides Read/Write/Edit/Glob/Grep/NotebookEdit/TodoWrite plus optional ToolSearch (ENABLE_TOOL_SEARCH / toolSearch.ts gates) and bash fallback; engine.New sets it when Tools is nil and Turn/Assistant is set.
+// NewDefaultToolRunner / NewDefaultToolRunnerForModel provide Phase-6 builtins plus optional WebSearch (features.WebSearchToolEnabled + model), ToolSearch (ENABLE_TOOL_SEARCH), and bash fallback; engine.New sets Tools when nil and Turn/Assistant is set, passing cfg.Model for WebSearch gating.
 type ToolRunner interface {
 	RunTool(ctx context.Context, name string, inputJSON []byte) (resultJSON []byte, err error)
 }

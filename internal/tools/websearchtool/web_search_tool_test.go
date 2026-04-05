@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestValidateInput(t *testing.T) {
@@ -104,5 +105,25 @@ func TestPromptBodyOverrideDate(t *testing.T) {
 	body := PromptBody()
 	if !strings.Contains(body, "June 2030") {
 		t.Fatalf("want June 2030 in: %s", body)
+	}
+}
+
+func TestMapWebSearchTruncatesToMaxResultSizeChars(t *testing.T) {
+	long := strings.Repeat("a", MaxResultSizeChars+500)
+	raw, err := json.Marshal(map[string]any{
+		"query":   "q",
+		"results": []string{long},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := MapWebSearchToolResultForMessagesAPI(raw)
+	const suffix = "\n…(truncated)"
+	if !strings.HasSuffix(out, suffix) {
+		t.Fatal("expected truncation marker")
+	}
+	base := strings.TrimSuffix(out, suffix)
+	if utf8.RuneCountInString(base) != MaxResultSizeChars {
+		t.Fatalf("base runes got %d want %d", utf8.RuneCountInString(base), MaxResultSizeChars)
 	}
 }

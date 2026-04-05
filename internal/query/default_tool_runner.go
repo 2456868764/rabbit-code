@@ -18,10 +18,16 @@ import (
 	"github.com/2456868764/rabbit-code/internal/tools/websearchtool"
 )
 
-// NewDefaultToolRunner returns a ToolRunner with Phase-6 builtins (Read, Write, Edit, Glob, Grep, NotebookEdit, TodoWrite, WebFetch, WebSearch)
+// NewDefaultToolRunner returns NewDefaultToolRunnerForModel("") (main loop model from ANTHROPIC_MODEL or default haiku).
+// WebSearch is registered only when features.WebSearchToolEnabled(resolvedModel) matches WebSearchTool.isEnabled upstream.
+func NewDefaultToolRunner() ToolRunner {
+	return NewDefaultToolRunnerForModel("")
+}
+
+// NewDefaultToolRunnerForModel builds the default registry; mainLoopModel seeds WebSearch gating (Vertex 4.x, Bedrock off, etc.).
 // and ToolSearch when features.ToolSearchEnabledOptimistic() matches upstream (utils/toolSearch.ts),
 // plus BashExecToolRunner for tool name "bash" when not handled by the registry.
-func NewDefaultToolRunner() ToolRunner {
+func NewDefaultToolRunnerForModel(mainLoopModel string) ToolRunner {
 	builtins := []tools.Tool{
 		filereadtool.New(),
 		filewritetool.New(),
@@ -31,7 +37,9 @@ func NewDefaultToolRunner() ToolRunner {
 		notebookedittool.New(),
 		todowritetool.New(),
 		webfetchtool.New(),
-		websearchtool.New(),
+	}
+	if features.WebSearchToolEnabled(ResolveMainLoopModel(mainLoopModel)) {
+		builtins = append(builtins, websearchtool.New())
 	}
 	if features.ToolSearchEnabledOptimistic() {
 		builtins = append(builtins, toolsearchtool.New())

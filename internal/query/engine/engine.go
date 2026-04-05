@@ -292,8 +292,12 @@ func New(parent context.Context, cfg *Config) *Engine {
 				deps.Turn = aa
 			}
 		}
+		loopModel := e.model
+		if strings.TrimSpace(cfg.Model) != "" {
+			loopModel = strings.TrimSpace(cfg.Model)
+		}
 		if deps.Tools == nil && (deps.Turn != nil || deps.Assistant != nil) {
-			deps.Tools = query.NewDefaultToolRunner()
+			deps.Tools = query.NewDefaultToolRunnerForModel(loopModel)
 		}
 		e.deps = deps
 		e.todoStore = todowritetool.NewStore()

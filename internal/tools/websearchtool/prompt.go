@@ -63,9 +63,9 @@ IMPORTANT - Use the correct year in search queries:
 const Description = `
 - Allows Claude to search the web and use the results to inform responses
 - Provides up-to-date information for current events and recent data
-- Returns search result blocks with links as markdown hyperlinks
-- Use for information beyond the model knowledge cutoff
-- Searches run via the Messages API web_search server tool when configured
+- Returns search result information formatted as search result blocks, including links as markdown hyperlinks
+- Use this tool for accessing information beyond Claude's knowledge cutoff
+- Searches are performed automatically within a single API call when the backend supports web_search_20250305
 
 Usage notes:
   - Domain filtering: optional allowed_domains or blocked_domains (not both)

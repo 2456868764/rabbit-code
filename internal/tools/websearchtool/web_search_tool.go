@@ -26,14 +26,16 @@ type Input struct {
 	BlockedDomains []string `json:"blocked_domains,omitempty"`
 }
 
-type searchHit struct {
+// SearchHit mirrors searchHitSchema in WebSearchTool.ts.
+type SearchHit struct {
 	Title string `json:"title"`
 	URL   string `json:"url"`
 }
 
-type searchResultBlock struct {
+// SearchResultBlock mirrors searchResultSchema in WebSearchTool.ts.
+type SearchResultBlock struct {
 	ToolUseID string      `json:"tool_use_id"`
-	Content   []searchHit `json:"content"`
+	Content   []SearchHit `json:"content"`
 }
 
 type output struct {
