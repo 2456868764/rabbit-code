@@ -31,6 +31,8 @@ type WriteContext struct {
 	FetchGitDiff func(absPath string) (map[string]any, error)
 	// FileEncodingMetadata optional override for readFileSyncWithMetadata (encoding + lineEndings); when ok is false, sniff from disk bytes like TS.
 	FileEncodingMetadata func(absPath string) (encoding string, lineEndings LineEndingType, ok bool)
+	// UserModified when non-nil is copied into FileEdit tool_result (TUI changed proposed edit).
+	UserModified *bool
 }
 
 // WithWriteContext attaches *WriteContext. Prefer filereadtool.WithRunContext(ReadFileState) when only Read state is needed.

@@ -26,8 +26,8 @@ func unescapeFromDiff(s string) string {
 	return strings.ReplaceAll(s, dollarToken, "$")
 }
 
-// convertLeadingTabsToSpaces mirrors utils/file.ts convertLeadingTabsToSpaces (leading \t → two spaces per tab).
-func convertLeadingTabsToSpaces(content string) string {
+// ConvertLeadingTabsToSpaces mirrors utils/file.ts convertLeadingTabsToSpaces (leading \t → two spaces per tab).
+func ConvertLeadingTabsToSpaces(content string) string {
 	if !strings.Contains(content, "\t") {
 		return content
 	}
@@ -172,8 +172,8 @@ func dirtyIntervals(recs []lineRec, ctx int) [][2]int {
 // filePath is passed through for parity with the upstream API (embedded in the diff engine’s file identity).
 func GetPatchForDisplay(filePath, oldContent, newContent string) []map[string]any {
 	_ = filePath
-	oldPrep := escapeForDiff(convertLeadingTabsToSpaces(oldContent))
-	newPrep := escapeForDiff(convertLeadingTabsToSpaces(newContent))
+	oldPrep := escapeForDiff(ConvertLeadingTabsToSpaces(oldContent))
+	newPrep := escapeForDiff(ConvertLeadingTabsToSpaces(newContent))
 	dmp := diffmatchpatch.New()
 	dmp.DiffTimeout = patchDiffTimeout
 	ch1, ch2, lineArray := dmp.DiffLinesToChars(oldPrep, newPrep)

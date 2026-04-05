@@ -18,10 +18,10 @@ const (
 	LineEndingCRLF LineEndingType = "CRLF"
 )
 
-// TS BufferEncoding values used by readFileSyncWithMetadata / writeTextContent.
+// EncUTF8 / EncUTF16LE match Node BufferEncoding for readFileSyncWithMetadata / writeTextContent.
 const (
-	encUTF8    = "utf8"
-	encUTF16LE = "utf16le"
+	EncUTF8    = "utf8"
+	EncUTF16LE = "utf16le"
 )
 
 const sniffLen = 4096
@@ -29,15 +29,15 @@ const sniffLen = 4096
 // DetectEncodingFromPrefix mirrors fileRead.ts detectEncodingForResolvedPath (first bytes only).
 func DetectEncodingFromPrefix(b []byte) string {
 	if len(b) == 0 {
-		return encUTF8
+		return EncUTF8
 	}
 	if len(b) >= 2 && b[0] == 0xff && b[1] == 0xfe {
-		return encUTF16LE
+		return EncUTF16LE
 	}
 	if len(b) >= 3 && b[0] == 0xef && b[1] == 0xbb && b[2] == 0xbf {
-		return encUTF8
+		return EncUTF8
 	}
-	return encUTF8
+	return EncUTF8
 }
 
 // DetectLineEndingsForString mirrors fileRead.ts detectLineEndingsForString on a UTF-8 string
@@ -75,7 +75,7 @@ func DetectLineEndingsForString(s string, maxRunes int) LineEndingType {
 
 func decodeFileBytesToUTF8(b []byte, enc string) (string, error) {
 	switch enc {
-	case encUTF16LE:
+	case EncUTF16LE:
 		raw := b
 		if len(raw) >= 2 && raw[0] == 0xff && raw[1] == 0xfe {
 			raw = raw[2:]
@@ -88,7 +88,7 @@ func decodeFileBytesToUTF8(b []byte, enc string) (string, error) {
 			u[i] = binary.LittleEndian.Uint16(raw[i*2:])
 		}
 		return string(utf16.Decode(u)), nil
-	case encUTF8:
+	case EncUTF8:
 		if bytes.HasPrefix(b, []byte{0xef, 0xbb, 0xbf}) {
 			b = b[3:]
 		}
@@ -130,11 +130,12 @@ func encodeUTF16LEToBytes(s string) ([]byte, error) {
 	return out, nil
 }
 
-func encodeTextToFileBytes(content string, enc string) ([]byte, error) {
+// EncodeTextToFileBytes encodes UTF-8 text for writeTextContent (utf8 / utf16le).
+func EncodeTextToFileBytes(content string, enc string) ([]byte, error) {
 	switch enc {
-	case encUTF8:
+	case EncUTF8:
 		return encodeUTF8ToBytes(content)
-	case encUTF16LE:
+	case EncUTF16LE:
 		return encodeUTF16LEToBytes(content)
 	default:
 		return nil, fmt.Errorf("filewritetool: unsupported encoding %q", enc)
@@ -145,7 +146,7 @@ func encodeTextToFileBytes(content string, enc string) ([]byte, error) {
 // When hadFile is false, returns utf-8 + LF. diskDecoded is UTF-8 text from disk (before CRLF→LF normalization).
 func resolveWriteEncoding(abs string, prevBytes []byte, hadFile bool, wc *WriteContext) (enc string, le LineEndingType, diskDecoded string, err error) {
 	if !hadFile {
-		return encUTF8, LineEndingLF, "", nil
+		return EncUTF8, LineEndingLF, "", nil
 	}
 	if wc != nil && wc.FileEncodingMetadata != nil {
 		if e, l, ok := wc.FileEncodingMetadata(abs); ok && e != "" {

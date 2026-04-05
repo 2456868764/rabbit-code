@@ -165,7 +165,7 @@ func (f *FileWrite) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 		wc.FileHistoryTrack(abs, wc.ParentMessageUUID)
 	}
 
-	writeEnc, writeLe := encUTF8, LineEndingLF
+	writeEnc, writeLe := EncUTF8, LineEndingLF
 	var hadFile bool
 	var diskDecoded string
 	prevBytes, readErr := os.ReadFile(abs)
@@ -199,7 +199,7 @@ func (f *FileWrite) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	if writeLe == LineEndingCRLF {
 		toWrite = ApplyCRLFLineEndings(in.Content)
 	}
-	outBytes, err := encodeTextToFileBytes(toWrite, writeEnc)
+	outBytes, err := EncodeTextToFileBytes(toWrite, writeEnc)
 	if err != nil {
 		return nil, err
 	}

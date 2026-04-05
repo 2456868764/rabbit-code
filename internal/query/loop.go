@@ -11,6 +11,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
+	"github.com/2456868764/rabbit-code/internal/tools/fileedittool"
 	"github.com/2456868764/rabbit-code/internal/tools/filereadtool"
 	"github.com/2456868764/rabbit-code/internal/tools/filewritetool"
 )
@@ -368,6 +369,10 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 				followUp = append(followUp, sup...)
 			} else if u.Name == filewritetool.FileWriteToolName {
 				if s := filewritetool.MapWriteToolResultForMessagesAPI(out); s != "" {
+					content = s
+				}
+			} else if u.Name == fileedittool.FileEditToolName {
+				if s := fileedittool.MapEditToolResultForMessagesAPI(out); s != "" {
 					content = s
 				}
 			}

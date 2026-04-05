@@ -47,7 +47,7 @@ func TestFileWrite_utf16lePreservesEncoding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	text, err := decodeFileBytesToUTF8(round, encUTF16LE)
+	text, err := decodeFileBytesToUTF8(round, EncUTF16LE)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestFileWrite_fileEncodingMetadataOverride(t *testing.T) {
 		filereadtool.WithRunContext(context.Background(), &filereadtool.RunContext{ReadFileState: st}),
 		&WriteContext{
 			FileEncodingMetadata: func(string) (string, LineEndingType, bool) {
-				return encUTF16LE, LineEndingLF, true
+				return EncUTF16LE, LineEndingLF, true
 			},
 		},
 	)
@@ -125,7 +125,7 @@ func TestFileWrite_fileEncodingMetadataOverride(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	txt, err := decodeFileBytesToUTF8(b, encUTF16LE)
+	txt, err := decodeFileBytesToUTF8(b, EncUTF16LE)
 	if err != nil || txt != "ok" {
 		t.Fatalf("%v %q", err, txt)
 	}

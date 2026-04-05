@@ -6,13 +6,13 @@ import (
 )
 
 func TestDetectEncodingFromPrefix(t *testing.T) {
-	if g := DetectEncodingFromPrefix(nil); g != encUTF8 {
+	if g := DetectEncodingFromPrefix(nil); g != EncUTF8 {
 		t.Fatal(g)
 	}
-	if g := DetectEncodingFromPrefix([]byte{0xff, 0xfe, 'x'}); g != encUTF16LE {
+	if g := DetectEncodingFromPrefix([]byte{0xff, 0xfe, 'x'}); g != EncUTF16LE {
 		t.Fatal(g)
 	}
-	if g := DetectEncodingFromPrefix([]byte{0xef, 0xbb, 0xbf, 'x'}); g != encUTF8 {
+	if g := DetectEncodingFromPrefix([]byte{0xef, 0xbb, 0xbf, 'x'}); g != EncUTF8 {
 		t.Fatal(g)
 	}
 }
@@ -26,7 +26,7 @@ func TestUTF16LERoundTrip(t *testing.T) {
 	if !bytes.HasPrefix(b, []byte{0xff, 0xfe}) {
 		t.Fatal("missing BOM")
 	}
-	got, err := decodeFileBytesToUTF8(b, encUTF16LE)
+	got, err := decodeFileBytesToUTF8(b, EncUTF16LE)
 	if err != nil || got != s {
 		t.Fatalf("%v %q", err, got)
 	}
