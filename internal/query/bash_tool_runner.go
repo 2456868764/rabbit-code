@@ -24,6 +24,7 @@ func (BashStubToolRunner) RunTool(_ context.Context, name string, inputJSON []by
 }
 
 // BashExecToolRunner runs bash tool calls via sh -c when RABBIT_CODE_BASH_EXEC is truthy; otherwise delegates to BashStubToolRunner.
+// Rejects NUL in the command string (H9 hygiene; BashTool / path validation analogue).
 type BashExecToolRunner struct{}
 
 // RunTool implements ToolRunner.
@@ -45,6 +46,9 @@ func (BashExecToolRunner) RunTool(ctx context.Context, name string, inputJSON []
 	}
 	if shell == "" {
 		return json.Marshal(map[string]any{"ok": true, "stdout": "", "stderr": "", "exit": 0})
+	}
+	if strings.ContainsRune(shell, 0) {
+		return nil, fmt.Errorf("query: bash exec: null byte in command")
 	}
 	cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()

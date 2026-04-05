@@ -43,6 +43,19 @@ func TestBashExecToolRunner_disabledUsesStub(t *testing.T) {
 	}
 }
 
+func TestBashExecToolRunner_rejectsNullByteInCommand(t *testing.T) {
+	t.Setenv(features.EnvBashExec, "1")
+	var tr BashExecToolRunner
+	in, err := json.Marshal(map[string]string{"cmd": "\x00evil"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = tr.RunTool(context.Background(), "bash", in)
+	if err == nil || !strings.Contains(err.Error(), "null byte") {
+		t.Fatalf("got err=%v", err)
+	}
+}
+
 func TestBashExecToolRunner_runsEcho(t *testing.T) {
 	t.Setenv(features.EnvBashExec, "1")
 	var tr BashExecToolRunner

@@ -19,7 +19,7 @@
 //   - analyze_context.go — reactive gates, QuerySource re-exports, BuildHeadlessContextReport (delegates to services/compact)
 //   - messages.go        — append user/assistant/tool messages
 //   - assistant_adapters.go — StreamAssistantFunc, Sequence* (tests; no standalone TS file)
-//   - bash_tool_runner.go — BashStubToolRunner, BashExecToolRunner
+//   - bash_tool_runner.go — BashStubToolRunner, BashExecToolRunner（H9 / Phase 6 桥；**PARITY**：docs/phases/PARITY_H9_BASH_PERMISSIONS.md）
 //   - streaming_compact_executor.go — StreamingCompactExecutor* (stays in query: avoids compact↔api cycle)
 //   - transcript.go      — trim prefix, strip cache_control, user hints, template appendix
 //

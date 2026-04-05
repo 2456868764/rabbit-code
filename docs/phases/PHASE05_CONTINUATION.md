@@ -12,6 +12,14 @@
 | 2 | ☑ | **H8 接线**：**`Bootstrap`** 成功后 **`app.WireHeadlessEngineForShutdown`**（最小 **`engine.New(parent, nil)`** + **`RegisterEngineShutdown`**）；**`cmd/rabbit-code`** 主路径在 **`QuitRuntime`** 前经 **`Runtime.Close`** drain | **`go test ./internal/app/... ./cmd/rabbit-code/... -short`** |
 | 3 | ☑ | **PARITY `[~]` 文档扫尾**：**`QueryEngineConfig`** 字段级映射（**§4**）、**`cost-tracker`/`accumulateUsage`**（**§5** → **`internal/cost`**）、**JSONL Map**（**§6** → Phase 8）— 全量单 struct / USD 聚合 / JSONL 仍 Follow-on | **`PARITY_QUERY_QUERYENGINE.md`** §4–§7 已更新 |
 
+### §3.0 H9 子计划（Headless 表 **行 9**：Bash / 权限）
+
+| 序 | 状态 | 项 | 验收 |
+|----|------|-----|------|
+| 1 | ☑ | **`BashExecToolRunner`** null 字节拒绝 + **`PARITY_H9_BASH_PERMISSIONS.md`** + H9 进度段 | **`go test ./internal/query/... -short`** |
+| 2 | ☐ | **`readOnlyValidation` / `pathValidation`** 与 Go **`IsExtractReadOnlyBash`** / **`BashExec`** 对照与加固 | 更新 **PARITY_H9** §3.0 序 2 |
+| 3 | ☐ | **权限 / `canUseTool`** 与 **`OrphanPermissionAdvisor`**、Phase 6 **`ToolRunner`** 全链 | **PARITY** / DEFERRED |
+
 ---
 
 | # | 项 | 说明 | 目标 Phase / 状态 |
@@ -49,7 +57,14 @@
 | 6 | **H5** | **Token / 附件预算全量**（API tokenizer、附件计入；引擎侧先落地） | `query.ts`、`utils/attachments.ts`；进度见下 **§H5** |
 | 7 | **H7** | **Snip 元数据与持久化**（UUID map、会话往返） | **headless 子集已落地**（见下 **§H7**）；JSONL Map+parentUuid 全量仍 PARITY |
 | 8 | **H8** | **memdir 全量**（含 LLM 选记忆、TEAMMEM、extract fork 等） | `memdir/*`、`findRelevantMemories.ts`、`services/extractMemories/*`；**子集已落地**，**缺口见下 §H8 仍待实现** |
-| 9 | **H9** | **Bash / 权限真实栈**（Phase 6 工具层） | bash / permissions 与上游工具栈 |
+| 9 | **H9** | **Bash / 权限真实栈**（Phase 6 工具层） | bash / permissions 与上游工具栈；**§3.0 子计划** **`PARITY_H9_BASH_PERMISSIONS.md`** |
+
+#### H9 进度（Bash / 权限；Phase 6 headless 桥）
+
+- **`RABBIT_CODE_BASH_EXEC`**：**`query.BashExecToolRunner`**（**`sh -c`**，**`command` / `cmd`** JSON）；未开启时 **`BashStubToolRunner`**（**`PARITY_PHASE5_DEFERRED` P5 Tools**）。
+- **卫生**：命令串 **null 字节**拒绝（对齐 TS 侧路径/命令注入防护思路；**`PARITY_H9_BASH_PERMISSIONS.md` §3.0 序 1**）。
+- **Extract**：**`memdir.IsExtractReadOnlyBash`** — **`readOnlyValidation.ts`** 保守子集（**H8** 续已述）。
+- **全量**：**`src/tools/BashTool/*`**（**pathValidation**、**bashPermissions**、**sandbox** 等）仍 **Phase 6**；迭代顺序见 **`PARITY_H9_BASH_PERMISSIONS.md` §3.0**。
 
 #### H6 进度（迭代 14 起）
 
@@ -176,4 +191,4 @@
 
 ---
 
-更新本表时同步 **PARITY_PHASE5_DEFERRED.md**、**PHASE05_SPEC_AND_ACCEPTANCE.md** §6，并与模块根 **README.md**（**`engine.Config` highlights / Phase 5 headless**）交叉核对。
+更新本表时同步 **PARITY_PHASE5_DEFERRED.md**、**PARITY_H9_BASH_PERMISSIONS.md**（H9 迭代）、**PHASE05_SPEC_AND_ACCEPTANCE.md** §6，并与模块根 **README.md**（**`engine.Config` highlights / Phase 5 headless**）交叉核对。
