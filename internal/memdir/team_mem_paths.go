@@ -52,6 +52,15 @@ func TeamMemEntrypointFromAutoMemDir(autoMemDir string) string {
 	return filepath.Join(root, TeamMemSubdir, EntrypointName)
 }
 
+// IsTeamMemPath mirrors teamMemPaths.ts isTeamMemPath: filepath is under the team directory for this auto-mem root (no symlink resolution; use Validate* for writes).
+func IsTeamMemPath(filePath, autoMemDir string) bool {
+	p, err := filepath.Abs(filepath.Clean(strings.TrimSpace(filePath)))
+	if err != nil {
+		return false
+	}
+	return IsTeamMemPathUnderAutoMem(p, autoMemDir)
+}
+
 // IsTeamMemPathUnderAutoMem reports whether absolutePath resolves under the team subdirectory of autoMemDir (string containment; no symlink resolution).
 func IsTeamMemPathUnderAutoMem(absolutePath, autoMemDir string) bool {
 	teamRoot := strings.TrimSuffix(TeamMemDirFromAutoMemDir(autoMemDir), string(filepath.Separator))

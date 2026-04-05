@@ -34,6 +34,19 @@ func TestTeamMemDirFromAutoMemDir(t *testing.T) {
 	}
 }
 
+func TestIsTeamMemPath_matchesUnderAutoMem(t *testing.T) {
+	auto := filepath.Join(t.TempDir(), "auto") + string(filepath.Separator)
+	teamFile := filepath.Join(strings.TrimSuffix(auto, string(filepath.Separator)), "team", "a.md")
+	_ = os.MkdirAll(filepath.Dir(teamFile), 0o700)
+	if !IsTeamMemPath(teamFile, auto) {
+		t.Fatal("expected team file")
+	}
+	priv := filepath.Join(strings.TrimSuffix(auto, string(filepath.Separator)), "priv.md")
+	if IsTeamMemPath(priv, auto) {
+		t.Fatal("private root should not be team path")
+	}
+}
+
 func TestIsTeamMemPathUnderAutoMem(t *testing.T) {
 	auto := filepath.Clean("/m/proj/memory") + string(filepath.Separator)
 	teamFile := filepath.Join(filepath.Clean("/m/proj/memory"), "team", "x.md")

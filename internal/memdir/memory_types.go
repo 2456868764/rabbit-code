@@ -11,18 +11,31 @@ import (
 // MemoryTypes is memoryTypes.ts MEMORY_TYPES (closed taxonomy).
 var MemoryTypes = []string{"user", "feedback", "project", "reference"}
 
-// ParseMemoryType returns the type string if raw matches a known type; otherwise "" (parseMemoryType).
-func ParseMemoryType(raw string) string {
-	s := strings.TrimSpace(raw)
+// ParseMemoryTypeFromAny mirrors memoryTypes.ts parseMemoryType(raw: unknown): non-string → unset; unknown value → unset.
+func ParseMemoryTypeFromAny(raw interface{}) (typ string, ok bool) {
+	s, isStr := raw.(string)
+	if !isStr {
+		return "", false
+	}
+	s = strings.TrimSpace(s)
 	if s == "" {
-		return ""
+		return "", false
 	}
 	for _, t := range MemoryTypes {
 		if s == t {
-			return t
+			return t, true
 		}
 	}
-	return ""
+	return "", false
+}
+
+// ParseMemoryType returns the type string if raw matches a known type; otherwise "" (parseMemoryType).
+func ParseMemoryType(raw string) string {
+	t, ok := ParseMemoryTypeFromAny(raw)
+	if !ok {
+		return ""
+	}
+	return t
 }
 
 //go:embed promptdata/types_combined.txt

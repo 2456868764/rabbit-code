@@ -73,7 +73,7 @@ Legend：**[x]** 已对齐或 env 等价，**[~]** 子集/签名差异，**[ ]**
 
 | TS | Go | 状态 |
 |----|-----|------|
-| `MEMORY_TYPES` / `parseMemoryType` | `MemoryTypes` / `ParseMemoryType` | **[x]** / **[~]** |
+| `MEMORY_TYPES` / `parseMemoryType` | `MemoryTypes` / `ParseMemoryType` / `ParseMemoryTypeFromAny` | **[x]**（`unknown` → `ParseMemoryTypeFromAny`） |
 | 各 `*_SECTION` | `TypesSection*`、`WhatNotToSaveSection` 等 | **[x]** embed |
 | `MEMORY_DRIFT_CAVEAT` | `MemoryDriftCaveat` | **[x]** |
 
@@ -97,7 +97,7 @@ Legend：**[x]** 已对齐或 env 等价，**[~]** 子集/签名差异，**[ ]**
 
 | TS | Go | 状态 |
 |----|-----|------|
-| `getTeamMemPath` / `isTeamMemFile` | `GetTeamMemPath` / `IsTeamMemFile` | **[x]** |
+| `getTeamMemPath` / `isTeamMemPath` / `isTeamMemFile` | `GetTeamMemPath` / `IsTeamMemPath` / `IsTeamMemFile` | **[x]** |
 | `buildCombinedMemoryPrompt` | `BuildCombinedMemoryPrompt` | **[x]** |
 
 ### `findRelevantMemories.ts`

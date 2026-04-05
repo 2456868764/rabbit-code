@@ -22,6 +22,22 @@ func TestTypesSectionIndividual_nonEmpty(t *testing.T) {
 	}
 }
 
+func TestParseMemoryTypeFromAny(t *testing.T) {
+	if _, ok := ParseMemoryTypeFromAny(123); ok {
+		t.Fatal("non-string")
+	}
+	if _, ok := ParseMemoryTypeFromAny(""); ok {
+		t.Fatal("empty")
+	}
+	if _, ok := ParseMemoryTypeFromAny("nope"); ok {
+		t.Fatal("unknown")
+	}
+	tv, ok := ParseMemoryTypeFromAny("  user  ")
+	if !ok || tv != "user" {
+		t.Fatalf("got %q %v", tv, ok)
+	}
+}
+
 func TestParseMemoryType(t *testing.T) {
 	if ParseMemoryType("  project  ") != "project" {
 		t.Fatal()
