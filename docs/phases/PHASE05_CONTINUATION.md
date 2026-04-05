@@ -2,6 +2,18 @@
 
 主清单 **§2** 已全 `[x]`；下列 **4–14** 已在 **迭代 12** 落地 **可测子集**（每步单独 commit）；与 `src/` **全量**语义之差仍见 **PARITY_PHASE5_DEFERRED.md** Follow-on。
 
+### §3.0 当前有序迭代计划（对照 `PHASE_ITERATION_RULES.md` §三-3.0）
+
+按顺序执行；完成一项则更新本段勾号与 **PHASE05_SPEC_AND_ACCEPTANCE.md §6**。
+
+| 序 | 状态 | 项 | 验收 |
+|----|------|-----|------|
+| 1 | ☑ | **`cmd/rabbit-code`**：`Bootstrap` 成功后凡退出路径经 **`app.QuitRuntime`** / **`app.FailBootstrap`**，确保 **`Runtime.Close`**（含未来 **`RegisterEngineShutdown`**）在 **`os.Exit` 前执行 | **`go test ./internal/app/... ./cmd/rabbit-code/... -short`**；手测 **`RABBIT_CODE_EXIT_AFTER_INIT=1`** 仍 0 |
+| 2 | ☐ | **H8 接线**：在首个持有 **`engine.Engine`** 的宿主路径调用 **`RegisterEngineShutdown`** | 有 Engine 的集成测或 E2E 子集 |
+| 3 | ☐ | **PARITY `[~]` 扫尾**：**`QueryEngineConfig` 1:1**、**`cost-tracker`**、**JSONL Map** — 按 **PARITY_PHASE5_DEFERRED** 目标 Phase 分步，不早于 headless 就绪项 | 更新 **PARITY_QUERY_QUERYENGINE.md** 格 |
+
+---
+
 | # | 项 | 说明 | 目标 Phase / 状态 |
 |---|----|------|-------------------|
 | 1 | **P5.2.2 SnipCompact 接循环** | `RunTurnLoop` + **`EventKindSnipCompactApplied`** | **已完成**（迭代 11） |
@@ -106,6 +118,7 @@
 - **`RABBIT_CODE_MEMDIR_RELEVANCE_MODE`**（**`heuristic`** | **`llm`** / **`side_query`**）；**`engine.Config`**：**`MemdirMemoryDir`**、**`MemdirRecentTools`**、**`MemdirTextComplete`**、**`MemdirRelevanceModeOverride`**、**`MemdirAlreadySurfaced`**；每轮 **`memdirPathsForSubmit`**，注入成功后累积 **`memdirSurfaced`**；LLM 路径默认 **`PostMessagesStreamReadAssistant`**（system+user 合并为单条 user）。
 - **`paths.ts` `autoMemoryDirectory`（可信来源）**：**`config.LoadTrustedAutoMemoryDirectory`**（policy → **`RABBIT_CODE_SETTINGS_JSON`** → **`.rabbit-code.local.json`** → **`config.json`**；**不读** project **`.rabbit-code.json`**）；**`memdir.ResolveAutoMemDirWithOptions`** 与 **`Config.MemdirTrustedAutoMemoryDirectory`**；**`RABBIT_CODE_AUTO_MEMDIR`** 与 trusted 二选一即可在 **`AutoMemoryEnabled`** 下走自动解析。
 - **单测**：**`memory_scan_test`**、**`find_relevant_memories_test`**、**`select_llm_test`**、**`engine` MemdirMemoryDir + surfaced**、**`auto_memory_settings_test`**、trusted-only memdir inject。
+- **§3.0 子计划（memdir `[~]` 扫尾顺序）**：**`internal/memdir/MEMDIR_TS_PARITY.md`** §3.0，执行方式同 **`PHASE_ITERATION_RULES.md`** §三（**3.0 + 3.2**）。
 - **H8 续（prompt / TEAMMEM / extract fork）**：**`promptdata/*.txt` + `promptembed.go`**；**`BuildCombinedMemoryPrompt`**、**`BuildSearchingPastContextSection`**（**`RABBIT_CODE_MEMORY_SEARCH_PAST_CONTEXT`**）；**`BuildExtractAutoOnlyPrompt` / `BuildExtractCombinedPrompt`**；**`RABBIT_CODE_TEAMMEM`**、**`TeamMemoryEnabledFromMerged`**、**`team_mem.go`**（**`team/`** 路径、**`SanitizeTeamMemPathKey`**）；**`ExtractController` + `RunForkedExtractMemory`**、**`AutoMemToolRunner`**、transcript 上 **`HasMemoryWritesSince` / `CountModelVisibleMessagesSince`**；**`query.QuerySourceExtractMemories`**；引擎 **stop hook 异步 extract**、**`DrainExtractMemories`**、可选 **`Config.ExtractMemoriesSaved`**；相关 env：**`RABBIT_CODE_EXTRACT_MEMORIES`**、**`_NON_INTERACTIVE`**、**`_INTERVAL`**、**`_SKIP_INDEX`**。
 - **H8 续二（系统块 / 守卫 / fork 对齐，Go 已落地）**：
   - **`LoadMemorySystemPrompt`**（**`memdir.ts` `loadMemoryPrompt`**  analogue）：**auto-only / TEAMMEM 合并 / KAIROS daily-log** 分支（**`KairosDailyLogMemoryEnabled`** 优先于 team）；**`AppendClaudeMdStyleMemoryEntrypoints`**（私享 + team **MEMORY.md** 截断正文）；**`RABBIT_CODE_MEMORY_SYSTEM_PROMPT`** 关闭注入；**`CoworkMemoryExtraGuidelineLines`**（**`RABBIT_CODE_` / `CLAUDE_COWORK_MEMORY_EXTRA_GUIDELINES`**）。
@@ -144,7 +157,7 @@
 
 **引擎 / 产品接线**
 
-- **进程退出前 drain**：**`Engine.DrainExtractMemories`** 已有；**`cmd/rabbit-code` / 长会话 REPL** 未默认在 flush 后调用（对照 **`print.ts` `drainPendingExtraction`**）。
+- **进程退出前 drain**：**`Engine.DrainExtractMemories`** 已有；宿主在 **`engine.New`** 后调用 **`app.(*Runtime).RegisterEngineShutdown(engine)`** 可在 **`Runtime.Close`** 时 bounded drain（**`internal/app/engine_shutdown.go`**）。**`cmd/rabbit-code`** 主路径经 **`app.QuitRuntime`/`FailBootstrap`** 在 **`os.Exit` 前调用 `Close`**，故注册后 drain 会运行；**当前 main 仍无 Engine**，注册调用点在 REPL 合入时补上。
 
 **其它**
 

@@ -234,6 +234,21 @@ func FindRelevantMemories(ctx context.Context, query, memoryDir string, opts Fin
 	return out, nil
 }
 
+// FindRelevantMemoriesClassic mirrors findRelevantMemories.ts call shape:
+//   TS (query, memoryDir, signal, recentTools?, alreadySurfaced?)
+//   Go  (ctx, query, memoryDir, recentTools, alreadySurfaced, textComplete)
+// Cancellation uses ctx (equivalent to AbortSignal). It always requests the LLM branch
+// (RelevanceModeLLM); when textComplete is nil or errors, FindRelevantMemoriesDetailed
+// falls back to heuristic like the rest of this package.
+func FindRelevantMemoriesClassic(ctx context.Context, query, memoryDir string, recentTools []string, alreadySurfaced map[string]struct{}, textComplete TextCompleteFunc) ([]RelevantMemory, error) {
+	return FindRelevantMemoriesDetailed(ctx, query, memoryDir, FindRelevantMemoriesOpts{
+		Mode:            RelevanceModeLLM,
+		RecentTools:     recentTools,
+		AlreadySurfaced: alreadySurfaced,
+		TextComplete:    textComplete,
+	})
+}
+
 // FindRelevantMemoriesDetailed returns paths with mtimes (findRelevantMemories.ts).
 func FindRelevantMemoriesDetailed(ctx context.Context, query, memoryDir string, opts FindRelevantMemoriesOpts) ([]RelevantMemory, error) {
 	if memoryDir == "" {

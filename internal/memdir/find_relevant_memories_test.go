@@ -23,6 +23,29 @@ func TestFindRelevantMemories_heuristic(t *testing.T) {
 	}
 }
 
+func TestFindRelevantMemoriesClassic_matchesDetailedLLM(t *testing.T) {
+	dir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(dir, "pick.md"), []byte("content"), 0o600)
+	tc := func(context.Context, string, string) (string, error) {
+		return `{"selected_memories":["pick.md"]}`, nil
+	}
+	ctx := context.Background()
+	classic, err := FindRelevantMemoriesClassic(ctx, "q", dir, nil, nil, tc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	detailed, err := FindRelevantMemoriesDetailed(ctx, "q", dir, FindRelevantMemoriesOpts{
+		Mode:         RelevanceModeLLM,
+		TextComplete: tc,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(classic, detailed) {
+		t.Fatalf("classic %#v detailed %#v", classic, detailed)
+	}
+}
+
 func TestFindRelevantMemories_llmUsesTextComplete(t *testing.T) {
 	dir := t.TempDir()
 	_ = os.WriteFile(filepath.Join(dir, "pick.md"), []byte("content"), 0o600)

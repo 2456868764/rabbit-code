@@ -35,9 +35,9 @@
 //
 //	session_memory_compact.go — services/compact/sessionMemoryCompact.ts（Go 侧仅为 SessionMemory 读 MEMORY.md 的 hooks 子集；完整 compact 在 internal/services/compact）
 //
-// **符号级对照表**：MEMDIR_TS_PARITY.md（export ↔ Go、[x]/[~]）。
+// **符号级对照表**：MEMDIR_TS_PARITY.md（export ↔ Go、[x]/[~]；**§3.0 / §3.2** 迭代计划与单次核对同文件）。
 //
-// Related: internal/features（env 门控）；engine 接线 FindRelevantMemories、extract stop hook、SessionMemoryCompactHooks。
+// Related: internal/features（env 门控）；engine 接线 FindRelevantMemories（Opts）；FindRelevantMemoriesClassic 为 findRelevantMemories.ts 形参顺序的薄委托；extract stop hook、SessionMemoryCompactHooks。
 // Trusted autoMemoryDirectory：config.LoadTrustedAutoMemoryDirectory ↔ paths.ts getAutoMemPathSetting。
 //
 // Tests：与源文件同基名 `*_test.go`（§3.1 验收：`go test ./internal/memdir/... -short`）。

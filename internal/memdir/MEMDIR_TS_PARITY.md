@@ -4,6 +4,31 @@
 
 ---
 
+## §3.0 有序迭代计划（`PHASE_ITERATION_RULES.md` §三-3.0）
+
+由 **本 PARITY 表 `[~]` / `[ ]`**、**`PHASE05_CONTINUATION.md` H8**、**`restored-src/src/memdir/*.ts`** 导出；**严格按序**执行；完成一项即更新下表 **状态** 与上表符号列。排序与 **`PARITY` + §3.2-3** 冲突时以强制规则为准并回写说明。
+
+| 序 | 状态 | 项 | 验收 |
+|----|------|-----|------|
+| 1 | ☑ | **`findRelevantMemories`**：TS 形参 ↔ **`FindRelevantMemoriesClassic`**（`ctx`↔`AbortSignal`）+ 通用 **`FindRelevantMemoriesOpts`** | 下表 **`findRelevantMemories`** 为 **[x]**；**`go test ./internal/memdir/... -short`** |
+| 2 | ☐ | **`memoryScan`**：**`MemoryHeader` / `scanMemoryFiles`** — `[~]` 收口（`description: null` ↔ 空串、`FormatMemoryManifest` 已对齐处标 **[x]**；**`AbortSignal` ↔ `context`** 在注释/PARITY 写死） | 表行 **[x]** 或 **defer** 指 **`PARITY_PHASE5_DEFERRED`** |
+| 3 | ☐ | **`memdir.ts`**：**`buildMemoryPrompt` / `buildSearchingPastContextSection`** 与 TS 差异表 | 表行或 defer |
+| 4 | ☐ | **`paths.ts`**：**`isAutoMemoryEnabled` / `isExtractModeActive` / `getAutoMemPath`** 与 **`internal/features`**、env 对照 | 表行或 defer |
+
+## §3.2 单次迭代核对（`PHASE_ITERATION_RULES.md` §三-3.2）
+
+每轮迭代按仓库强制规则执行，不另向发起人征集排序。
+
+| 阶段 | 内容 |
+|------|------|
+| **3.2-1 P1** | 还原树 **`claude-code-sourcemap/restored-src/src/memdir/*.ts`** 可打开；范围在本文件 / Phase SPEC **§4** / **§6** 有记录。 |
+| **3.2-1 P2** | 改前 **`go test ./... -short`** 绿；本 PARITY 主表与映射行完整。 |
+| **3.2-2 #1** | 对照 **§3.0 当前首项**：改 Go / 接线；**`go build ./...`**；改动包 **`go test -short`** 绿。 |
+| **3.2-2 #2** | 无 import 环；**README / doc.go / PARITY** 与路径一致（**§3.2-3**）。 |
+| **3.2-2 #3** | 全量 **`go test ./... -short`**；**一增量一提交**（**§三-3**）。 |
+
+---
+
 ## §3.1-1 上游 TS 清单（`src/memdir/`，8 个，无子目录）
 
 | # | `restored-src/src/memdir/*.ts` |
@@ -104,7 +129,7 @@ Legend：**[x]** 已对齐或 env 等价，**[~]** 子集/签名差异，**[ ]**
 
 | TS | Go | 状态 |
 |----|-----|------|
-| `findRelevantMemories` | `FindRelevantMemories*` | **[~]** opts 结构体 |
+| `findRelevantMemories` | `FindRelevantMemoriesDetailed` / `FindRelevantMemories` / `FindRelevantMemoriesClassic` | **[x]**（`ctx`↔`AbortSignal`；**`FindRelevantMemoriesClassic`** ≈ TS 形参顺序；通用逻辑用 **`FindRelevantMemoriesOpts`**） |
 | `RelevantMemory` | `RelevantMemory` | **[x]** |
 
 ---
