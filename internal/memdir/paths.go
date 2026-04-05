@@ -79,19 +79,9 @@ func SanitizePath(name string) string {
 	return sanitized[:MaxSanitizedLength] + "-" + suffix
 }
 
-// ConfigHomeDir resolves Claude-style config home (envUtils.getClaudeConfigHomeDir): RABBIT_CODE_CONFIG_DIR, CLAUDE_CONFIG_DIR, else ~/.claude.
+// ConfigHomeDir resolves Claude-style config home; delegates to features.ConfigHomeDir.
 func ConfigHomeDir() string {
-	if s := strings.TrimSpace(os.Getenv("RABBIT_CODE_CONFIG_DIR")); s != "" {
-		return filepath.Clean(s)
-	}
-	if s := strings.TrimSpace(os.Getenv("CLAUDE_CONFIG_DIR")); s != "" {
-		return filepath.Clean(s)
-	}
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		return ".claude"
-	}
-	return filepath.Join(home, ".claude")
+	return features.ConfigHomeDir()
 }
 
 // MemoryBaseDir returns the root for projects/* layout (paths.ts getMemoryBaseDir).

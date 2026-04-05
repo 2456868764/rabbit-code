@@ -5,6 +5,7 @@ package features
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -357,6 +358,9 @@ const (
 	EnvClaudeRemote            = "CLAUDE_CODE_REMOTE"
 	EnvRemoteMemoryDir         = "RABBIT_CODE_REMOTE_MEMORY_DIR"
 	EnvClaudeRemoteMemoryDir   = "CLAUDE_CODE_REMOTE_MEMORY_DIR"
+	// EnvRabbitCodeConfigDir overrides Claude config home (~/.claude); memdir/paths.ts getClaudeConfigHomeDir.
+	EnvRabbitCodeConfigDir = "RABBIT_CODE_CONFIG_DIR"
+	EnvClaudeConfigDir     = "CLAUDE_CONFIG_DIR"
 	// EnvTeamMem enables team memory (TEAMMEM build + GrowthBook tengu_herring_clock in TS). Headless: default off unless truthy.
 	EnvTeamMem = "RABBIT_CODE_TEAMMEM"
 	// EnvMemorySearchPastContext enables "## Searching past context" in memory prompts (memdir.ts buildSearchingPastContextSection).
@@ -410,6 +414,21 @@ func MemdirStrictLLM() bool {
 // MemdirMemoryDirFromEnv returns RABBIT_CODE_MEMDIR_MEMORY_DIR trimmed.
 func MemdirMemoryDirFromEnv() string {
 	return strings.TrimSpace(os.Getenv(EnvMemdirMemoryDir))
+}
+
+// ConfigHomeDir resolves Claude-style config home (envUtils.getClaudeConfigHomeDir): RABBIT_CODE_CONFIG_DIR, CLAUDE_CONFIG_DIR, else ~/.claude.
+func ConfigHomeDir() string {
+	if s := strings.TrimSpace(os.Getenv(EnvRabbitCodeConfigDir)); s != "" {
+		return filepath.Clean(s)
+	}
+	if s := strings.TrimSpace(os.Getenv(EnvClaudeConfigDir)); s != "" {
+		return filepath.Clean(s)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return ".claude"
+	}
+	return filepath.Join(home, ".claude")
 }
 
 // AutoMemdirFromProject is true when RABBIT_CODE_AUTO_MEMDIR is truthy.

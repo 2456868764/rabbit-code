@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/2456868764/rabbit-code/internal/features"
 )
 
 const orphanedAtFilename = ".orphaned_at"
@@ -28,21 +30,6 @@ func ClearPluginCacheExclusions() {
 	pluginExclReady = false
 }
 
-// configHomeDir mirrors memdir.ConfigHomeDir without importing memdir (avoids globtool import cycle).
-func configHomeDir() string {
-	if s := strings.TrimSpace(os.Getenv("RABBIT_CODE_CONFIG_DIR")); s != "" {
-		return filepath.Clean(s)
-	}
-	if s := strings.TrimSpace(os.Getenv("CLAUDE_CONFIG_DIR")); s != "" {
-		return filepath.Clean(s)
-	}
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		return ".claude"
-	}
-	return filepath.Join(home, ".claude")
-}
-
 func pluginsDirectory() string {
 	if e := strings.TrimSpace(os.Getenv("CLAUDE_CODE_PLUGIN_CACHE_DIR")); e != "" {
 		return expandTildeClaudePath(e)
@@ -51,7 +38,7 @@ func pluginsDirectory() string {
 	if v := strings.TrimSpace(strings.ToLower(os.Getenv("CLAUDE_CODE_USE_COWORK_PLUGINS"))); v == "1" || v == "true" || v == "yes" || v == "on" {
 		name = "cowork_plugins"
 	}
-	return filepath.Join(configHomeDir(), name)
+	return filepath.Join(features.ConfigHomeDir(), name)
 }
 
 func pluginCachePath() string {
