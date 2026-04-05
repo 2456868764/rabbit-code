@@ -2,6 +2,11 @@ package webfetchtool
 
 import "strings"
 
+// contentTypeIncludes mirrors TS Content-Type header .includes(substr) (case-sensitive on full header).
+func contentTypeIncludes(ct, substr string) bool {
+	return strings.Contains(ct, substr)
+}
+
 // isBinaryContentType mirrors mcpOutputStorage.ts isBinaryContentType.
 func isBinaryContentType(contentType string) bool {
 	if contentType == "" {

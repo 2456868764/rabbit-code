@@ -135,7 +135,7 @@ func (w *WebFetch) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 
 		raw, redir, fetchErr = getWithPermittedRedirects(ctx, client, fetchURL, 0)
 		if redir != nil {
-			st := httpStatusText(redir.StatusCode, "")
+			st := redirectCodeText(redir.StatusCode)
 			msg := fmt.Sprintf(`REDIRECT DETECTED: The URL redirects to a different host.
 
 Original URL: %s
@@ -171,7 +171,7 @@ To complete your request, I need to fetch content from the redirected URL. Pleas
 		}
 
 		utf8Content := bytesToUTF8(body)
-		if strings.Contains(strings.ToLower(ct), "text/html") {
+		if contentTypeIncludes(ct, "text/html") {
 			md, err := htmlToMarkdown(utf8Content)
 			if err != nil {
 				markdown = htmlToPlainText(utf8Content)
@@ -194,9 +194,8 @@ To complete your request, I need to fetch content from the redirected URL. Pleas
 	}
 
 	preapproved := IsPreapprovedURL(urlInput)
-	ctLower := strings.ToLower(ct)
 	var result string
-	if preapproved && strings.Contains(ctLower, "text/markdown") && len(markdown) < maxMarkdownLength {
+	if preapproved && contentTypeIncludes(ct, "text/markdown") && len(markdown) < maxMarkdownLength {
 		result = markdown
 	} else {
 		truncated := markdown

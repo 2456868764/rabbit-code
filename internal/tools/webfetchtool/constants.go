@@ -7,8 +7,7 @@ const (
 	// HTTP client timeout: 60s (FETCH_TIMEOUT_MS upstream).
 	maxRedirects           = 10
 	maxMarkdownLength      = 100_000
-	maxResultSizeChars     = 100_000 // Tool.ts maxResultSizeChars
-	webFetchUserAgentLine  = "Claude-User (RabbitCode; +https://support.anthropic.com/)"
+	maxResultSizeChars = 100_000 // Tool.ts maxResultSizeChars
 	// DefaultDomainCheckBaseURL is the origin for /api/web/domain_info (utils.ts checkDomainBlocklist).
 	DefaultDomainCheckBaseURL = "https://api.anthropic.com"
 )

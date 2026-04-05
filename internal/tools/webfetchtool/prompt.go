@@ -4,13 +4,17 @@ package webfetchtool
 // WebFetchToolName is WEB_FETCH_TOOL_NAME upstream.
 const WebFetchToolName = "WebFetch"
 
-// Description mirrors prompt.ts DESCRIPTION (tool listing / search body).
+// AuthWarningPrefix is the first paragraph of WebFetchTool.prompt() (before DESCRIPTION).
+const AuthWarningPrefix = `IMPORTANT: WebFetch WILL FAIL for authenticated or private URLs. Before using this tool, check if the URL points to an authenticated service (e.g. Google Docs, Confluence, Jira, GitHub). If so, look for a specialized MCP tool that provides authenticated access.
+`
+
+// Description mirrors prompt.ts DESCRIPTION (tool listing body; used by ToolSearch catalog and docs).
 const Description = `
 - Fetches content from a specified URL and processes it using an AI model
 - Takes a URL and a prompt as input
-- Fetches the URL content, converts HTML to plain text (upstream uses HTML→markdown)
-- Processes the content with the prompt using a small, fast model when wired via RunContext.ApplyPrompt; otherwise returns the same structured prompt text upstream sends to Haiku
-- Returns the model's response about the content (or the structured prompt in headless mode)
+- Fetches the URL content, converts HTML to markdown
+- Processes the content with the prompt using a small, fast model
+- Returns the model's response about the content
 - Use this tool when you need to retrieve and analyze web content
 
 Usage notes:
@@ -19,7 +23,11 @@ Usage notes:
   - HTTP URLs will be automatically upgraded to HTTPS
   - The prompt should describe what information you want to extract from the page
   - This tool is read-only and does not modify any files
-  - When a URL redirects to a different host, the tool will inform you and provide the redirect URL; make a new WebFetch request with the redirect URL.
-  - Domain blocklist preflight calls https://api.anthropic.com/api/web/domain_info (set RABBIT_CODE_SKIP_WEBFETCH_PREFLIGHT=1 or RunContext.SkipWebFetchPreflight to skip, same as settings skipWebFetchPreflight).
-  - Fetched pages are cached for 15 minutes with a 50MB total budget (URL_CACHE upstream).
+  - Results may be summarized if the content is very large
+  - Includes a self-cleaning 15-minute cache for faster responses when repeatedly accessing the same URL
+  - When a URL redirects to a different host, the tool will inform you and provide the redirect URL in a special format. You should then make a new WebFetch request with the redirect URL to fetch the content.
+  - For GitHub URLs, prefer using the gh CLI via Bash instead (e.g., gh pr view, gh issue view, gh api).
 `
+
+// PromptBody is the full WebFetchTool.prompt() return value (auth warning + DESCRIPTION).
+const PromptBody = AuthWarningPrefix + Description

@@ -47,16 +47,6 @@ func isPermittedRedirect(originalURL, redirectURL string) bool {
 	return stripWww(ou.Hostname()) == stripWww(ru.Hostname())
 }
 
-func httpStatusText(code int, fallback string) string {
-	if s := http.StatusText(code); s != "" {
-		return s
-	}
-	if fallback != "" {
-		return strings.TrimPrefix(fallback, fmt.Sprintf("%d ", code))
-	}
-	return "Unknown"
-}
-
 func getWithPermittedRedirects(ctx context.Context, client *http.Client, currentURL string, depth int) (fetchedRaw, *redirectInfo, error) {
 	if depth > maxRedirects {
 		return fetchedRaw{}, nil, fmt.Errorf("webfetchtool: too many redirects (exceeded %d)", maxRedirects)
@@ -66,7 +56,7 @@ func getWithPermittedRedirects(ctx context.Context, client *http.Client, current
 		return fetchedRaw{}, nil, err
 	}
 	req.Header.Set("Accept", "text/markdown, text/html, */*")
-	req.Header.Set("User-Agent", webFetchUserAgentLine)
+	req.Header.Set("User-Agent", WebFetchUserAgent())
 
 	resp, err := client.Do(req)
 	if err != nil {
