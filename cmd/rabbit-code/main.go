@@ -8,8 +8,8 @@ import (
 	"syscall"
 
 	"github.com/2456868764/rabbit-code/internal/app"
-	"github.com/2456868764/rabbit-code/internal/services/api/services"
 	"github.com/2456868764/rabbit-code/internal/commands/breakcache"
+	"github.com/2456868764/rabbit-code/internal/services/api/services"
 	"github.com/2456868764/rabbit-code/internal/version"
 )
 
@@ -57,31 +57,30 @@ func main() {
 	if err != nil {
 		app.PrintBootstrapFailure(err)
 	}
-	defer rt.Close()
 
 	if os.Getenv(app.ExitAfterInitEnv) == "1" {
 		// AC1-7: full Bootstrap, skip first-run TUI (no hang in CI).
-		os.Exit(0)
+		app.QuitRuntime(rt, 0)
 	}
 
 	if err := app.RunPostBootstrapOnboarding(ctx, rt); err != nil {
-		app.PrintBootstrapFailure(err)
+		app.FailBootstrap(rt, err)
 	}
 
 	// Phase 2: after trust, load merged config and apply managed_env (SPEC §1.5, AC2-5).
 	if ok, err := app.TrustAccepted(rt.GlobalConfigDir); err != nil {
 		fmt.Fprintf(os.Stderr, "rabbit-code: config: trust check: %v\n", err)
-		os.Exit(1)
+		app.QuitRuntime(rt, 1)
 	} else if ok {
 		if err := app.LoadAndApplyMergedConfig(rt); err != nil {
 			fmt.Fprintf(os.Stderr, "rabbit-code: config: %v\n", err)
-			os.Exit(1)
+			app.QuitRuntime(rt, 1)
 		}
 		app.RunAPIPreconnect(ctx, rt)
 	}
 
 	fmt.Fprintf(os.Stderr, "rabbit-code — Phase 1 bootstrap OK. Commands: version | config dump | probe | context break-cache | set | wizard | sync | %s=1\n", app.ExitAfterInitEnv)
-	os.Exit(0)
+	app.QuitRuntime(rt, 0)
 }
 
 func handleConfigSubcommand() error {
