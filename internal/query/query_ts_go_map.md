@@ -23,6 +23,7 @@ Authority tree: `claude-code-sourcemap/restored-src/src/`.
 | Streaming compact summary | `internal/services/api/anthropic_stream_compact.go` |
 | Compact executor + hooks wiring | `internal/query/streaming_compact_executor.go` |
 | Deps / turn types | `internal/query/deps.go`, `internal/types/assistant_turn.go` |
+| `notifyCommandLifecycle`（成功返回后） | `internal/query/engine` **`Config.CommandLifecycleNotify`**、**`SubmitWithOptions.ConsumedCommandUUIDs`** |
 
 ## `src/QueryEngine.ts`
 

@@ -31,6 +31,69 @@ func drainChFor(d time.Duration, ch <-chan EngineEvent) {
 	}
 }
 
+func TestEngine_SubmitWithOptions_commandLifecycleNotify_stub(t *testing.T) {
+	var got [][2]string
+	e := New(context.Background(), &Config{
+		CommandLifecycleNotify: func(uuid, phase string) {
+			got = append(got, [2]string{uuid, phase})
+		},
+	})
+	e.SubmitWithOptions("hi", SubmitOptions{ConsumedCommandUUIDs: []string{" cmd-1 ", "", "cmd-2"}})
+	ch := e.Events()
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind == EventKindDone {
+				e.Wait()
+				if len(got) != 2 {
+					t.Fatalf("want 2 notifications, got %+v", got)
+				}
+				if got[0][0] != "cmd-1" || got[0][1] != "completed" {
+					t.Fatalf("first: %+v", got[0])
+				}
+				if got[1][0] != "cmd-2" || got[1][1] != "completed" {
+					t.Fatalf("second: %+v", got[1])
+				}
+				return
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
+func TestEngine_SubmitWithOptions_commandLifecycleNotify_afterRunTurnLoop(t *testing.T) {
+	var got [][2]string
+	e := New(context.Background(), &Config{
+		Deps: query.Deps{
+			Turn: &query.SequenceTurnAssistant{Turns: []query.TurnResult{{Text: "ok"}}},
+		},
+		Model: "m", MaxTokens: 8,
+		CommandLifecycleNotify: func(uuid, phase string) {
+			got = append(got, [2]string{uuid, phase})
+		},
+	})
+	e.SubmitWithOptions("hi", SubmitOptions{ConsumedCommandUUIDs: []string{"u1"}})
+	ch := e.Events()
+	for {
+		select {
+		case ev := <-ch:
+			switch ev.Kind {
+			case EventKindDone:
+				e.Wait()
+				if len(got) != 1 || got[0][0] != "u1" || got[0][1] != "completed" {
+					t.Fatalf("got %+v", got)
+				}
+				return
+			case EventKindError:
+				t.Fatal(ev.Err)
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
 func TestEngine_ProactiveAutoCompact_suggestWithoutAdvisor(t *testing.T) {
 	t.Setenv(features.EnvContextWindowTokens, "50000")
 	t.Setenv(features.EnvDisableCompact, "")

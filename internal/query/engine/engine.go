@@ -153,6 +153,15 @@ type Config struct {
 	RestoredSessionLastAssistantAt time.Time
 	// ExtractMemoriesSaved runs after a successful forked extract when new topic files were written (extractMemories appendSystemMessage analogue).
 	ExtractMemoriesSaved func(memoryPaths []string, teamMemoryCount int)
+	// CommandLifecycleNotify optional; invoked as notifyCommandLifecycle(uuid, phase) for each ConsumedCommandUUID in SubmitWithOptions
+	// after EventKindDone (successful Submit), matching query.ts after query() returns normally.
+	CommandLifecycleNotify func(uuid string, phase string)
+}
+
+// SubmitOptions optional per-submit fields (query.ts consumedCommandUuids + notifyCommandLifecycle).
+type SubmitOptions struct {
+	// ConsumedCommandUUIDs triggers CommandLifecycleNotify(uuid, "completed") for each non-empty id after successful Done.
+	ConsumedCommandUUIDs []string
 }
 
 // Engine coordinates cancellable query turns (stub or real StreamAssistant / RunTurnLoop).
@@ -225,6 +234,8 @@ type Engine struct {
 	postCompactSkills       []compact.PostCompactSkillEntry
 	postCompactDeltaAttach  []json.RawMessage
 	postCompactWorkspaceDir string
+
+	commandLifecycleNotify func(uuid string, phase string)
 }
 
 // NewEngine is equivalent to New(parent, nil) (stub assistant).
@@ -357,6 +368,7 @@ func New(parent context.Context, cfg *Config) *Engine {
 			e.sessionLastAssistantAt = cfg.RestoredSessionLastAssistantAt
 		}
 		e.extractMemoriesSavedFn = cfg.ExtractMemoriesSaved
+		e.commandLifecycleNotify = cfg.CommandLifecycleNotify
 	}
 	e.stopHooks = append(e.stopHooks, e.stopHookExtractMemories)
 	return e
@@ -380,6 +392,11 @@ func (e *Engine) useQueryLoop() bool {
 
 // Submit runs one user turn: stub, single StreamAssistant call, or query.RunTurnLoop when assistant/turn is configured.
 func (e *Engine) Submit(userText string) {
+	e.SubmitWithOptions(userText, SubmitOptions{})
+}
+
+// SubmitWithOptions is like Submit with per-submit options (e.g. ConsumedCommandUUIDs for command lifecycle parity).
+func (e *Engine) SubmitWithOptions(userText string, opts SubmitOptions) {
 	e.wg.Add(1)
 	go func() {
 		defer e.wg.Done()
@@ -393,7 +410,7 @@ func (e *Engine) Submit(userText string) {
 			return
 		}
 		if e.useQueryLoop() {
-			e.runTurnLoop(userText)
+			e.runTurnLoop(userText, opts.ConsumedCommandUUIDs)
 			return
 		}
 		select {
@@ -404,8 +421,24 @@ func (e *Engine) Submit(userText string) {
 		if !e.trySend(EngineEvent{Kind: EventKindAssistantText, AssistText: "stub"}) {
 			return
 		}
-		e.trySend(EngineEvent{Kind: EventKindDone})
+		if !e.trySend(EngineEvent{Kind: EventKindDone}) {
+			return
+		}
+		e.fireCommandLifecycleNotifyCompleted(opts.ConsumedCommandUUIDs)
 	}()
+}
+
+func (e *Engine) fireCommandLifecycleNotifyCompleted(uuids []string) {
+	if e.commandLifecycleNotify == nil || len(uuids) == 0 {
+		return
+	}
+	for _, u := range uuids {
+		u = strings.TrimSpace(u)
+		if u == "" {
+			continue
+		}
+		e.commandLifecycleNotify(u, "completed")
+	}
 }
 
 func engineAutoMemoryEnabled(cfg *Config) bool {
@@ -698,7 +731,7 @@ func (e *Engine) submitTokenEstimate(ctx context.Context, mode, resolved string,
 	}
 }
 
-func (e *Engine) runTurnLoop(userText string) {
+func (e *Engine) runTurnLoop(userText string, consumedCommandUUIDs []string) {
 	restoreUsage := e.chainStreamUsage()
 	defer restoreUsage()
 	e.refreshMemorySystemPromptForAssistant()
@@ -863,6 +896,7 @@ func (e *Engine) runTurnLoop(userText string) {
 			query.RecordLoopContinue(st, query.LoopContinue{Reason: query.ContinueReasonStopHookPrevented})
 			e.persistSessionLastAssistantAt(st)
 			e.trySend(EngineEvent{Kind: EventKindDone, LoopTurnCount: st.TurnCount, PhaseDetail: stopReason})
+			e.fireCommandLifecycleNotifyCompleted(consumedCommandUUIDs)
 			return
 		}
 		needStopHookBlock := blockFromAfterTurn || (e.stopHookBlockingContinue != nil && e.stopHookBlockingContinue(e.ctx, *st))
@@ -957,6 +991,7 @@ func (e *Engine) runTurnLoop(userText string) {
 
 	e.persistSessionLastAssistantAt(st)
 	e.trySend(EngineEvent{Kind: EventKindDone, LoopTurnCount: st.TurnCount})
+	e.fireCommandLifecycleNotifyCompleted(consumedCommandUUIDs)
 }
 
 func (e *Engine) effectiveQuerySource(st *query.LoopState) string {
