@@ -30,6 +30,8 @@ type GlobContext struct {
 	DenyRead func(absPath string) bool
 	// IgnoreGlobs are passed to ripgrep as repeated --glob !pattern (TS getFileReadIgnorePatterns subset).
 	IgnoreGlobs []string
+	// FileReadDenyPatternsByRoot mirrors getFileReadIgnorePatterns output: absolute root -> patterns; key "" = TS null root (verbatim globs).
+	FileReadDenyPatternsByRoot map[string][]string
 }
 
 // WithGlobContext attaches *GlobContext for Glob.Run.
@@ -296,8 +298,20 @@ func ripgrepListFiles(ctx context.Context, rgPath, searchDir, searchPattern stri
 			if ign == "" {
 				continue
 			}
-			args = append(args, "--glob", "!"+ign)
+			if strings.HasPrefix(ign, "!") {
+				args = append(args, "--glob", ign)
+			} else {
+				args = append(args, "--glob", "!"+ign)
+			}
 		}
+		if len(gc.FileReadDenyPatternsByRoot) > 0 {
+			for _, g := range NormalizeFileReadDenyPatternsToSearchDir(gc.FileReadDenyPatternsByRoot, searchDir) {
+				args = append(args, "--glob", g)
+			}
+		}
+	}
+	for _, ex := range getGlobExclusionsForPluginCache(ctx, rgPath, searchDir) {
+		args = append(args, "--glob", ex)
 	}
 	args = append(args, searchDir)
 
