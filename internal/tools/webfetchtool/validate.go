@@ -6,23 +6,12 @@ import (
 	"strings"
 )
 
-func isLoopbackHost(host string) bool {
-	h := strings.ToLower(strings.TrimSpace(host))
-	switch h {
-	case "localhost", "127.0.0.1", "::1":
-		return true
-	default:
-		return false
-	}
-}
-
 func parseAndUpgradeURL(s string) (*url.URL, error) {
 	u, err := url.Parse(strings.TrimSpace(s))
 	if err != nil {
 		return nil, err
 	}
-	// Upstream upgrades all http→https; we skip loopback so httptest and local dev work over HTTP.
-	if u.Scheme == "http" && !isLoopbackHost(u.Hostname()) {
+	if u.Scheme == "http" {
 		u.Scheme = "https"
 	}
 	return u, nil

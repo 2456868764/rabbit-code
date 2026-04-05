@@ -9,4 +9,6 @@ const (
 	maxMarkdownLength      = 100_000
 	maxResultSizeChars     = 100_000 // Tool.ts maxResultSizeChars
 	webFetchUserAgentLine  = "Claude-User (RabbitCode; +https://support.anthropic.com/)"
+	// DefaultDomainCheckBaseURL is the origin for /api/web/domain_info (utils.ts checkDomainBlocklist).
+	DefaultDomainCheckBaseURL = "https://api.anthropic.com"
 )

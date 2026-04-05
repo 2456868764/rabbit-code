@@ -620,6 +620,17 @@ func TestUseAPIClearToolFlags(t *testing.T) {
 	}
 }
 
+func TestSkipWebFetchPreflight(t *testing.T) {
+	t.Setenv(EnvSkipWebFetchPreflight, "")
+	if SkipWebFetchPreflight() {
+		t.Fatal()
+	}
+	t.Setenv(EnvSkipWebFetchPreflight, "1")
+	if !SkipWebFetchPreflight() {
+		t.Fatal()
+	}
+}
+
 func TestUseAPIContextManagement(t *testing.T) {
 	t.Setenv(EnvUseAPIContextManagement, "")
 	if UseAPIContextManagement() {

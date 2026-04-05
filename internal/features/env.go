@@ -209,6 +209,8 @@ const (
 	EnvUseAPIContextManagement = "USE_API_CONTEXT_MANAGEMENT"
 	EnvAPIMaxInputTokens       = "API_MAX_INPUT_TOKENS"
 	EnvAPITargetInputTokens    = "API_TARGET_INPUT_TOKENS"
+	// EnvSkipWebFetchPreflight skips api.anthropic.com domain_info preflight (settings skipWebFetchPreflight analogue).
+	EnvSkipWebFetchPreflight = "RABBIT_CODE_SKIP_WEBFETCH_PREFLIGHT"
 )
 
 // AntUserType is true when USER_TYPE or RABBIT_CODE_USER_TYPE equals "ant" (apiMicrocompact ant-only branches).
@@ -233,6 +235,11 @@ func UseAPIClearToolUses() bool {
 // UseAPIContextManagement mirrors isEnvTruthy(USE_API_CONTEXT_MANAGEMENT) (ant opt-in for tool clearing + beta).
 func UseAPIContextManagement() bool {
 	return truthy(os.Getenv(EnvUseAPIContextManagement))
+}
+
+// SkipWebFetchPreflight mirrors settings skipWebFetchPreflight (enterprise / no outbound to claude.ai).
+func SkipWebFetchPreflight() bool {
+	return truthy(os.Getenv(EnvSkipWebFetchPreflight))
 }
 
 const (

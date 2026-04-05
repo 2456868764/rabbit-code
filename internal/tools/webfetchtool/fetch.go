@@ -74,6 +74,16 @@ func getWithPermittedRedirects(ctx context.Context, client *http.Client, current
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusForbidden && strings.EqualFold(resp.Header.Get("X-Proxy-Error"), "blocked-by-allowlist") {
+		u, _ := url.Parse(currentURL)
+		host := ""
+		if u != nil {
+			host = u.Hostname()
+		}
+		_, _ = io.Copy(io.Discard, resp.Body)
+		return fetchedRaw{}, nil, EgressBlockedError(host)
+	}
+
 	switch resp.StatusCode {
 	case http.StatusMovedPermanently, http.StatusFound, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
 		loc := resp.Header.Get("Location")

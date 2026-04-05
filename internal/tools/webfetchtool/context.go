@@ -12,6 +12,14 @@ type RunContext struct {
 	HTTPClient *http.Client
 	// ApplyPrompt when non-nil replaces the headless fallback (Haiku / queryHaiku upstream).
 	ApplyPrompt func(ctx context.Context, markdown, prompt string, preapproved bool) (string, error)
+	// SkipWebFetchPreflight when non-nil overrides env/features (true = skip domain_info preflight).
+	SkipWebFetchPreflight *bool
+	// ToolResultsDir when non-empty is the directory for persistBinaryWebFetch (default: user cache rabbit-code/tool-results).
+	ToolResultsDir string
+	// DomainCheckBaseURL when non-empty overrides DefaultDomainCheckBaseURL for domain_info requests.
+	DomainCheckBaseURL string
+	// DomainCheckClient optional HTTP client for domain preflight only.
+	DomainCheckClient *http.Client
 }
 
 // WithRunContext attaches *RunContext for WebFetch.Run.

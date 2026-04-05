@@ -20,5 +20,6 @@ Usage notes:
   - The prompt should describe what information you want to extract from the page
   - This tool is read-only and does not modify any files
   - When a URL redirects to a different host, the tool will inform you and provide the redirect URL; make a new WebFetch request with the redirect URL.
-  - Domain blocklist preflight to api.anthropic.com is not implemented in Rabbit Code headless mode (equivalent to skipWebFetchPreflight).
+  - Domain blocklist preflight calls https://api.anthropic.com/api/web/domain_info (set RABBIT_CODE_SKIP_WEBFETCH_PREFLIGHT=1 or RunContext.SkipWebFetchPreflight to skip, same as settings skipWebFetchPreflight).
+  - Fetched pages are cached for 15 minutes with a 50MB total budget (URL_CACHE upstream).
 `
