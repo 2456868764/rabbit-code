@@ -14,9 +14,10 @@ import (
 	"github.com/2456868764/rabbit-code/internal/tools/registry"
 	"github.com/2456868764/rabbit-code/internal/tools/todowritetool"
 	"github.com/2456868764/rabbit-code/internal/tools/toolsearchtool"
+	"github.com/2456868764/rabbit-code/internal/tools/webfetchtool"
 )
 
-// NewDefaultToolRunner returns a ToolRunner with Phase-6 builtins (Read, Write, Edit, Glob, Grep, NotebookEdit, TodoWrite)
+// NewDefaultToolRunner returns a ToolRunner with Phase-6 builtins (Read, Write, Edit, Glob, Grep, NotebookEdit, TodoWrite, WebFetch)
 // and ToolSearch when features.ToolSearchEnabledOptimistic() matches upstream (utils/toolSearch.ts),
 // plus BashExecToolRunner for tool name "bash" when not handled by the registry.
 func NewDefaultToolRunner() ToolRunner {
@@ -28,6 +29,7 @@ func NewDefaultToolRunner() ToolRunner {
 		greptool.New(),
 		notebookedittool.New(),
 		todowritetool.New(),
+		webfetchtool.New(),
 	}
 	if features.ToolSearchEnabledOptimistic() {
 		builtins = append(builtins, toolsearchtool.New())

@@ -33,7 +33,7 @@ func DefaultCatalog() []ToolEntry {
 		{Name: greptool.GrepToolName, SearchHint: "search file contents with regex (ripgrep)", Description: greptool.GetDescription()},
 		{Name: notebookedittool.NotebookEditToolName, SearchHint: "edit Jupyter notebook cells (.ipynb)", Description: "NotebookEdit: replace, insert, or delete cells in .ipynb notebooks."},
 		{Name: todowritetool.TodoWriteToolName, SearchHint: "manage the session task checklist", Description: "TodoWrite: create and update structured todo items for the session."},
-		{Name: webfetchtool.WebFetchToolName, SearchHint: "fetch and extract content from a URL", Description: "WebFetch: fetch a URL and return extracted readable content."},
+		{Name: webfetchtool.WebFetchToolName, SearchHint: "fetch and extract content from a URL", Description: webfetchtool.Description},
 		{Name: websearchtool.WebSearchToolName, SearchHint: "search the web for current information", Description: "WebSearch: run a web search and return summarized results."},
 		{Name: bashtool.BashToolName, SearchHint: "run shell commands", Description: "Bash: execute shell commands in the project environment."},
 		{Name: powershelltool.PowerShellToolName, SearchHint: "run PowerShell commands", Description: "PowerShell: execute PowerShell commands on Windows."},
