@@ -96,3 +96,9 @@ func ClearURLCacheForTest() {
 	urlBytes = 0
 	urlCacheMu.Unlock()
 }
+
+// ClearWebFetchCaches mirrors utils.ts clearWebFetchCache (URL cache + domain allowlist cache).
+func ClearWebFetchCaches() {
+	ClearURLCacheForTest()
+	ClearDomainAllowCacheForTest()
+}

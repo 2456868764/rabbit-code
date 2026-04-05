@@ -130,7 +130,7 @@ func TestWebFetch_applyPrompt(t *testing.T) {
 
 	rc := &RunContext{
 		HTTPClient: client,
-		ApplyPrompt: func(_ context.Context, markdown, prompt string, _ bool) (string, error) {
+		ApplyPrompt: func(_ context.Context, markdown, prompt string, _, _ bool) (string, error) {
 			return "OUT:" + markdown + ":" + prompt, nil
 		},
 	}

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -45,6 +46,22 @@ func isPermittedRedirect(originalURL, redirectURL string) bool {
 		return false
 	}
 	return stripWww(ou.Hostname()) == stripWww(ru.Hostname())
+}
+
+// responseReasonPhrase mirrors axios response.statusText (HTTP reason after status code).
+func responseReasonPhrase(resp *http.Response) string {
+	if resp == nil {
+		return ""
+	}
+	code := resp.StatusCode
+	s := strings.TrimSpace(resp.Status)
+	prefix := strconv.Itoa(code) + " "
+	if strings.HasPrefix(s, prefix) {
+		if reason := strings.TrimSpace(strings.TrimPrefix(s, prefix)); reason != "" {
+			return reason
+		}
+	}
+	return http.StatusText(code)
 }
 
 func getWithPermittedRedirects(ctx context.Context, client *http.Client, currentURL string, depth int) (fetchedRaw, *redirectInfo, error) {
@@ -112,7 +129,7 @@ func getWithPermittedRedirects(ctx context.Context, client *http.Client, current
 	return fetchedRaw{
 		Body:        body,
 		StatusCode:  resp.StatusCode,
-		StatusText:  http.StatusText(resp.StatusCode),
+		StatusText:  responseReasonPhrase(resp),
 		ContentType: resp.Header.Get("Content-Type"),
 		FinalURL:    currentURL,
 	}, nil, nil

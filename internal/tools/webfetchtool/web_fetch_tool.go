@@ -194,6 +194,10 @@ To complete your request, I need to fetch content from the redirected URL. Pleas
 	}
 
 	preapproved := IsPreapprovedURL(urlInput)
+	nonInteractive := false
+	if rc != nil && rc.NonInteractive != nil {
+		nonInteractive = *rc.NonInteractive
+	}
 	var result string
 	if preapproved && contentTypeIncludes(ct, "text/markdown") && len(markdown) < maxMarkdownLength {
 		result = markdown
@@ -204,7 +208,7 @@ To complete your request, I need to fetch content from the redirected URL. Pleas
 		}
 		if rc != nil && rc.ApplyPrompt != nil {
 			var aerr error
-			result, aerr = rc.ApplyPrompt(ctx, truncated, prompt, preapproved)
+			result, aerr = rc.ApplyPrompt(ctx, truncated, prompt, preapproved, nonInteractive)
 			if aerr != nil {
 				return nil, aerr
 			}

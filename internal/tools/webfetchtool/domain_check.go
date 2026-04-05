@@ -19,6 +19,14 @@ const (
 	domainInfoPath     = "/api/web/domain_info"
 )
 
+// domainCheckFailedUserMsg mirrors utils.ts DomainCheckFailedError message.
+func domainCheckFailedUserMsg(hostname string) string {
+	return fmt.Sprintf(
+		"Unable to verify if domain %s is safe to fetch. This may be due to network restrictions or enterprise security policies blocking claude.ai.",
+		hostname,
+	)
+}
+
 var (
 	domainCheckMu    sync.Mutex
 	domainAllowCache = make(map[string]time.Time) // hostname -> expiry; only 'allowed' cached upstream
@@ -39,7 +47,7 @@ func domainCheckURL(base, hostname string) (string, error) {
 // CheckDomainBlocklist mirrors utils.ts checkDomainBlocklist (GET api.anthropic.com/api/web/domain_info).
 func CheckDomainBlocklist(ctx context.Context, apiBase string, hostname string, client *http.Client) error {
 	if hostname == "" {
-		return fmt.Errorf("%w: empty host", ErrDomainCheckFailed)
+		return fmt.Errorf("%w: empty hostname", ErrDomainCheckFailed)
 	}
 	domainCheckMu.Lock()
 	if exp, ok := domainAllowCache[hostname]; ok && time.Now().Before(exp) {
@@ -53,16 +61,16 @@ func CheckDomainBlocklist(ctx context.Context, apiBase string, hostname string, 
 	}
 	reqURL, err := domainCheckURL(apiBase, hostname)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrDomainCheckFailed, err)
+		return fmt.Errorf("%s: %v: %w", domainCheckFailedUserMsg(hostname), err, ErrDomainCheckFailed)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrDomainCheckFailed, err)
+		return fmt.Errorf("%s: %v: %w", domainCheckFailedUserMsg(hostname), err, ErrDomainCheckFailed)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrDomainCheckFailed, err)
+		return fmt.Errorf("%s: %v: %w", domainCheckFailedUserMsg(hostname), err, ErrDomainCheckFailed)
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
@@ -72,7 +80,7 @@ func CheckDomainBlocklist(ctx context.Context, apiBase string, hostname string, 
 			CanFetch bool `json:"can_fetch"`
 		}
 		if err := json.Unmarshal(body, &parsed); err != nil {
-			return fmt.Errorf("%w: invalid domain_info JSON: %w", ErrDomainCheckFailed, err)
+			return fmt.Errorf("%s: %v: %w", domainCheckFailedUserMsg(hostname), err, ErrDomainCheckFailed)
 		}
 		if parsed.CanFetch {
 			domainCheckMu.Lock()
@@ -83,10 +91,10 @@ func CheckDomainBlocklist(ctx context.Context, apiBase string, hostname string, 
 			domainCheckMu.Unlock()
 			return nil
 		}
-		return fmt.Errorf("%w: %s", ErrDomainBlocked, hostname)
+		return fmt.Errorf("Claude Code is unable to fetch from %s: %w", hostname, ErrDomainBlocked)
 	}
 
-	return fmt.Errorf("%w: status %d", ErrDomainCheckFailed, resp.StatusCode)
+	return fmt.Errorf("%s (domain check returned status %d): %w", domainCheckFailedUserMsg(hostname), resp.StatusCode, ErrDomainCheckFailed)
 }
 
 // ClearDomainAllowCacheForTest clears the positive domain cache (TTL cache).

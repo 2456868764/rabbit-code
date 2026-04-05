@@ -139,7 +139,8 @@ func IsPreapprovedURL(rawURL string) bool {
 	if err != nil || u.Hostname() == "" {
 		return false
 	}
-	path := u.EscapedPath()
+	// pathname parity: utils.ts isPreapprovedUrl uses URL.pathname (decoded), not escaped path.
+	path := u.Path
 	if path == "" {
 		path = "/"
 	}

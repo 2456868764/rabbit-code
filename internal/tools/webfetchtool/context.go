@@ -11,7 +11,10 @@ type runCtxKey struct{}
 type RunContext struct {
 	HTTPClient *http.Client
 	// ApplyPrompt when non-nil replaces the headless fallback (Haiku / queryHaiku upstream).
-	ApplyPrompt func(ctx context.Context, markdown, prompt string, preapproved bool) (string, error)
+	// nonInteractive mirrors call() isNonInteractiveSession passed to applyPromptToMarkdown.
+	ApplyPrompt func(ctx context.Context, markdown, prompt string, preapproved, nonInteractive bool) (string, error)
+	// NonInteractive when non-nil mirrors options.isNonInteractiveSession for ApplyPrompt.
+	NonInteractive *bool
 	// SkipWebFetchPreflight when non-nil overrides env/features (true = skip domain_info preflight).
 	SkipWebFetchPreflight *bool
 	// ToolResultsDir when non-empty is the directory for persistBinaryWebFetch (default: user cache rabbit-code/tool-results).
