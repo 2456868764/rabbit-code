@@ -9,6 +9,19 @@ import (
 	"testing"
 )
 
+func TestGetTeamMemPath_alias(t *testing.T) {
+	auto := filepath.Join(t.TempDir(), "mem") + string(filepath.Separator)
+	if GetTeamMemPath(auto) != TeamMemDirFromAutoMemDir(auto) {
+		t.Fatal()
+	}
+}
+
+func TestIsTeamMemFile_alias(t *testing.T) {
+	if IsTeamMemFile("/x", "/m", false) {
+		t.Fatal()
+	}
+}
+
 func TestTeamMemDirFromAutoMemDir(t *testing.T) {
 	auto := filepath.Clean("/home/u/.claude/projects/foo/memory") + string(filepath.Separator)
 	got := TeamMemDirFromAutoMemDir(auto)

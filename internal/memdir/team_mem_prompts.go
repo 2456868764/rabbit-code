@@ -31,7 +31,7 @@ func BuildCombinedMemoryPrompt(opt CombinedMemoryPromptOpts) string {
 			"",
 			"Write each memory to its own file in the chosen directory (private or team, per the type's scope guidance) using this frontmatter format:",
 			"",
-			rawFrontmatterExample,
+			MemoryFrontmatterExampleBlock(),
 			"",
 			"- Keep the name, description, and type fields in memory files up-to-date with the content",
 			"- Organize memory semantically by topic, not chronologically",
@@ -46,7 +46,7 @@ func BuildCombinedMemoryPrompt(opt CombinedMemoryPromptOpts) string {
 			"",
 			"**Step 1** — write the memory to its own file in the chosen directory (private or team, per the type's scope guidance) using this frontmatter format:",
 			"",
-			rawFrontmatterExample,
+			MemoryFrontmatterExampleBlock(),
 			"",
 			fmt.Sprintf("**Step 2** — add a pointer to that file in the same directory's `%s`. Each directory (private and team) has its own `%s` index — each entry should be one line, under ~150 characters: `- [Title](file.md) — one-line hook`. They have no frontmatter. Never write memory content directly into a `%s`.", EntrypointName, EntrypointName, EntrypointName),
 			"",
@@ -75,19 +75,19 @@ func BuildCombinedMemoryPrompt(opt CombinedMemoryPromptOpts) string {
 		fmt.Sprintf("- team: memories that are shared with and contributed by all of the users who work within this project directory. Team memories are synced at the beginning of every session and they are stored at `%s`.", teamDir),
 		"",
 	}
-	lines = append(lines, strings.Split(strings.TrimSuffix(rawTypesSectionCombined, "\n"), "\n")...)
-	lines = append(lines, strings.Split(strings.TrimSuffix(rawWhatNotToSave, "\n"), "\n")...)
+	lines = append(lines, TypesSectionCombined()...)
+	lines = append(lines, WhatNotToSaveSection()...)
 	lines = append(lines,
 		"- You MUST avoid saving sensitive data within shared team memories. For example, never save API keys or user credentials.",
 		"",
 	)
 	lines = append(lines, howToSave...)
 	lines = append(lines, "")
-	lines = append(lines, strings.Split(strings.TrimSuffix(rawWhenToAccessCombined, "\n"), "\n")...)
+	lines = append(lines, WhenToAccessCombinedSection()...)
 	lines = append(lines, "")
-	lines = append(lines, strings.Split(strings.TrimSuffix(rawTrustingRecall, "\n"), "\n")...)
+	lines = append(lines, TrustingRecallSection()...)
 	lines = append(lines, "")
-	lines = append(lines, strings.Split(strings.TrimSuffix(rawMemoryPersistence, "\n"), "\n")...)
+	lines = append(lines, MemoryAndPersistenceSection()...)
 	for _, g := range opt.ExtraGuidelines {
 		g = strings.TrimSpace(g)
 		if g != "" {

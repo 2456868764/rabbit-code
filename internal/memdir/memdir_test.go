@@ -53,6 +53,19 @@ func TestTruncateEntrypointContent_byteCapLongLines(t *testing.T) {
 	if len(got.Content) > MaxEntrypointBytes+4000 {
 		t.Fatalf("content too long: %d", len(got.Content))
 	}
+	// memdir.ts uses utils/format.ts formatFileSize in the warning (e.g. "29.3KB").
+	if !strings.Contains(got.Content, "KB") && !strings.Contains(got.Content, "bytes") {
+		t.Fatalf("expected human size in warning: %q", got.Content)
+	}
+}
+
+func TestFormatFileSizeBytes_matchesTSFormatExamples(t *testing.T) {
+	if formatFileSizeBytes(512) != "512 bytes" {
+		t.Fatal(formatFileSizeBytes(512))
+	}
+	if formatFileSizeBytes(1536) != "1.5KB" {
+		t.Fatal(formatFileSizeBytes(1536))
+	}
 }
 
 func TestEnsureMemoryDirExists(t *testing.T) {

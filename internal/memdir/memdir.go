@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/2456868764/rabbit-code/internal/features"
@@ -40,6 +41,29 @@ type EntrypointTruncation struct {
 	ByteCount        int
 	WasLineTruncated bool
 	WasByteTruncated bool
+}
+
+// formatFileSizeBytes matches utils/format.ts formatFileSize for MEMORY.md truncation warnings (memdir.ts).
+func formatFileSizeBytes(sizeInBytes int) string {
+	kb := float64(sizeInBytes) / 1024
+	if kb < 1 {
+		return strconv.Itoa(sizeInBytes) + " bytes"
+	}
+	if kb < 1024 {
+		return trimOneDecimalFileSize(kb) + "KB"
+	}
+	mb := kb / 1024
+	if mb < 1024 {
+		return trimOneDecimalFileSize(mb) + "MB"
+	}
+	gb := mb / 1024
+	return trimOneDecimalFileSize(gb) + "GB"
+}
+
+func trimOneDecimalFileSize(x float64) string {
+	s := strconv.FormatFloat(x, 'f', 1, 64)
+	s = strings.TrimSuffix(strings.TrimSuffix(s, "0"), ".")
+	return s
 }
 
 // TruncateEntrypointContent applies line then byte caps and appends a warning (memdir.ts truncateEntrypointContent).
@@ -86,11 +110,11 @@ func TruncateEntrypointContent(raw string) EntrypointTruncation {
 	var reason string
 	switch {
 	case wasByteTruncated && !wasLineTruncated:
-		reason = fmt.Sprintf("%d bytes (limit: %d) — index entries are too long", byteCount, MaxEntrypointBytes)
+		reason = fmt.Sprintf("%s (limit: %s) — index entries are too long", formatFileSizeBytes(byteCount), formatFileSizeBytes(MaxEntrypointBytes))
 	case wasLineTruncated && !wasByteTruncated:
 		reason = fmt.Sprintf("%d lines (limit: %d)", lineCount, MaxEntrypointLines)
 	default:
-		reason = fmt.Sprintf("%d lines and %d bytes", lineCount, byteCount)
+		reason = fmt.Sprintf("%d lines and %s", lineCount, formatFileSizeBytes(byteCount))
 	}
 
 	warning := fmt.Sprintf(
@@ -277,7 +301,7 @@ func BuildMemoryLinesAutoOnly(displayName, memoryDirWithSep, projectDir string, 
 			"",
 			"Write each memory to its own file (e.g., `user_role.md`, `feedback_testing.md`) using this frontmatter format:",
 			"",
-			rawFrontmatterExample,
+			MemoryFrontmatterExampleBlock(),
 			"",
 			"- Keep the name, description, and type fields in memory files up-to-date with the content",
 			"- Organize memory semantically by topic, not chronologically",
@@ -292,7 +316,7 @@ func BuildMemoryLinesAutoOnly(displayName, memoryDirWithSep, projectDir string, 
 			"",
 			"**Step 1** — write the memory to its own file (e.g., `user_role.md`, `feedback_testing.md`) using this frontmatter format:",
 			"",
-			rawFrontmatterExample,
+			MemoryFrontmatterExampleBlock(),
 			"",
 			fmt.Sprintf("**Step 2** — add a pointer to that file in `%s`. `%s` is an index, not a memory — each entry should be one line, under ~150 characters: `- [Title](file.md) — one-line hook`. It has no frontmatter. Never write memory content directly into `%s`.", EntrypointName, EntrypointName, EntrypointName),
 			"",
@@ -313,16 +337,16 @@ func BuildMemoryLinesAutoOnly(displayName, memoryDirWithSep, projectDir string, 
 		"If the user explicitly asks you to remember something, save it immediately as whichever type fits best. If they ask you to forget something, find and remove the relevant entry.",
 		"",
 	}
-	lines = append(lines, strings.Split(strings.TrimSuffix(rawTypesSectionIndividual, "\n"), "\n")...)
-	lines = append(lines, strings.Split(strings.TrimSuffix(rawWhatNotToSave, "\n"), "\n")...)
+	lines = append(lines, TypesSectionIndividual()...)
+	lines = append(lines, WhatNotToSaveSection()...)
 	lines = append(lines, "")
 	lines = append(lines, howToSave...)
 	lines = append(lines, "")
-	lines = append(lines, strings.Split(strings.TrimSuffix(rawWhenToAccess, "\n"), "\n")...)
+	lines = append(lines, WhenToAccessSection()...)
 	lines = append(lines, "")
-	lines = append(lines, strings.Split(strings.TrimSuffix(rawTrustingRecall, "\n"), "\n")...)
+	lines = append(lines, TrustingRecallSection()...)
 	lines = append(lines, "")
-	lines = append(lines, strings.Split(strings.TrimSuffix(rawMemoryPersistence, "\n"), "\n")...)
+	lines = append(lines, MemoryAndPersistenceSection()...)
 	for _, g := range extraGuidelines {
 		g = strings.TrimSpace(g)
 		if g != "" {
@@ -361,7 +385,7 @@ func BuildAssistantDailyLogMemoryPrompt(memoryDirWithSep, projectDir string, ski
 		"- Anything the user explicitly asks you to remember",
 		"",
 	}
-	lines = append(lines, strings.Split(strings.TrimSuffix(rawWhatNotToSave, "\n"), "\n")...)
+	lines = append(lines, WhatNotToSaveSection()...)
 	lines = append(lines, "")
 	if !skipIndex {
 		lines = append(lines,

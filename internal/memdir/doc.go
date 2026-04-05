@@ -1,4 +1,5 @@
 // Package memdir mirrors claude-code-sourcemap/restored-src/src/memdir for headless parity.
+// **Symbol-level table:** MEMDIR_TS_PARITY.md (TS export ↔ Go, [x]/[~]).
 // File naming follows docs/phases/PHASE_ITERATION_RULES.md §3.1: one Go file per TS module basename
 // (snake_case.go), whole-module conversion — not per-helper .go splits.
 //

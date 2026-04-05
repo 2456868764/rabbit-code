@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/2456868764/rabbit-code/internal/features"
 )
 
 func TestSessionFragmentsFromPaths(t *testing.T) {
@@ -241,5 +243,24 @@ func TestHasAutoMemPathOverride(t *testing.T) {
 	t.Setenv("RABBIT_CODE_MEMORY_PATH_OVERRIDE", abs+string(filepath.Separator))
 	if !HasAutoMemPathOverride() {
 		t.Fatal()
+	}
+}
+
+func TestIsExtractModeActive_envParity(t *testing.T) {
+	t.Setenv(features.EnvExtractMemories, "")
+	t.Setenv(features.EnvExtractMemoriesNonInteractive, "")
+	if IsExtractModeActive(false) {
+		t.Fatal("extract env off should be inactive")
+	}
+	t.Setenv(features.EnvExtractMemories, "1")
+	if !IsExtractModeActive(false) {
+		t.Fatal("interactive + env on")
+	}
+	if IsExtractModeActive(true) {
+		t.Fatal("non-interactive without override")
+	}
+	t.Setenv(features.EnvExtractMemoriesNonInteractive, "1")
+	if !IsExtractModeActive(true) {
+		t.Fatal("non-interactive with override")
 	}
 }

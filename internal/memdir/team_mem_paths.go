@@ -38,6 +38,11 @@ func TeamMemDirFromAutoMemDir(autoMemDir string) string {
 	return filepath.Join(root, TeamMemSubdir) + string(filepath.Separator)
 }
 
+// GetTeamMemPath mirrors teamMemPaths.ts getTeamMemPath (same path as TeamMemDirFromAutoMemDir).
+func GetTeamMemPath(autoMemDir string) string {
+	return TeamMemDirFromAutoMemDir(autoMemDir)
+}
+
 // TeamMemEntrypointFromAutoMemDir returns <autoMem>/team/MEMORY.md.
 func TeamMemEntrypointFromAutoMemDir(autoMemDir string) string {
 	root := strings.TrimSuffix(strings.TrimSpace(autoMemDir), string(filepath.Separator))
@@ -290,6 +295,11 @@ func IsTeamMemFileActive(filePath, autoMemDir string, teamMemoryEnabled bool) bo
 		return false
 	}
 	return TeamMemPathResolved(filePath, autoMemDir)
+}
+
+// IsTeamMemFile mirrors teamMemPaths.ts isTeamMemFile (team on + path under team layout).
+func IsTeamMemFile(filePath, autoMemDir string, teamMemoryEnabled bool) bool {
+	return IsTeamMemFileActive(filePath, autoMemDir, teamMemoryEnabled)
 }
 
 // SecretMatch records a gitleaks-style rule hit (secretScanner.ts); matched text is never stored.

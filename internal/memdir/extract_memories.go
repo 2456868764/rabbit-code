@@ -436,7 +436,7 @@ func BuildExtractAutoOnlyPrompt(newMessageCount int, existingMemories string, sk
 			"",
 			"Write each memory to its own file (e.g., `user_role.md`, `feedback_testing.md`) using this frontmatter format:",
 			"",
-			rawFrontmatterExample,
+			MemoryFrontmatterExampleBlock(),
 			"",
 			"- Organize memory semantically by topic, not chronologically",
 			"- Update or remove memories that turn out to be wrong or outdated",
@@ -450,7 +450,7 @@ func BuildExtractAutoOnlyPrompt(newMessageCount int, existingMemories string, sk
 			"",
 			"**Step 1** — write the memory to its own file (e.g., `user_role.md`, `feedback_testing.md`) using this frontmatter format:",
 			"",
-			rawFrontmatterExample,
+			MemoryFrontmatterExampleBlock(),
 			"",
 			fmt.Sprintf("**Step 2** — add a pointer to that file in `%s`. `%s` is an index, not a memory — each entry should be one line, under ~150 characters: `- [Title](file.md) — one-line hook`. It has no frontmatter. Never write memory content directly into `%s`.", EntrypointName, EntrypointName, EntrypointName),
 			"",
@@ -466,8 +466,8 @@ func BuildExtractAutoOnlyPrompt(newMessageCount int, existingMemories string, sk
 		"If the user explicitly asks you to remember something, save it immediately as whichever type fits best. If they ask you to forget something, find and remove the relevant entry.",
 		"",
 	}
-	lines = append(lines, strings.Split(strings.TrimSuffix(rawTypesSectionIndividual, "\n"), "\n")...)
-	lines = append(lines, strings.Split(strings.TrimSuffix(rawWhatNotToSave, "\n"), "\n")...)
+	lines = append(lines, TypesSectionIndividual()...)
+	lines = append(lines, WhatNotToSaveSection()...)
 	lines = append(lines, "")
 	lines = append(lines, howToSave...)
 	return strings.Join(lines, "\n")
@@ -485,7 +485,7 @@ func BuildExtractCombinedPrompt(newMessageCount int, existingMemories string, sk
 			"",
 			"Write each memory to its own file in the chosen directory (private or team, per the type's scope guidance) using this frontmatter format:",
 			"",
-			rawFrontmatterExample,
+			MemoryFrontmatterExampleBlock(),
 			"",
 			"- Organize memory semantically by topic, not chronologically",
 			"- Update or remove memories that turn out to be wrong or outdated",
@@ -499,7 +499,7 @@ func BuildExtractCombinedPrompt(newMessageCount int, existingMemories string, sk
 			"",
 			"**Step 1** — write the memory to its own file in the chosen directory (private or team, per the type's scope guidance) using this frontmatter format:",
 			"",
-			rawFrontmatterExample,
+			MemoryFrontmatterExampleBlock(),
 			"",
 			fmt.Sprintf("**Step 2** — add a pointer to that file in the same directory's `%s`. Each directory (private and team) has its own `%s` index — each entry should be one line, under ~150 characters: `- [Title](file.md) — one-line hook`. They have no frontmatter. Never write memory content directly into a `%s`.", EntrypointName, EntrypointName, EntrypointName),
 			"",
@@ -515,8 +515,8 @@ func BuildExtractCombinedPrompt(newMessageCount int, existingMemories string, sk
 		"If the user explicitly asks you to remember something, save it immediately as whichever type fits best. If they ask you to forget something, find and remove the relevant entry.",
 		"",
 	}
-	lines = append(lines, strings.Split(strings.TrimSuffix(rawTypesSectionCombined, "\n"), "\n")...)
-	lines = append(lines, strings.Split(strings.TrimSuffix(rawWhatNotToSave, "\n"), "\n")...)
+	lines = append(lines, TypesSectionCombined()...)
+	lines = append(lines, WhatNotToSaveSection()...)
 	lines = append(lines, "- You MUST avoid saving sensitive data within shared team memories. For example, never save API keys or user credentials.", "")
 	lines = append(lines, howToSave...)
 	return strings.Join(lines, "\n")

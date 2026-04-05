@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/2456868764/rabbit-code/internal/features"
 )
 
 // FindGitRoot returns the absolute directory containing .git (paths.ts getAutoMemBase analogue).
@@ -96,6 +98,14 @@ func MemoryBaseDir() string {
 		return filepath.Clean(s)
 	}
 	return ConfigHomeDir()
+}
+
+// IsExtractModeActive mirrors paths.ts isExtractModeActive for headless wiring.
+// TS gates on GrowthBook (tengu_passport_quail, tengu_slate_thimble); Go maps to
+// RABBIT_CODE_EXTRACT_MEMORIES* via features.ExtractMemoriesAllowed. Pass nonInteractive
+// from the host session (e.g. app.IsNonInteractive).
+func IsExtractModeActive(nonInteractive bool) bool {
+	return features.ExtractMemoriesAllowed(nonInteractive)
 }
 
 // validateMemoryPath returns an absolute directory with trailing separator, or ("", false) if rejected (paths.ts validateMemoryPath).
