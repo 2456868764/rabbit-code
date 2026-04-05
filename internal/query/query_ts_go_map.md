@@ -18,6 +18,7 @@ Authority tree: `claude-code-sourcemap/restored-src/src/`.
 | Area | Go (primary) |
 |------|----------------|
 | Loop / tools / cache break | `internal/query/loop.go`, `state.go`, `messages.go`, `transcript.go`, `snip.go` |
+| `skipCacheWrite`（断点下标） | `transcript.go` **`RemapPromptCacheBreakpointsForSkipCacheWrite`**；`engine.Config.SkipCacheWrite` |
 | `taskBudget` → Messages API | `engine.Config.TaskBudgetTotal` → `LoopDriver.TaskBudgetTotal` → `internal/services/api/task_budget_context.go` + `anthropic_assistant.go` |
 | Streaming compact summary | `internal/services/api/anthropic_stream_compact.go` |
 | Compact executor + hooks wiring | `internal/query/streaming_compact_executor.go` |

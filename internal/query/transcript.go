@@ -54,6 +54,64 @@ func StripCacheControlFromMessagesJSON(raw json.RawMessage) (out json.RawMessage
 	return json.RawMessage(enc), removed, nil
 }
 
+// RemapPromptCacheBreakpointsForSkipCacheWrite strips all cache_control markers, then adds exactly one
+// ephemeral breakpoint on the message at index len(messages)-2 when len>=2 (query.ts / claude.ts addCacheBreakpoints
+// with skipCacheWrite: fork/side paths avoid writing a new tail into KVCC). When len(messages)<2, leaves
+// no cache_control (matches TS markerIndex < 0 case).
+func RemapPromptCacheBreakpointsForSkipCacheWrite(raw json.RawMessage) (json.RawMessage, error) {
+	stripped, _, err := StripCacheControlFromMessagesJSON(raw)
+	if err != nil {
+		return nil, err
+	}
+	var arr []interface{}
+	if err := json.Unmarshal(stripped, &arr); err != nil {
+		return nil, err
+	}
+	if len(arr) < 2 {
+		return stripped, nil
+	}
+	markerIndex := len(arr) - 2
+	msg, ok := arr[markerIndex].(map[string]interface{})
+	if !ok {
+		return stripped, nil
+	}
+	addEphemeralCacheControlToMessageContent(msg)
+	out, err := json.Marshal(arr)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(out), nil
+}
+
+func addEphemeralCacheControlToMessageContent(m map[string]interface{}) {
+	content, ok := m["content"]
+	if !ok {
+		return
+	}
+	ephemeral := map[string]interface{}{"type": "ephemeral"}
+	switch c := content.(type) {
+	case string:
+		m["content"] = []interface{}{
+			map[string]interface{}{
+				"type":           "text",
+				"text":           c,
+				"cache_control": ephemeral,
+			},
+		}
+	case []interface{}:
+		if len(c) == 0 {
+			return
+		}
+		last, ok := c[len(c)-1].(map[string]interface{})
+		if !ok {
+			return
+		}
+		last["cache_control"] = ephemeral
+	default:
+		return
+	}
+}
+
 func stripCacheControlWalk(v interface{}) (interface{}, bool) {
 	switch x := v.(type) {
 	case map[string]interface{}:

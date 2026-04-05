@@ -48,6 +48,8 @@ type LoopDriver struct {
 	MicrocompactEditBuffer *compact.MicrocompactEditBuffer
 	// TaskBudgetTotal if > 0 sets output_config.task_budget on each Messages API assistant call (QueryEngine.ts taskBudget).
 	TaskBudgetTotal int
+	// SkipCacheWrite when true remaps prompt-cache breakpoints like query.ts skipCacheWrite (claude.ts addCacheBreakpoints).
+	SkipCacheWrite bool
 }
 
 func (d *LoopDriver) streamer() StreamAssistant {
@@ -279,6 +281,19 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 			}
 			if mcChanged {
 				msgs = json.RawMessage(out)
+				st.SetMessagesJSON(msgs)
+			}
+		}
+		if d.SkipCacheWrite {
+			next, rerr := RemapPromptCacheBreakpointsForSkipCacheWrite(msgs)
+			if rerr != nil {
+				if st != nil {
+					st.SetMessagesJSON(msgs)
+				}
+				return msgs, lastAssistantText, rerr
+			}
+			msgs = next
+			if st != nil {
 				st.SetMessagesJSON(msgs)
 			}
 		}

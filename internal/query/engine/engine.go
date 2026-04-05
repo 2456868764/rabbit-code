@@ -95,6 +95,8 @@ type Config struct {
 	MaxAssistantTurns int
 	// TaskBudgetTotal if > 0 sets output_config.task_budget on main turn-loop Messages API calls (query.ts / QueryEngine.ts taskBudget).
 	TaskBudgetTotal int
+	// SkipCacheWrite remaps cache breakpoints per query.ts / claude.ts fork semantics before each assistant call.
+	SkipCacheWrite bool
 	// SuggestCompactOnRecoverableError emits EventKindCompactSuggest (auto) before EventKindError when the failure is RecoverableCompact (P5.1.3 hint).
 	SuggestCompactOnRecoverableError bool
 	// CompactAdvisor, if set, runs after a successful turn loop to surface scheduling hints (P5.2.1 stub).
@@ -180,6 +182,7 @@ type Engine struct {
 	orphanPermissionAdvisor          func(query.LoopState) (string, bool)
 	maxAssistantTurns                int
 	taskBudgetTotal                  int
+	skipCacheWrite                   bool
 	suggestCompactOnRecoverableError bool
 	templateDir                      string
 	contextWindowTokens              int
@@ -303,6 +306,7 @@ func New(parent context.Context, cfg *Config) *Engine {
 		if cfg.TaskBudgetTotal > 0 {
 			e.taskBudgetTotal = cfg.TaskBudgetTotal
 		}
+		e.skipCacheWrite = cfg.SkipCacheWrite
 		e.suggestCompactOnRecoverableError = cfg.SuggestCompactOnRecoverableError
 		e.templateDir = strings.TrimSpace(cfg.TemplateDir)
 		if cfg.ContextWindowTokens > 0 {

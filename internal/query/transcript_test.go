@@ -155,3 +155,57 @@ func TestStripCacheControlFromMessagesJSON_nestedInToolInput(t *testing.T) {
 		t.Fatalf("still has cache_control: %s", out)
 	}
 }
+
+func TestRemapPromptCacheBreakpointsForSkipCacheWrite_oneMessage_noMarker(t *testing.T) {
+	raw := json.RawMessage(`[{"role":"user","content":[{"type":"text","text":"only"}]}]`)
+	out, err := RemapPromptCacheBreakpointsForSkipCacheWrite(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(out, []byte("cache_control")) {
+		t.Fatalf("single message: want no cache_control, got %s", out)
+	}
+}
+
+func TestRemapPromptCacheBreakpointsForSkipCacheWrite_twoMessages_markerOnFirst(t *testing.T) {
+	raw := json.RawMessage(`[{"role":"user","content":[{"type":"text","text":"a"}]},{"role":"assistant","content":[{"type":"text","text":"b"}]}]`)
+	out, err := RemapPromptCacheBreakpointsForSkipCacheWrite(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var arr []map[string]interface{}
+	if err := json.Unmarshal(out, &arr); err != nil {
+		t.Fatal(err)
+	}
+	if len(arr) != 2 {
+		t.Fatalf("len=%d", len(arr))
+	}
+	first := arr[0]["content"].([]interface{})[0].(map[string]interface{})
+	if _, ok := first["cache_control"]; !ok {
+		t.Fatalf("first block missing cache_control: %#v", first)
+	}
+	second := arr[1]["content"].([]interface{})[0].(map[string]interface{})
+	if _, ok := second["cache_control"]; ok {
+		t.Fatalf("second block should not have cache_control: %#v", second)
+	}
+}
+
+func TestRemapPromptCacheBreakpointsForSkipCacheWrite_stripsThenPlacesSecondToLast(t *testing.T) {
+	raw := json.RawMessage(`[{"role":"user","content":[{"type":"text","text":"a","cache_control":{"type":"ephemeral"}}]},{"role":"user","content":[{"type":"text","text":"b"}]},{"role":"assistant","content":[{"type":"text","text":"c"}]}]`)
+	out, err := RemapPromptCacheBreakpointsForSkipCacheWrite(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := bytes.Count(out, []byte("cache_control"))
+	if n != 1 {
+		t.Fatalf("want exactly one cache_control key occurrence, got count=%d body=%s", n, out)
+	}
+	var arr []map[string]interface{}
+	if err := json.Unmarshal(out, &arr); err != nil {
+		t.Fatal(err)
+	}
+	mid := arr[1]["content"].([]interface{})[0].(map[string]interface{})
+	if _, ok := mid["cache_control"]; !ok {
+		t.Fatalf("message index 1 should hold cache breakpoint, got %#v", mid)
+	}
+}
