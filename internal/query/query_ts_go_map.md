@@ -2,6 +2,8 @@
 
 Authority tree: `claude-code-sourcemap/restored-src/src/`.
 
+**全量功能对照与 PARITY 状态**：`docs/phases/PARITY_QUERY_QUERYENGINE.md`（遵守 **PARITY_PHASE5_DEFERRED.md**）。
+
 ## `src/query/*.ts`
 
 | TS | Go |
@@ -16,15 +18,17 @@ Authority tree: `claude-code-sourcemap/restored-src/src/`.
 | Area | Go (primary) |
 |------|----------------|
 | Loop / tools / cache break | `internal/query/loop.go`, `state.go`, `messages.go`, `transcript.go`, `snip.go` |
+| `taskBudget` → Messages API | `engine.Config.TaskBudgetTotal` → `LoopDriver.TaskBudgetTotal` → `internal/services/api/task_budget_context.go` + `anthropic_assistant.go` |
 | Streaming compact summary | `internal/services/api/anthropic_stream_compact.go` |
 | Compact executor + hooks wiring | `internal/query/streaming_compact_executor.go` |
 | Deps / turn types | `internal/query/deps.go`, `internal/types/assistant_turn.go` |
 
 ## `src/QueryEngine.ts`
 
-| Go |
-|----|
-| `internal/query/engine/*.go` |
+| TS | Go |
+|----|-----|
+| 包整体 | `internal/query/engine/*.go` |
+| `taskBudget.total` | `engine.Config.TaskBudgetTotal` → `query.LoopDriver` → `anthropic.WithPerTurnTaskBudget`（`internal/services/api/task_budget_context.go`） |
 
 ## Import rules (enforced)
 

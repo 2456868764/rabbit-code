@@ -36,6 +36,7 @@ func (e *Engine) loopDriver() query.LoopDriver {
 		SnipCompactMaxRounds:   features.SnipCompactMaxRounds(),
 		InitialLastAssistantAt: e.sessionLastAssistantAt,
 		MicrocompactEditBuffer: e.microcompactEditBuffer,
+		TaskBudgetTotal:        e.taskBudgetTotal,
 	}
 	if features.PromptCacheBreakAutoCompactEnabled() && e.compactExecutor != nil {
 		d.PromptCacheBreakRecovery = e.promptCacheBreakCompactRecovery

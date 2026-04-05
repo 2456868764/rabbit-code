@@ -67,6 +67,20 @@ func (a *AnthropicAssistant) streamBody(model string, maxTokens int, messagesJSO
 	return body
 }
 
+func applyPerTurnTaskBudgetFromContext(ctx context.Context, body *MessagesStreamBody) {
+	if body == nil {
+		return
+	}
+	total, ok := perTurnTaskBudgetTotal(ctx)
+	if !ok {
+		return
+	}
+	if body.OutputConfig == nil {
+		body.OutputConfig = &OutputConfig{}
+	}
+	body.OutputConfig.TaskBudget = &TaskBudgetParam{Type: "tokens", Total: total}
+}
+
 func (a *AnthropicAssistant) attachAPIContextManagement(model string, body *MessagesStreamBody) {
 	if a == nil || a.Client == nil || body == nil {
 		return
@@ -113,6 +127,7 @@ func (a *AnthropicAssistant) StreamAssistant(ctx context.Context, model string, 
 		pol = DefaultPolicy()
 	}
 	body := a.streamBody(model, maxTokens, messagesJSON)
+	applyPerTurnTaskBudgetFromContext(ctx, &body)
 	text, _, err := a.Client.PostMessagesStreamReadAssistant(ctx, body, pol, a.readOpts(ctx)...)
 	if err == nil {
 		a.markMicrocompactAfterSuccessfulAPI()
@@ -142,6 +157,7 @@ func (a *AnthropicAssistant) AssistantTurn(ctx context.Context, model string, ma
 		pol = DefaultPolicy()
 	}
 	body := a.streamBody(model, maxTokens, messagesJSON)
+	applyPerTurnTaskBudgetFromContext(ctx, &body)
 	turn, _, err := a.Client.PostMessagesStreamReadAssistantTurn(ctx, body, pol, a.readOpts(ctx)...)
 	if err != nil {
 		return types.TurnResult{}, err

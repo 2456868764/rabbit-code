@@ -93,6 +93,8 @@ type Config struct {
 	MemdirOnRecallShape memdir.RecallShapeHook
 	// MaxAssistantTurns if > 0 sets query.LoopState.MaxTurns for each Submit (caps assistant API rounds).
 	MaxAssistantTurns int
+	// TaskBudgetTotal if > 0 sets output_config.task_budget on main turn-loop Messages API calls (query.ts / QueryEngine.ts taskBudget).
+	TaskBudgetTotal int
 	// SuggestCompactOnRecoverableError emits EventKindCompactSuggest (auto) before EventKindError when the failure is RecoverableCompact (P5.1.3 hint).
 	SuggestCompactOnRecoverableError bool
 	// CompactAdvisor, if set, runs after a successful turn loop to surface scheduling hints (P5.2.1 stub).
@@ -177,6 +179,7 @@ type Engine struct {
 	recoverStrategy                  RecoverStrategy
 	orphanPermissionAdvisor          func(query.LoopState) (string, bool)
 	maxAssistantTurns                int
+	taskBudgetTotal                  int
 	suggestCompactOnRecoverableError bool
 	templateDir                      string
 	contextWindowTokens              int
@@ -296,6 +299,9 @@ func New(parent context.Context, cfg *Config) *Engine {
 		e.orphanPermissionAdvisor = cfg.OrphanPermissionAdvisor
 		if cfg.MaxAssistantTurns > 0 {
 			e.maxAssistantTurns = cfg.MaxAssistantTurns
+		}
+		if cfg.TaskBudgetTotal > 0 {
+			e.taskBudgetTotal = cfg.TaskBudgetTotal
 		}
 		e.suggestCompactOnRecoverableError = cfg.SuggestCompactOnRecoverableError
 		e.templateDir = strings.TrimSpace(cfg.TemplateDir)

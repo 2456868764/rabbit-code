@@ -128,6 +128,52 @@ func TestAnthropicAssistant_AssistantTurn_promptCacheBreakFromContext(t *testing
 	}
 }
 
+func TestAnthropicAssistant_AssistantTurn_perTurnTaskBudgetFromContext(t *testing.T) {
+	t.Setenv(features.EnvUseBedrock, "")
+	t.Setenv(features.EnvUseVertex, "")
+	t.Setenv(features.EnvUseFoundry, "")
+
+	var gotTotal int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var probe struct {
+			OutputConfig *struct {
+				TaskBudget *struct {
+					Type  string `json:"type"`
+					Total int    `json:"total"`
+				} `json:"task_budget"`
+			} `json:"output_config"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&probe)
+		if probe.OutputConfig != nil && probe.OutputConfig.TaskBudget != nil {
+			gotTotal = probe.OutputConfig.TaskBudget.Total
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "data: {\"type\":\"message_stop\"}\n\n")
+	}))
+	defer srv.Close()
+
+	cl := NewClient(NewTransportChain(http.DefaultTransport, "k", ""))
+	cl.BaseURL = srv.URL
+	cl.Provider = ProviderAnthropic
+
+	a := &AnthropicAssistant{
+		Client:           cl,
+		DefaultModel:     "m",
+		DefaultMaxTokens: 8,
+		Policy:           Policy{MaxAttempts: 1, Retry529429: false},
+	}
+	ctx := WithPerTurnTaskBudget(context.Background(), 42000)
+	msgs := []byte(`[{"role":"user","content":[{"type":"text","text":"yo"}]}]`)
+	_, err := a.AssistantTurn(ctx, "", 0, msgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotTotal != 42000 {
+		t.Fatalf("output_config.task_budget.total: want 42000, got %d", gotTotal)
+	}
+}
+
 func TestAnthropicAssistant_streamBody_anthropicBetaCachedMicrocompact(t *testing.T) {
 	t.Setenv(features.EnvCachedMicrocompact, "true")
 	t.Setenv(features.EnvUseBedrock, "")

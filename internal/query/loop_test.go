@@ -299,6 +299,34 @@ func TestLoopDriver_RunTurnLoopFromMessages_equivalentToRunTurnLoop(t *testing.T
 	}
 }
 
+func TestLoopDriver_RunTurnLoop_taskBudgetContext(t *testing.T) {
+	inner := &SequenceTurnAssistant{Turns: []TurnResult{{Text: "x"}}}
+	d := LoopDriver{
+		Deps:            Deps{Turn: assertPerTurnTaskBudgetTurn{t: t, want: 777, inner: inner}},
+		Model:           "m",
+		MaxTokens:       8,
+		TaskBudgetTotal: 777,
+	}
+	_, _, err := d.RunTurnLoop(context.Background(), &LoopState{}, "hi")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+type assertPerTurnTaskBudgetTurn struct {
+	t     *testing.T
+	want  int
+	inner TurnAssistant
+}
+
+func (a assertPerTurnTaskBudgetTurn) AssistantTurn(ctx context.Context, model string, maxTokens int, messagesJSON []byte) (TurnResult, error) {
+	got, ok := anthropic.PerTurnTaskBudgetFromContext(ctx)
+	if !ok || got != a.want {
+		a.t.Fatalf("PerTurnTaskBudgetFromContext: ok=%v got=%d want=%d", ok, got, a.want)
+	}
+	return a.inner.AssistantTurn(ctx, model, maxTokens, messagesJSON)
+}
+
 func TestLoopDriver_RunTurnLoopFromMessages_emptySeed(t *testing.T) {
 	d := LoopDriver{Deps: Deps{Turn: &SequenceTurnAssistant{}}, Model: "m", MaxTokens: 8}
 	_, _, err := d.RunTurnLoopFromMessages(context.Background(), &LoopState{}, json.RawMessage(`   `))

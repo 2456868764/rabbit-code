@@ -46,6 +46,8 @@ type LoopDriver struct {
 	InitialLastAssistantAt time.Time
 	// MicrocompactEditBuffer optional; reset when time-based microcompact clears tool results (microCompact.ts).
 	MicrocompactEditBuffer *compact.MicrocompactEditBuffer
+	// TaskBudgetTotal if > 0 sets output_config.task_budget on each Messages API assistant call (QueryEngine.ts taskBudget).
+	TaskBudgetTotal int
 }
 
 func (d *LoopDriver) streamer() StreamAssistant {
@@ -137,6 +139,9 @@ func (d *LoopDriver) RunTurnLoopFromMessages(ctx context.Context, st *LoopState,
 }
 
 func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText string, seedMsgs json.RawMessage) (msgs json.RawMessage, lastAssistantText string, err error) {
+	if d.TaskBudgetTotal > 0 {
+		ctx = anthropic.WithPerTurnTaskBudget(ctx, d.TaskBudgetTotal)
+	}
 	if st != nil {
 		st.SnipTokensFreedAccum = 0
 	}

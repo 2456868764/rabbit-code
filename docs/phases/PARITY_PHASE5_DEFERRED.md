@@ -2,7 +2,9 @@
 
 See **PHASE05_SPEC_AND_ACCEPTANCE.md** §2 **P5.F.*** and **`internal/features/rabbit_env.go`** for env names.
 
-## Implemented in `engine` / `query` / `querydeps` (headless path)
+**`query.ts` / `QueryEngine.ts` 符号级全量对照**（含 **[x]/[~]/[ ]**）：**PARITY_QUERY_QUERYENGINE.md**。
+
+## Implemented in `engine` / `query` (headless path)
 
 | SPEC ID | Flag | Runtime behavior |
 |---------|------|-------------------|
