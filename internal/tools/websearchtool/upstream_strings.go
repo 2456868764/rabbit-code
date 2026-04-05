@@ -2,7 +2,7 @@ package websearchtool
 
 // Upstream WebSearchTool.call / claude.ts query options (string parity for future streaming wiring).
 const (
-	// QuerySourceWebSearchTool is options.querySource in WebSearchTool.call.
+	// QuerySourceWebSearchTool is options.querySource in WebSearchTool.call (529 tagging: anthropic.QuerySourceWebSearchTool in internal/services/api/retry.go).
 	QuerySourceWebSearchTool = "web_search_tool"
 	// InnerSearchSystemPrompt is the single system line for the inner streaming request.
 	InnerSearchSystemPrompt = "You are an assistant for performing a web search tool use"

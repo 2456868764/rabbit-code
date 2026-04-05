@@ -48,6 +48,23 @@ func TestMakeOutputFromContentBlocks_errorContent(t *testing.T) {
 	}
 }
 
+func TestMakeOutputFromContentBlocks_errorContent_missingCode(t *testing.T) {
+	blocks := []json.RawMessage{
+		json.RawMessage(`{"type":"web_search_tool_result","tool_use_id":"x","content":{}}`),
+	}
+	got, err := MakeOutputFromContentBlocks(blocks, "q", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatal(got)
+	}
+	s, ok := got[0].(string)
+	if !ok || s != "Web search error: undefined" {
+		t.Fatalf("got %q ok=%v", s, ok)
+	}
+}
+
 func TestWebSearchToolSchemaFromInput(t *testing.T) {
 	s := WebSearchToolSchemaFromInput(Input{
 		Query:          "q",

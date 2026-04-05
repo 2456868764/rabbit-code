@@ -66,9 +66,10 @@ func MakeOutputFromContentBlocks(blocks []json.RawMessage, query string, duratio
 				ErrorCode string `json:"error_code"`
 			}
 			_ = json.Unmarshal(content, &errObj)
-			code := strings.TrimSpace(errObj.ErrorCode)
-			if code == "" {
-				code = "unknown"
+			// Mirror TS: `Web search error: ${block.content.error_code}` (missing → undefined).
+			code := errObj.ErrorCode
+			if strings.TrimSpace(code) == "" {
+				code = "undefined"
 			}
 			results = append(results, fmt.Sprintf("Web search error: %s", code))
 		case "text":

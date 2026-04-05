@@ -57,6 +57,8 @@ const (
 	QuerySourceSideQuestion                         QuerySource = "side_question"
 	QuerySourceAutoMode                             QuerySource = "auto_mode"
 	QuerySourceBashClassifier                       QuerySource = "bash_classifier"
+	// QuerySourceWebSearchTool is WebSearchTool.call options.querySource; not in FOREGROUND_529_RETRY_SOURCES — inner search does not retry HTTP 529 under strict foreground (withRetry.ts parity).
+	QuerySourceWebSearchTool QuerySource = "web_search_tool"
 )
 
 // foreground529RetrySources mirrors withRetry.ts FOREGROUND_529_RETRY_SOURCES (BASH_CLASSIFIER branch always included in Go).

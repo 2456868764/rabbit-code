@@ -14,10 +14,10 @@ import (
 
 // WebSearchCallParams configures ExecuteWebSearchToolCall (WebSearchTool.call analogue).
 type WebSearchCallParams struct {
-	Policy        Policy
-	MainLoopModel string
+	Policy         Policy
+	MainLoopModel  string
 	SmallFastModel string
-	MaxTokens     int
+	MaxTokens      int
 }
 
 // ExecuteWebSearchToolCall mirrors WebSearchTool.call: inner Messages stream with web_search_20250305 tool,
@@ -31,6 +31,8 @@ func ExecuteWebSearchToolCall(ctx context.Context, c *Client, in websearchtool.I
 	if pol.MaxAttempts == 0 {
 		pol = DefaultPolicy()
 	}
+	// Tag inner call like upstream querySource: 'web_search_tool' so StrictForeground529 does not treat it as repl_main_thread (529 retry policy).
+	pol.QuerySource = QuerySourceWebSearchTool
 
 	model := strings.TrimSpace(p.MainLoopModel)
 	if model == "" {

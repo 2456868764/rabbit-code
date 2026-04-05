@@ -103,6 +103,29 @@ func TestDoRequest_StrictForeground529_unknownSource(t *testing.T) {
 	}
 }
 
+func TestDoRequest_StrictForeground529_webSearchToolNoRetry(t *testing.T) {
+	var n atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n.Add(1)
+		w.WriteHeader(529)
+	}))
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+	_, err := DoRequest(context.Background(), http.DefaultTransport, req, Policy{
+		MaxAttempts:         20,
+		Retry529429:         true,
+		QuerySource:         QuerySourceWebSearchTool,
+		StrictForeground529: true,
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if n.Load() != 1 {
+		t.Fatalf("round trips=%d want 1 (web_search_tool not in FOREGROUND_529_RETRY_SOURCES)", n.Load())
+	}
+}
+
 func TestDoRequest_StrictForeground529_sdkStillRetries529(t *testing.T) {
 	var n atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

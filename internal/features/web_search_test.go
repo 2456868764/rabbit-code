@@ -49,3 +49,25 @@ func TestWebSearchToolEnabled(t *testing.T) {
 		t.Fatal("disable wins over anthropic")
 	}
 }
+
+func TestWebSearchHeadlessOnly(t *testing.T) {
+	t.Setenv(EnvWebSearchHeadless, "")
+	if WebSearchHeadlessOnly() {
+		t.Fatal("empty env should be false")
+	}
+	t.Setenv(EnvWebSearchHeadless, "1")
+	if !WebSearchHeadlessOnly() {
+		t.Fatal("truthy env should be true")
+	}
+}
+
+func TestWebSearchPlumVx3(t *testing.T) {
+	t.Setenv(EnvWebSearchPlumVx3, "")
+	if WebSearchPlumVx3() {
+		t.Fatal("empty env should be false")
+	}
+	t.Setenv(EnvWebSearchPlumVx3, "true")
+	if !WebSearchPlumVx3() {
+		t.Fatal("truthy env should be true")
+	}
+}
