@@ -2059,6 +2059,44 @@ func TestEngine_ProcessUserInputHook_replace(t *testing.T) {
 	}
 }
 
+func TestEngine_ProcessUserInputHook_replace_truncatesWhenConfigured(t *testing.T) {
+	long := strings.Repeat("a", 12000)
+	var captured string
+	e := New(context.Background(), &Config{
+		TruncateProcessUserInputHookOutput: true,
+		ProcessUserInputHook: func(_ context.Context, s string) (string, bool, error) {
+			return long, true, nil
+		},
+		Deps: query.Deps{
+			Assistant: query.StreamAssistantFunc(func(_ context.Context, _ string, _ int, messagesJSON []byte) (string, error) {
+				captured = string(messagesJSON)
+				return "x", nil
+			}),
+		},
+	})
+	e.Submit("x")
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == EventKindDone {
+				e.Wait()
+				if !strings.Contains(captured, "output truncated") {
+					t.Fatalf("expected truncated hook output in messages: len=%d", len(captured))
+				}
+				if strings.Count(captured, "a") >= 12000 {
+					t.Fatal("expected fewer than full hook payload a-runs in messages")
+				}
+				return
+			}
+			if ev.Kind == EventKindError {
+				t.Fatal(ev.Err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+}
+
 func TestEngine_ExtraTemplateNames_mergedAppendixAndEvent(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "a.md"), []byte("AAA"), 0o600); err != nil {

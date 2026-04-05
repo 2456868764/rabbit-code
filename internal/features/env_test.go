@@ -630,3 +630,25 @@ func TestUseAPIContextManagement(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+func TestRedactThinkingEnabled(t *testing.T) {
+	t.Setenv(EnvRedactThinking, "")
+	if RedactThinkingEnabled() {
+		t.Fatal()
+	}
+	t.Setenv(EnvRedactThinking, "1")
+	if !RedactThinkingEnabled() {
+		t.Fatal()
+	}
+}
+
+func TestThinkingClearAllLatched(t *testing.T) {
+	t.Setenv(EnvThinkingClearAll, "0")
+	if ThinkingClearAllLatched() {
+		t.Fatal()
+	}
+	t.Setenv(EnvThinkingClearAll, "yes")
+	if !ThinkingClearAllLatched() {
+		t.Fatal()
+	}
+}

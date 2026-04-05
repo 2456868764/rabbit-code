@@ -25,8 +25,8 @@
 | 序 | 状态 | 项 | 验收 |
 |----|------|-----|------|
 | 1 | ☑ | **`thinking.ts`** → **`internal/utils/thinking`**；**ultrathink** 关键词与 **`RABBIT_CODE_ULTRATHINK`** 在 **`EventKindUserSubmit.PhaseDetail`** 与 **`ApplyUserTextHints`** 中**或**关系 | **`go test ./internal/utils/thinking/... ./internal/query/engine/... -short`** |
-| 2 | ☐ | **`processUserInput`**：`TruncateHookOutput`（**`processuserinput`**）；全量 slash/附件/**`processTextPrompt`** 仍 TUI | **`PARITY_T1_THINKING_PROCESSUSERINPUT.md`** |
-| 3 | ☐ | **系统块 / interleaved thinking** 与 **`AnthropicAssistant.APIContextManagementOpts`**、展示层一致 | **H4** / T3 穿插 |
+| 2 | ☑ | **`processUserInput`** headless：**`user_prompt_keywords`**、**`PlainPromptSignals`**；**`Config.TruncateProcessUserInputHookOutput`**；全量 slash/附件/**`processTextPrompt`** 仍 TUI | **`PARITY_T1_THINKING_PROCESSUSERINPUT.md`** |
+| 3 | ☑ | **`InterleavedAPIContextManagementOpts`** + **`ApplyEngineCompactIntegration`** 默认 **`APIContextManagementOpts`**；展示层仍 **H4** / T3 | **`PARITY_T1_THINKING_PROCESSUSERINPUT.md`** |
 
 ---
 
@@ -201,7 +201,9 @@
 #### T1 进度（**§3.0 T1 子计划**）
 
 - **序 1 ☑**：**`internal/utils/thinking`** 对照 **`utils/thinking.ts`**（关键词、模型门控、默认 thinking、彩虹 token 名）；**`engine`** 在 **`Submit`** 与 **`ApplyUserTextHints`** 中对 **ultrathink** 使用 **`features.UltrathinkEnabled() || thinking.HasUltrathinkKeyword(...)`**。
-- **Hook 截断**：**`internal/utils/processuserinput`** **`TruncateHookOutput`**（**`processUserInput.ts`** **`MAX_HOOK_OUTPUT_LENGTH`**），供宿主 **`ProcessUserInputHook`** 输出收敛；全量 **`processUserInput`** 管线仍 **T1 序 2**。
+- **序 2 ☑**：**`user_prompt_keywords`** / **`PlainPromptSignals`**；**`engine.Config.TruncateProcessUserInputHookOutput`** 在钩 **`replace`** 后应用 **`TruncateHookOutput`**。
+- **序 3 ☑**：**`thinking.InterleavedAPIContextManagementOpts`**；**`features.RedactThinkingEnabled`** / **`ThinkingClearAllLatched`**；**`ApplyEngineCompactIntegration`** 默认 **`AnthropicAssistant.APIContextManagementOpts`**（**`aa.Client != nil`** 且未预设时）。
+- **Hook 截断**：**`internal/utils/processuserinput`** **`TruncateHookOutput`**（**`processUserInput.ts`** **`MAX_HOOK_OUTPUT_LENGTH`**）；宿主可另选自调用或开启 **`TruncateProcessUserInputHookOutput`**。
 - **PARITY**：**`docs/phases/PARITY_T1_THINKING_PROCESSUSERINPUT.md`**。
 
 ---

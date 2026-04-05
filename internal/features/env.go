@@ -234,6 +234,23 @@ func UseAPIContextManagement() bool {
 	return truthy(os.Getenv(EnvUseAPIContextManagement))
 }
 
+const (
+	// EnvRedactThinking enables compact.APIContextManagementOptions.IsRedactThinkingActive (betas REDACT_THINKING_BETA_HEADER analogue).
+	EnvRedactThinking = "RABBIT_CODE_REDACT_THINKING"
+	// EnvThinkingClearAll sets ClearAllThinking (apiMicrocompact.ts clearAllThinking / thinkingClearLatched analogue).
+	EnvThinkingClearAll = "RABBIT_CODE_THINKING_CLEAR_ALL"
+)
+
+// RedactThinkingEnabled is true when RABBIT_CODE_REDACT_THINKING is truthy.
+func RedactThinkingEnabled() bool {
+	return truthy(os.Getenv(EnvRedactThinking))
+}
+
+// ThinkingClearAllLatched is true when RABBIT_CODE_THINKING_CLEAR_ALL is truthy.
+func ThinkingClearAllLatched() bool {
+	return truthy(os.Getenv(EnvThinkingClearAll))
+}
+
 const defaultAPIMaxInputTokens = 180_000
 const defaultAPITargetInputTokens = 40_000
 

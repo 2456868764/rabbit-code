@@ -21,3 +21,8 @@ func TruncateHookOutput(content string) string {
 func PlainString(input string) string {
 	return strings.TrimSpace(input)
 }
+
+// PlainPromptSignals mirrors processTextPrompt classification of userPromptText (tengu_input_prompt analogue).
+func PlainPromptSignals(userPromptText string) (isNegative, isKeepGoing bool) {
+	return MatchesNegativeKeyword(userPromptText), MatchesKeepGoingKeyword(userPromptText)
+}

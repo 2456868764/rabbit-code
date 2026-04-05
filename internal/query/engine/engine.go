@@ -14,6 +14,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/memdir"
 	"github.com/2456868764/rabbit-code/internal/query"
+	"github.com/2456868764/rabbit-code/internal/utils/processuserinput"
 	"github.com/2456868764/rabbit-code/internal/utils/thinking"
 	anthropic "github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
@@ -159,6 +160,8 @@ type Config struct {
 	CommandLifecycleNotify func(uuid string, phase string)
 	// ProcessUserInputHook optional; runs before memdir / template pipeline. When replace is true, newText is the submit body (QueryEngine.ts processUserInput analogue).
 	ProcessUserInputHook ProcessUserInputHook
+	// TruncateProcessUserInputHookOutput when true, applies processuserinput.TruncateHookOutput to replaced text from ProcessUserInputHook (UserPromptSubmit hook output cap).
+	TruncateProcessUserInputHookOutput bool
 	// ExtraTemplateNames returns extra template basenames (no .md) merged with features.TemplateNames() for TEMPLATES appendix and EventKindTemplatesActive (classifier hook surface).
 	ExtraTemplateNames ExtraTemplateNames
 	// AfterToolResultsHook runs after each tool round appends user tool_result blocks, before next-turn state reset (query.ts post-tools collect hooks).
@@ -251,9 +254,10 @@ type Engine struct {
 	postCompactDeltaAttach  []json.RawMessage
 	postCompactWorkspaceDir string
 
-	commandLifecycleNotify func(uuid string, phase string)
-	processUserInputHook   ProcessUserInputHook
-	extraTemplateNames     ExtraTemplateNames
+	commandLifecycleNotify           func(uuid string, phase string)
+	processUserInputHook             ProcessUserInputHook
+	truncateProcessUserInputHook     bool
+	extraTemplateNames               ExtraTemplateNames
 	afterToolResultsHook   AfterToolResultsHook
 }
 
@@ -389,6 +393,7 @@ func New(parent context.Context, cfg *Config) *Engine {
 		e.extractMemoriesSavedFn = cfg.ExtractMemoriesSaved
 		e.commandLifecycleNotify = cfg.CommandLifecycleNotify
 		e.processUserInputHook = cfg.ProcessUserInputHook
+		e.truncateProcessUserInputHook = cfg.TruncateProcessUserInputHookOutput
 		e.extraTemplateNames = cfg.ExtraTemplateNames
 		e.afterToolResultsHook = cfg.AfterToolResultsHook
 	}
@@ -813,6 +818,9 @@ func (e *Engine) runTurnLoop(userText string, consumedCommandUUIDs []string) {
 		}
 		if use {
 			submitBody = repl
+			if e.truncateProcessUserInputHook {
+				submitBody = processuserinput.TruncateHookOutput(submitBody)
+			}
 		}
 	}
 
