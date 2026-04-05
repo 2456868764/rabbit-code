@@ -9,7 +9,7 @@ import (
 // EnvClaudeCodeExtraMetadata mirrors process.env.CLAUDE_CODE_EXTRA_METADATA (claude.ts getAPIMetadata).
 const EnvClaudeCodeExtraMetadata = "CLAUDE_CODE_EXTRA_METADATA"
 
-// EnvRabbitDeviceID optional stable device id (upstream getOrCreateUserID file-backed; rabbit uses env).
+// EnvRabbitDeviceID when set overrides file-backed device id (LoadOrCreateDeviceID / getOrCreateUserID parity).
 const EnvRabbitDeviceID = "RABBIT_CODE_DEVICE_ID"
 
 // EnvRabbitOAuthAccountUUID optional OAuth account UUID (upstream getOauthAccountInfo()?.accountUuid).
@@ -27,7 +27,7 @@ func BuildMessagesAPIMetadata(c *Client) (json.RawMessage, error) {
 			}
 		}
 	}
-	inner["device_id"] = strings.TrimSpace(os.Getenv(EnvRabbitDeviceID))
+	inner["device_id"] = LoadOrCreateDeviceID()
 	inner["account_uuid"] = strings.TrimSpace(os.Getenv(EnvRabbitOAuthAccountUUID))
 	sid := ""
 	if c != nil {

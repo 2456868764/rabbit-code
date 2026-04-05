@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 
@@ -95,7 +96,11 @@ type vertexStreamJSONBody struct {
 	ContextManagement json.RawMessage `json:"context_management,omitempty"`
 	AnthropicVersion  string          `json:"anthropic_version"`
 	AntiDistillation  []string        `json:"anti_distillation,omitempty"`
+	Speed             string          `json:"speed,omitempty"`
 }
+
+// EnvRabbitMessagesAPISpeed sets MessagesStreamBody.Speed when non-empty (claude.ts fast-mode body.speed).
+const EnvRabbitMessagesAPISpeed = "RABBIT_CODE_MESSAGES_API_SPEED"
 
 func (c *Client) mergeStreamingBody(body MessagesStreamBody) MessagesStreamBody {
 	if c.Provider == ProviderBedrock && len(c.bedrockBodyBetas) > 0 && len(body.AnthropicBeta) == 0 {
@@ -109,12 +114,18 @@ func (c *Client) mergeStreamingBody(body MessagesStreamBody) MessagesStreamBody 
 			body.Metadata = meta
 		}
 	}
+	if body.Speed == "" {
+		if s := strings.TrimSpace(os.Getenv(EnvRabbitMessagesAPISpeed)); s != "" {
+			body.Speed = s
+		}
+	}
 	return body
 }
 
 func (c *Client) marshalMessagesStreamJSON(body MessagesStreamBody) ([]byte, error) {
 	body = c.mergeStreamingBody(body)
 	body.Stream = true
+	extra := extraBodyParamsFromEnv()
 	if c.Provider == ProviderVertex && envVertexProjectID() != "" {
 		vb := vertexStreamJSONBody{
 			MaxTokens:         body.MaxTokens,
@@ -131,10 +142,31 @@ func (c *Client) marshalMessagesStreamJSON(body MessagesStreamBody) ([]byte, err
 			ContextManagement: append(json.RawMessage(nil), body.ContextManagement...),
 			AnthropicVersion:  VertexDefaultAnthropicVersion,
 			AntiDistillation:  append([]string(nil), body.AntiDistillation...),
+			Speed:             body.Speed,
 		}
-		return json.Marshal(vb)
+		raw, err := json.Marshal(vb)
+		if err != nil {
+			return nil, err
+		}
+		return applyExtraBodyMerge(raw, extra)
 	}
-	return json.Marshal(body)
+	raw, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	return applyExtraBodyMerge(raw, extra)
+}
+
+func applyExtraBodyMerge(raw []byte, extra map[string]any) ([]byte, error) {
+	if len(extra) == 0 {
+		return raw, nil
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil, err
+	}
+	mergeExtraBodyIntoMap(m, extra)
+	return json.Marshal(m)
 }
 
 func (c *Client) effectiveTransport() http.RoundTripper {
@@ -208,6 +240,8 @@ type MessagesStreamBody struct {
 	Temperature *float64 `json:"temperature,omitempty"`
 	// Metadata is optional; when empty, marshal merges BuildMessagesAPIMetadata(c) (claude.ts getAPIMetadata).
 	Metadata json.RawMessage `json:"metadata,omitempty"`
+	// Speed optional fast-mode body field (claude.ts speed; e.g. RABBIT_CODE_MESSAGES_API_SPEED=fast).
+	Speed string `json:"speed,omitempty"`
 }
 
 // PostMessagesStream starts a streaming request. Caller must close resp.Body.
