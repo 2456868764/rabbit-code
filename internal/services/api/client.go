@@ -86,6 +86,9 @@ type vertexStreamJSONBody struct {
 	Messages          json.RawMessage `json:"messages"`
 	System            json.RawMessage `json:"system,omitempty"`
 	Tools             json.RawMessage `json:"tools,omitempty"`
+	ToolChoice        json.RawMessage `json:"tool_choice,omitempty"`
+	Thinking          json.RawMessage `json:"thinking,omitempty"`
+	Temperature       *float64        `json:"temperature,omitempty"`
 	OutputConfig      *OutputConfig   `json:"output_config,omitempty"`
 	AnthropicBeta     []string        `json:"anthropic_beta,omitempty"`
 	ContextManagement json.RawMessage `json:"context_management,omitempty"`
@@ -113,6 +116,9 @@ func (c *Client) marshalMessagesStreamJSON(body MessagesStreamBody) ([]byte, err
 			Messages:          body.Messages,
 			System:            body.System,
 			Tools:             append(json.RawMessage(nil), body.Tools...),
+			ToolChoice:        append(json.RawMessage(nil), body.ToolChoice...),
+			Thinking:          append(json.RawMessage(nil), body.Thinking...),
+			Temperature:       body.Temperature,
 			OutputConfig:      body.OutputConfig,
 			AnthropicBeta:     append([]string(nil), body.AnthropicBeta...),
 			ContextManagement: append(json.RawMessage(nil), body.ContextManagement...),
@@ -187,6 +193,12 @@ type MessagesStreamBody struct {
 	ContextManagement json.RawMessage `json:"context_management,omitempty"`
 	// Tools is optional tool definitions (compact.ts streamCompactSummary Read / ToolSearch path).
 	Tools json.RawMessage `json:"tools,omitempty"`
+	// ToolChoice optional (WebSearchTool.call Haiku path: {type:"tool",name:"web_search"}).
+	ToolChoice json.RawMessage `json:"tool_choice,omitempty"`
+	// Thinking optional; WebSearch inner call uses {"type":"disabled"} when forcing small model + tool_choice.
+	Thinking json.RawMessage `json:"thinking,omitempty"`
+	// Temperature when thinking disabled (claude.ts parity for inner web search request).
+	Temperature *float64 `json:"temperature,omitempty"`
 }
 
 // PostMessagesStream starts a streaming request. Caller must close resp.Body.

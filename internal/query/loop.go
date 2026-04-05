@@ -62,6 +62,8 @@ type LoopDriver struct {
 	SkipCacheWrite bool
 	// TodoStore optional in-memory todos for TodoWrite (engine sets one shared store per Engine).
 	TodoStore *todowritetool.Store
+	// WebSearchExecute optional live WebSearch (Messages API web_search_20250305); nil uses WebSearch.Run headless stub unless RunContext.ExecuteSearch is set elsewhere.
+	WebSearchExecute func(ctx context.Context, in websearchtool.Input) ([]any, error)
 }
 
 func (d *LoopDriver) streamer() StreamAssistant {
@@ -112,8 +114,10 @@ func (d *LoopDriver) RunToolStep(ctx context.Context, st *LoopState, name string
 			NonInteractive: d.NonInteractive,
 			Store:          d.TodoStore,
 		})
-		ctx = websearchtool.WithRunContext(ctx, &websearchtool.RunContext{})
-	}
+		ctx = websearchtool.WithRunContext(ctx, &websearchtool.RunContext{
+			ExecuteSearch: d.WebSearchExecute,
+		})
+		}
 	if st != nil {
 		*st = ApplyTransition(*st, TranScheduleTools)
 	}

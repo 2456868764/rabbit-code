@@ -11,6 +11,22 @@ const EnvDisableWebSearch = "RABBIT_CODE_DISABLE_WEB_SEARCH"
 // EnvForceWebSearch when truthy registers WebSearch even on providers where upstream disables it (e.g. Bedrock).
 const EnvForceWebSearch = "RABBIT_CODE_FORCE_WEB_SEARCH"
 
+// EnvWebSearchHeadless when truthy skips wiring live Messages API web search in the engine (WebSearch.Run stays stub unless ExecuteSearch injected).
+const EnvWebSearchHeadless = "RABBIT_CODE_WEB_SEARCH_HEADLESS"
+
+// EnvWebSearchPlumVx3 mirrors GrowthBook tengu_plum_vx3: use small fast model + tool_choice web_search for inner search request.
+const EnvWebSearchPlumVx3 = "RABBIT_CODE_WEB_SEARCH_PLUM_VX3"
+
+// WebSearchHeadlessOnly returns true when live API wiring should be skipped (headless stub path).
+func WebSearchHeadlessOnly() bool {
+	return truthy(os.Getenv(EnvWebSearchHeadless))
+}
+
+// WebSearchPlumVx3 returns true when inner web search should use the Haiku/small-fast + forced tool_choice path.
+func WebSearchPlumVx3() bool {
+	return truthy(os.Getenv(EnvWebSearchPlumVx3))
+}
+
 // WebSearchToolEnabled mirrors WebSearchTool.isEnabled() in WebSearchTool.ts (firstParty / Vertex 4.x / Foundry).
 // mainLoopModel should be the configured main loop model id (e.g. cfg.Model); when empty, callers often pass
 // ResolveMainLoopModel("") from the query package.

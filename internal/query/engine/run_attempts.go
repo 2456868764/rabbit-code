@@ -8,8 +8,9 @@ import (
 
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query"
-	"github.com/2456868764/rabbit-code/internal/services/api"
+	anthropic "github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
+	"github.com/2456868764/rabbit-code/internal/tools/websearchtool"
 )
 
 const maxSubmitContinuationRounds = 32
@@ -39,6 +40,23 @@ func (e *Engine) loopDriver() query.LoopDriver {
 		TaskBudgetTotal:        e.taskBudgetTotal,
 		SkipCacheWrite:         e.skipCacheWrite,
 		TodoStore:              e.todoStore,
+	}
+	if !features.WebSearchHeadlessOnly() {
+		turn := e.deps.Turn
+		if turn == nil {
+			if aa, ok := e.deps.Assistant.(*anthropic.AnthropicAssistant); ok {
+				turn = aa
+			}
+		}
+		if aa, ok := turn.(*anthropic.AnthropicAssistant); ok && aa.Client != nil {
+			d.WebSearchExecute = func(ctx context.Context, in websearchtool.Input) ([]any, error) {
+				return anthropic.ExecuteWebSearchToolCall(ctx, aa.Client, in, anthropic.WebSearchCallParams{
+					Policy:        aa.Policy,
+					MainLoopModel: e.model,
+					MaxTokens:     e.maxTokens,
+				})
+			}
+		}
 	}
 	if features.PromptCacheBreakAutoCompactEnabled() && e.compactExecutor != nil {
 		d.PromptCacheBreakRecovery = e.promptCacheBreakCompactRecovery
