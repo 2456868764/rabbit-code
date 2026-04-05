@@ -12,7 +12,8 @@ func MapTodoWriteToolResultForMessagesAPI(outJSON []byte) string {
 	_ = json.Unmarshal(outJSON, &m)
 	base := todoWriteResultBase
 	if m.VerificationNudge {
-		base += "\n\nNOTE: You just closed out 3+ tasks and none of them was a verification step. Before writing your final summary, spawn the verification agent (subagent_type=\"" + VerificationAgentType + "\"). You cannot self-assign PARTIAL by listing caveats in your summary — only the verifier issues a verdict."
+		// \u2014 matches TodoWriteTool.ts mapToolResultToToolResultBlockParam (em dash).
+		base += "\n\nNOTE: You just closed out 3+ tasks and none of them was a verification step. Before writing your final summary, spawn the verification agent (subagent_type=\"" + VerificationAgentType + "\"). You cannot self-assign PARTIAL by listing caveats in your summary \u2014 only the verifier issues a verdict."
 	}
 	return base
 }

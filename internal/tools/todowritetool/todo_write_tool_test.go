@@ -24,9 +24,42 @@ func TestTodoWrite_validation(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty content")
 	}
+	// z.string().min(1): whitespace-only is length ≥ 1 (matches Zod, unlike trim-based checks).
+	_, err = New().Run(context.Background(), []byte(`{"todos":[{"content":"   ","status":"pending","activeForm":"   "}]}`))
+	if err != nil {
+		t.Fatalf("whitespace-only content/activeForm should pass Zod min(1): %v", err)
+	}
 	_, err = New().Run(context.Background(), []byte(`{"todos":[{"content":"x","status":"nope","activeForm":"X"}]}`))
 	if err == nil {
 		t.Fatal("expected error for bad status")
+	}
+}
+
+func TestTodoWrite_strictInputRejectsUnknownKeys(t *testing.T) {
+	_, err := New().Run(context.Background(), []byte(`{"todos":[],"extra":1}`))
+	if err == nil {
+		t.Fatal("expected strictObject-style reject for unknown key")
+	}
+}
+
+func TestTodoWrite_rejectsNullTodos(t *testing.T) {
+	_, err := New().Run(context.Background(), []byte(`{"todos":null}`))
+	if err == nil {
+		t.Fatal("expected error for null todos")
+	}
+}
+
+func TestTodoWrite_outputAlwaysIncludesVerificationNudgeField(t *testing.T) {
+	out, err := New().Run(context.Background(), []byte(`{"todos":[{"content":"x","status":"pending","activeForm":"X"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(out, &m); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := m["verificationNudgeNeeded"]; !ok {
+		t.Fatalf("missing verificationNudgeNeeded: %v", m)
 	}
 }
 
@@ -117,7 +150,8 @@ func TestTodoWrite_disabledEnableTasksEnv(t *testing.T) {
 }
 
 func TestTodoWrite_verificationNudgeFromRun(t *testing.T) {
-	t.Setenv("RABBIT_CODE_TODO_VERIFICATION_NUDGE", "1")
+	t.Setenv("RABBIT_CODE_VERIFICATION_AGENT", "1")
+	t.Setenv("RABBIT_CODE_TENGU_HIVE_EVIDENCE", "1")
 	store := NewStore()
 	ctx := WithRunContext(context.Background(), &RunContext{
 		SessionID: "main",
@@ -143,8 +177,36 @@ func TestTodoWrite_verificationNudgeFromRun(t *testing.T) {
 	}
 }
 
+func TestTodoWrite_verifRegexOnContent(t *testing.T) {
+	t.Setenv("RABBIT_CODE_VERIFICATION_AGENT", "1")
+	t.Setenv("RABBIT_CODE_TENGU_HIVE_EVIDENCE", "1")
+	store := NewStore()
+	ctx := WithRunContext(context.Background(), &RunContext{
+		SessionID: "main",
+		Store:     store,
+	})
+	tool := New()
+	done := []TodoItem{
+		item("Verify tests", "completed", "V"),
+		item("two", "completed", "T"),
+		item("three", "completed", "Th"),
+	}
+	raw, _ := json.Marshal(map[string]any{"todos": done})
+	out, err := tool.Run(ctx, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(out, &m); err != nil {
+		t.Fatal(err)
+	}
+	if m["verificationNudgeNeeded"] == true {
+		t.Fatal("verif in content should suppress nudge")
+	}
+}
+
 func TestMapTodoWriteToolResultForMessagesAPI(t *testing.T) {
-	s := MapTodoWriteToolResultForMessagesAPI([]byte(`{"oldTodos":[],"newTodos":[]}`))
+	s := MapTodoWriteToolResultForMessagesAPI([]byte(`{"oldTodos":[],"newTodos":[],"verificationNudgeNeeded":false}`))
 	if s == "" || !strings.Contains(s, "Todos have been modified") {
 		t.Fatalf("%q", s)
 	}
@@ -156,5 +218,8 @@ func TestMapTodoWriteToolResultForMessagesAPI(t *testing.T) {
 	s2 := MapTodoWriteToolResultForMessagesAPI(raw)
 	if !strings.Contains(s2, "verification agent") {
 		t.Fatalf("%q", s2)
+	}
+	if !strings.Contains(s2, "\u2014") {
+		t.Fatalf("expected em dash U+2014 in nudge, got %q", s2)
 	}
 }

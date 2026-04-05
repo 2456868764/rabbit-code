@@ -301,8 +301,10 @@ const (
 	EnvSessionRestore    = "RABBIT_CODE_SESSION_RESTORE"
 	// EnvClaudeCodeEnableTasks mirrors CLAUDE_CODE_ENABLE_TASKS (tasks.ts): when set, Task v2 is on and TodoWrite is disabled.
 	EnvClaudeCodeEnableTasks = "CLAUDE_CODE_ENABLE_TASKS"
-	// EnvTodoWriteVerificationNudge mirrors VERIFICATION_AGENT + GrowthBook tengu_hive_evidence for TodoWrite closing nudge (headless gate).
-	EnvTodoWriteVerificationNudge = "RABBIT_CODE_TODO_VERIFICATION_NUDGE"
+	// EnvVerificationAgent mirrors bundle feature('VERIFICATION_AGENT') (builtInAgents.ts / TodoWriteTool nudge gate).
+	EnvVerificationAgent = "RABBIT_CODE_VERIFICATION_AGENT"
+	// EnvTenguHiveEvidence mirrors getFeatureValue_CACHED_MAY_BE_STALE('tengu_hive_evidence', false) (TodoWriteTool.ts).
+	EnvTenguHiveEvidence = "RABBIT_CODE_TENGU_HIVE_EVIDENCE"
 	EnvUltrathink        = "RABBIT_CODE_ULTRATHINK"
 	EnvUltraplan         = "RABBIT_CODE_ULTRAPLAN"
 	EnvBreakCacheCommand = "RABBIT_CODE_BREAK_CACHE_COMMAND"
@@ -839,9 +841,19 @@ func TodoWriteToolEnabled(nonInteractive bool) bool {
 	return true
 }
 
-// TodoWriteVerificationNudgeEnabled is the headless analogue of feature('VERIFICATION_AGENT') && tengu_hive_evidence.
+// VerificationAgentEnabled mirrors feature('VERIFICATION_AGENT') (default off when env unset).
+func VerificationAgentEnabled() bool {
+	return truthy(os.Getenv(EnvVerificationAgent))
+}
+
+// TenguHiveEvidenceEnabled mirrors getFeatureValue_CACHED_MAY_BE_STALE('tengu_hive_evidence', false).
+func TenguHiveEvidenceEnabled() bool {
+	return truthy(os.Getenv(EnvTenguHiveEvidence))
+}
+
+// TodoWriteVerificationNudgeEnabled is true when both upstream gates are on (TodoWriteTool.ts call() nudge).
 func TodoWriteVerificationNudgeEnabled() bool {
-	return truthy(os.Getenv(EnvTodoWriteVerificationNudge))
+	return VerificationAgentEnabled() && TenguHiveEvidenceEnabled()
 }
 
 func UltrathinkEnabled() bool        { return truthy(os.Getenv(EnvUltrathink)) }

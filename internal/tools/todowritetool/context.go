@@ -56,7 +56,8 @@ func (s *Store) Set(key string, todos []TodoItem) {
 	s.m[key] = slices.Clone(todos)
 }
 
-// TodoKey returns context.agentId ?? sessionId (trimmed), matching TodoWriteTool.call.
+// TodoKey returns context.agentId ?? getSessionId() (TodoWriteTool.ts). AgentID and SessionID
+// should mirror toolUseContext.agentId and bootstrap getSessionId() when wired; empty key shares one bucket.
 func TodoKey(rc *RunContext) string {
 	if rc == nil {
 		return ""
