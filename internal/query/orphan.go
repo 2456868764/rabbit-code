@@ -6,6 +6,8 @@ import (
 )
 
 // ErrOrphanPermission marks a tool failure caused by a permission / orphan tool_use (P5.3.3 bridge for Phase 6).
+// TS: denied tool_use / useCanUseTool-style failures surfaced through the tool pipeline; headless emits
+// engine.EventKindOrphanPermission when RunTool returns *OrphanPermissionError or when engine.Config.OrphanPermissionAdvisor reports an orphan after a successful loop (see PARITY_H9_BASH_PERMISSIONS.md §5).
 var ErrOrphanPermission = errors.New("query: orphan permission")
 
 // OrphanPermissionError wraps ErrOrphanPermission with the tool_use id.

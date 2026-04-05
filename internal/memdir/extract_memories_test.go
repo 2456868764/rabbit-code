@@ -47,6 +47,31 @@ func TestIsExtractReadOnlyBash(t *testing.T) {
 	if IsExtractReadOnlyBash([]byte(`{"cmd":"git push"}`)) {
 		t.Fatal("deny git push")
 	}
+	if !IsExtractReadOnlyBash([]byte(`{"cmd":"git blame README.md"}`)) {
+		t.Fatal("allow git blame")
+	}
+	if !IsExtractReadOnlyBash([]byte(`{"cmd":"git stash list"}`)) {
+		t.Fatal("allow git stash list")
+	}
+	if !IsExtractReadOnlyBash([]byte(`{"cmd":"git remote -v"}`)) {
+		t.Fatal("allow git remote -v")
+	}
+	if !IsExtractReadOnlyBash([]byte(`{"cmd":"git remote show origin"}`)) {
+		t.Fatal("allow git remote show")
+	}
+	if IsExtractReadOnlyBash([]byte(`{"cmd":"git remote add origin u"}`)) {
+		t.Fatal("deny git remote add")
+	}
+	if !IsExtractReadOnlyBash([]byte(`{"cmd":"git config --get core.editor"}`)) {
+		t.Fatal("allow git config --get")
+	}
+	if IsExtractReadOnlyBash([]byte(`{"cmd":"git config --set x y"}`)) {
+		t.Fatal("deny git config set-style")
+	}
+	in, _ := json.Marshal(map[string]string{"cmd": "\x00"})
+	if IsExtractReadOnlyBash(in) {
+		t.Fatal("deny null in cmd")
+	}
 }
 
 func TestAutoMemToolRunner(t *testing.T) {

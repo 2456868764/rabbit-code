@@ -24,7 +24,7 @@ func (BashStubToolRunner) RunTool(_ context.Context, name string, inputJSON []by
 }
 
 // BashExecToolRunner runs bash tool calls via sh -c when RABBIT_CODE_BASH_EXEC is truthy; otherwise delegates to BashStubToolRunner.
-// Rejects NUL in the command string (H9 hygiene; BashTool / path validation analogue).
+// Rejects NUL in the command string (H9 hygiene). No read-only gate here; extract path uses memdir.IsExtractReadOnlyBash (PARITY_H9_BASH_PERMISSIONS.md §4).
 type BashExecToolRunner struct{}
 
 // RunTool implements ToolRunner.

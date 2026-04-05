@@ -15,7 +15,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/query"
 )
 
-// IsExtractReadOnlyBash is a conservative subset of BashTool.isReadOnly for the memory-extraction fork (extractMemories createAutoMemCanUseTool).
+// IsExtractReadOnlyBash is a conservative subset of BashTool/readOnlyCommandValidation (readOnlyValidation.ts + utils/shell/readOnlyCommandValidation.ts) for the extract fork (createAutoMemCanUseTool). Rejects NUL in the command string.
 func IsExtractReadOnlyBash(inputJSON []byte) bool {
 	var in struct {
 		Command string `json:"command"`
@@ -28,6 +28,9 @@ func IsExtractReadOnlyBash(inputJSON []byte) bool {
 	}
 	if cmd == "" {
 		return true
+	}
+	if strings.ContainsRune(cmd, 0) {
+		return false
 	}
 	return isExtractReadOnlyShellCommand(cmd)
 }
@@ -137,9 +140,30 @@ func singleSegmentReadOnly(seg string) bool {
 		if len(fields) < 2 {
 			return true
 		}
-		switch strings.ToLower(fields[1]) {
+		sub := strings.ToLower(fields[1])
+		// Subset of readOnlyCommandValidation.ts git entries (extract fork; conservative).
+		if sub == "stash" && len(fields) >= 3 && strings.ToLower(fields[2]) == "list" {
+			return true
+		}
+		if sub == "remote" {
+			if len(fields) == 2 {
+				return true
+			}
+			if len(fields) == 3 && (fields[2] == "-v" || fields[2] == "-vv") {
+				return true
+			}
+			if len(fields) >= 3 && strings.ToLower(fields[2]) == "show" {
+				return true
+			}
+			return false
+		}
+		if sub == "config" && len(fields) >= 3 && fields[2] == "--get" {
+			return true
+		}
+		switch sub {
 		case "log", "show", "diff", "status", "branch", "rev-parse", "ls-files", "ls-tree",
-			"grep", "describe", "tag":
+			"grep", "describe", "tag", "blame", "merge-base", "shortlog", "reflog", "rev-list",
+			"cat-file", "for-each-ref", "whatchanged", "name-rev":
 			return true
 		default:
 			return false
