@@ -32,7 +32,7 @@ See **PHASE05_SPEC_AND_ACCEPTANCE.md** §2 **P5.F.*** and **`internal/features/r
 | Session coordinator / restore tools | 6 / 8 / 9 | Iter 12: **SESSION_RESTORE** text hint only |
 | `thinking.ts` / `processUserInput` TUI | 5 / 9 | Iter 12: **UserSubmit** **`PhaseDetail`** mode tags |
 | Full REPL `context.ts` | 10 | Iter 12: **`rabbit-code context break-cache`** JSON |
-| Job classifier, `stopHooks` from disk | 2 / 5 / 10 | Headless：**`engine.Config.ExtraTemplateNames`** 扩展 **F.7** 模板名；磁盘 **`stopHooks`** 仍 defer |
+| Job classifier, `stopHooks` from disk | 2 / 5 / 10 | Headless：**`engine.Config.ExtraTemplateNames`** 扩展 **F.7** 模板名；**`rabbit-code stop-hooks list`** + **`RABBIT_CODE_STOP_HOOKS_DIR`** 为 **manifest 子集**；**`executeStopHooks`** / 分类器全链仍 defer |
 | F.8 upstream-named cache-editing beta + full `microCompact.ts` / cache field parity | 4 / 6 | Placeholder beta only in headless path |
 | F.9 Auto-trim transcript + resend after break | 5 / 6 | Iter 12: compact **suggest** only |
 | **P5.2.2** snip metadata / persistence (UUID map, session round-trip) | 5 / 8 | Headless：**H7.6–H7.11**（重放、侧车 UUID、**`AnnotateTranscriptWithUUIDs`** / 多字段 strip）；**JSONL Map + parentUuid 重链** 仍 Phase 8 |

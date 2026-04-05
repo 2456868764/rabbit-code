@@ -9,6 +9,7 @@ import (
 
 	"github.com/2456868764/rabbit-code/internal/app"
 	"github.com/2456868764/rabbit-code/internal/commands/contextcmd"
+	"github.com/2456868764/rabbit-code/internal/commands/stophooks"
 	"github.com/2456868764/rabbit-code/internal/services/api/services"
 	"github.com/2456868764/rabbit-code/internal/version"
 )
@@ -37,6 +38,12 @@ func main() {
 			return
 		case "context":
 			code := contextcmd.Run(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)
+			if code != 0 {
+				os.Exit(code)
+			}
+			return
+		case "stop-hooks":
+			code := stophooks.Run(os.Args[2:], os.Stdout, os.Stderr)
 			if code != 0 {
 				os.Exit(code)
 			}
@@ -78,7 +85,7 @@ func main() {
 		app.RunAPIPreconnect(ctx, rt)
 	}
 
-	fmt.Fprintf(os.Stderr, "rabbit-code — Phase 1 bootstrap OK. Commands: version | config dump | probe | context (break-cache|report|report-md|budget|help) | set | wizard | sync | %s=1\n", app.ExitAfterInitEnv)
+	fmt.Fprintf(os.Stderr, "rabbit-code — Phase 1 bootstrap OK. Commands: version | config dump | probe | context (break-cache|report|report-md|budget|help) | stop-hooks list | set | wizard | sync | %s=1\n", app.ExitAfterInitEnv)
 	app.QuitRuntime(rt, 0)
 }
 

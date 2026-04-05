@@ -296,12 +296,14 @@ const (
 	// EnvContextCollapseInactive when truthy: CONTEXT_COLLAPSE env is on but runtime collapse is off — proactive autocompact may run (autoCompact.ts isContextCollapseEnabled false).
 	EnvContextCollapseInactive = "RABBIT_CODE_CONTEXT_COLLAPSE_INACTIVE"
 	// EnvCommitAttribution mirrors internal COMMIT_ATTRIBUTION (postCompactCleanup.ts sweepFileContentCache gate).
-	EnvCommitAttribution  = "RABBIT_CODE_COMMIT_ATTRIBUTION"
-	EnvSessionRestore     = "RABBIT_CODE_SESSION_RESTORE"
-	EnvUltrathink         = "RABBIT_CODE_ULTRATHINK"
-	EnvUltraplan          = "RABBIT_CODE_ULTRAPLAN"
-	EnvBreakCacheCommand  = "RABBIT_CODE_BREAK_CACHE_COMMAND"
-	EnvTemplates          = "RABBIT_CODE_TEMPLATES"
+	EnvCommitAttribution = "RABBIT_CODE_COMMIT_ATTRIBUTION"
+	EnvSessionRestore    = "RABBIT_CODE_SESSION_RESTORE"
+	EnvUltrathink        = "RABBIT_CODE_ULTRATHINK"
+	EnvUltraplan         = "RABBIT_CODE_ULTRAPLAN"
+	EnvBreakCacheCommand = "RABBIT_CODE_BREAK_CACHE_COMMAND"
+	EnvTemplates         = "RABBIT_CODE_TEMPLATES"
+	// EnvStopHooksDir is a directory of *.md stop-hook scripts (query/stopHooks.ts job dir analogue; list-only CLI in rabbit-code).
+	EnvStopHooksDir       = "RABBIT_CODE_STOP_HOOKS_DIR"
 	EnvCachedMicrocompact = "RABBIT_CODE_CACHED_MICROCOMPACT"
 	// Compact API behaviour (compact.ts streamCompactSummary GrowthBook keys → env).
 	EnvCompactStreamingRetry = "RABBIT_CODE_COMPACT_STREAMING_RETRY" // tengu_compact_streaming_retry, default off
@@ -801,11 +803,14 @@ func BlockingLimitOverrideTokens() int {
 	}
 	return v
 }
-func SessionRestoreEnabled() bool     { return truthy(os.Getenv(EnvSessionRestore)) }
-func UltrathinkEnabled() bool         { return truthy(os.Getenv(EnvUltrathink)) }
-func UltraplanEnabled() bool          { return truthy(os.Getenv(EnvUltraplan)) }
-func BreakCacheCommandEnabled() bool  { return truthy(os.Getenv(EnvBreakCacheCommand)) }
-func TemplatesEnabled() bool          { return truthy(os.Getenv(EnvTemplates)) }
+func SessionRestoreEnabled() bool    { return truthy(os.Getenv(EnvSessionRestore)) }
+func UltrathinkEnabled() bool        { return truthy(os.Getenv(EnvUltrathink)) }
+func UltraplanEnabled() bool         { return truthy(os.Getenv(EnvUltraplan)) }
+func BreakCacheCommandEnabled() bool { return truthy(os.Getenv(EnvBreakCacheCommand)) }
+func TemplatesEnabled() bool         { return truthy(os.Getenv(EnvTemplates)) }
+
+// StopHooksDir returns RABBIT_CODE_STOP_HOOKS_DIR when set (trimmed); empty if unset.
+func StopHooksDir() string            { return strings.TrimSpace(os.Getenv(EnvStopHooksDir)) }
 func CachedMicrocompactEnabled() bool { return truthy(os.Getenv(EnvCachedMicrocompact)) }
 
 // CompactStreamingRetryEnabled mirrors getFeatureValue_CACHED_MAY_BE_STALE('tengu_compact_streaming_retry', false).

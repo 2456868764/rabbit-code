@@ -43,6 +43,18 @@
 | 1 | ☑ | **`context budget`**：**`query.BuildSubmitTokenBudgetSnapshotPayload`** ↔ **`EventKindSubmitTokenBudgetSnapshot`**（**H5.3** JSON 脚本面） | **`go test ./internal/query/... ./internal/commands/contextcmd/... -short`** |
 | 2 | ☑ | **`SubmitChromeTeaModel`**（**`EngineEvent`** → budget + memdir 条）；主 REPL **`tea.Batch`** 合成仍 Phase 9；**`attachments.ts`** 全量仍 Follow-on | **`PARITY_T3_BUDGET_METER.md`** |
 
+### §3.0 T4 子计划（**TUI 表行 D**：`sessionRestore` / 恢复协调）
+
+| 序 | 状态 | 项 | 验收 |
+|----|------|-----|------|
+| 1 | ☑ | **`query.ExtractTodosFromTranscriptJSON`**（**`sessionRestore.ts`** **`extractTodosFromTranscript`** 子集：**`TodoWrite`** → **`todos`**） | **`go test ./internal/query/... -short`**；**`PARITY_T4T5_SESSION_STOPHOOKS.md`** |
+
+### §3.0 T5 子计划（**jobs / stopHooks / REPL 相关 headless 切片**）
+
+| 序 | 状态 | 项 | 验收 |
+|----|------|-----|------|
+| 1 | ☑ | **`RABBIT_CODE_STOP_HOOKS_DIR`** + **`rabbit-code stop-hooks list`**（**`*.md`** JSON manifest）；**`executeStopHooks`** 全链仍 defer | **`go test ./internal/commands/stophooks/... -short`**；**`PARITY_T4T5_SESSION_STOPHOOKS.md`** |
+
 ---
 
 | # | 项 | 说明 | 目标 Phase / 状态 |
@@ -232,6 +244,16 @@
 - **序 2 ☑**：**`internal/app`** **`SubmitChromeState`** / **`SubmitChromeTeaModel`**（**`EngineEventMsg`**、链式 **`listenOneEngineEvent`**）；消费 **budget snapshot** 与 **`EventKindMemdirInject`**。**§3.0 T3 两行全 ☑**；主会话 **Bubble Tea** 合成仍 Phase 9。
 - **PARITY**：**`docs/phases/PARITY_T3_BUDGET_METER.md`**。
 
+#### T4 进度（**§3.0 T4 子计划**）
+
+- **序 1 ☑**：**`query.ExtractTodosFromTranscriptJSON`** / **`TodoResumeItem`**；单测 **`session_restore_test.go`**。
+- **PARITY**：**`docs/phases/PARITY_T4T5_SESSION_STOPHOOKS.md`**（T4 段）。
+
+#### T5 进度（**§3.0 T5 子计划**）
+
+- **序 1 ☑**：**`features.StopHooksDir`**（**`RABBIT_CODE_STOP_HOOKS_DIR`**）；**`internal/commands/stophooks`** **`list`**；**`cmd/rabbit-code`** **`stop-hooks`**。
+- **PARITY**：**`docs/phases/PARITY_T4T5_SESSION_STOPHOOKS.md`**（T5 段）。
+
 ---
 
-更新本表时同步 **PARITY_PHASE5_DEFERRED.md**、**PARITY_H9_BASH_PERMISSIONS.md**（H9 迭代）、**PARITY_T1_THINKING_PROCESSUSERINPUT.md**（T1 迭代）、**PARITY_T2_CONTEXT_CLI.md**（T2 迭代）、**PARITY_T3_BUDGET_METER.md**（T3 迭代）、**PHASE05_SPEC_AND_ACCEPTANCE.md** §6，并与模块根 **README.md**（**`engine.Config` highlights / Phase 5 headless**）交叉核对。
+更新本表时同步 **PARITY_PHASE5_DEFERRED.md**、**PARITY_H9_BASH_PERMISSIONS.md**（H9 迭代）、**PARITY_T1_THINKING_PROCESSUSERINPUT.md**（T1 迭代）、**PARITY_T2_CONTEXT_CLI.md**（T2 迭代）、**PARITY_T3_BUDGET_METER.md**（T3 迭代）、**PARITY_T4T5_SESSION_STOPHOOKS.md**（T4/T5 迭代）、**PHASE05_SPEC_AND_ACCEPTANCE.md** §6，并与模块根 **README.md**（**`engine.Config` highlights / Phase 5 headless**）交叉核对。

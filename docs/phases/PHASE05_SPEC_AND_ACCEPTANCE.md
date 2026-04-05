@@ -187,5 +187,6 @@
 | **2026-04-01** | commit | **迭代 32（T2 §3.0 序 3）**：**`query.FormatHeadlessContextReportMarkdown`**、**`HeadlessContextReport.ResolvedTokenUsage`**；**`context report-md`**；**`-microcompact`**（**`MicrocompactMessagesAPIJSON`**）；**PARITY** / **CONTINUATION** T2 全 ☑。 | **T3** 预算 UI；**`analyzeContext.ts`** 全分类 / **`context.tsx`** |
 | **2026-04-01** | commit | **迭代 33（T3 §3.0 序 1）**：**`query.BuildSubmitTokenBudgetSnapshotPayload`**、**`SubmitTokenBudgetSnapshotPayload`**；**`context budget`** CLI；**`PARITY_T3_BUDGET_METER.md`**；**CONTINUATION** T3 表与进度。 | **T3** 序 **2**（Ink meter / 附件 UX） |
 | **2026-04-01** | commit | **迭代 34（T3 §3.0 序 2）**：**`app.SubmitChromeState`**、**`SubmitChromeTeaModel`**、**`EngineEventMsg`**（Bubble Tea v2 **`tea.View`**）；预算 + memdir 条；单测；**PARITY** / **CONTINUATION** T3 全 ☑。 | **Phase 9** 主 REPL 合成；**`attachments.ts`** 全量 |
+| **2026-04-01** | commit | **迭代 35（T4/T5 穿插）**：**`query.ExtractTodosFromTranscriptJSON`** / **`TodoResumeItem`**（**`sessionRestore.ts`** **`extractTodosFromTranscript`**）；**`RABBIT_CODE_STOP_HOOKS_DIR`**、**`stophooks list`** CLI；**`PARITY_T4T5_SESSION_STOPHOOKS.md`**；**CONTINUATION** §3.0 **T4/T5** 子计划；**DEFERRED** 表注。 | **T4** 协调器全量；**T5** **`executeStopHooks`** / job 分类器 |
 
 （后续行：每完成可合并条目追加一行。）
