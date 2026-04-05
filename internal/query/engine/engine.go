@@ -14,6 +14,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/memdir"
 	"github.com/2456868764/rabbit-code/internal/query"
+	"github.com/2456868764/rabbit-code/internal/utils/thinking"
 	anthropic "github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
@@ -446,7 +447,7 @@ func (e *Engine) SubmitWithOptions(userText string, opts SubmitOptions) {
 		defer e.wg.Done()
 		modeTags := query.FormatHeadlessModeTags(query.UserTextHintFlags{
 			ContextCollapse: features.ContextCollapseEnabled(),
-			Ultrathink:      features.UltrathinkEnabled(),
+			Ultrathink:      features.UltrathinkEnabled() || thinking.HasUltrathinkKeyword(userText),
 			Ultraplan:       features.UltraplanEnabled(),
 			SessionRestore:  features.SessionRestoreEnabled(),
 		})
@@ -902,7 +903,7 @@ func (e *Engine) runTurnLoop(userText string, consumedCommandUUIDs []string) {
 
 	resolved = query.ApplyUserTextHints(resolved, query.UserTextHintFlags{
 		ContextCollapse: features.ContextCollapseEnabled(),
-		Ultrathink:      features.UltrathinkEnabled(),
+		Ultrathink:      features.UltrathinkEnabled() || thinking.HasUltrathinkKeyword(resolved),
 		Ultraplan:       features.UltraplanEnabled(),
 		SessionRestore:  features.SessionRestoreEnabled(),
 	})

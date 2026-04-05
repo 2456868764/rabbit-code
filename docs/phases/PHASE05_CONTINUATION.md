@@ -17,8 +17,16 @@
 | 序 | 状态 | 项 | 验收 |
 |----|------|-----|------|
 | 1 | ☑ | **`BashExecToolRunner`** null 字节拒绝 + **`PARITY_H9_BASH_PERMISSIONS.md`** + H9 进度段 | **`go test ./internal/query/... -short`** |
-| 2 | ☐ | **`readOnlyValidation` / `pathValidation`** 与 Go **`IsExtractReadOnlyBash`** / **`BashExec`** 对照与加固 | 更新 **PARITY_H9** §3.0 序 2 |
-| 3 | ☐ | **权限 / `canUseTool`** 与 **`OrphanPermissionAdvisor`**、Phase 6 **`ToolRunner`** 全链 | **PARITY** / DEFERRED |
+| 2 | ☑ | **`readOnlyCommandValidation` / `readOnlyValidation`** ↔ **`IsExtractReadOnlyBash`**（**git** 子集扩展、**NUL** 拒绝）；**`pathValidation`** / **`BashExec`** 对照见 **PARITY_H9** **§4** | **`go test ./internal/memdir/... -short`** |
+| 3 | ☑ | **`canUseTool` / 孤儿** ↔ **`OrphanPermissionError`**、**`OrphanPermissionAdvisor`**、**`EventKindOrphanPermission`**（**PARITY_H9** **§5**）；全量 **`ToolRunner`/`canUseTool`** 仍 **DEFERRED** | 文档 + **`go test ./internal/engine/... -short`** |
+
+### §3.0 T1 子计划（**TUI 表行 A**：`thinking` / `processUserInput` / 系统块）
+
+| 序 | 状态 | 项 | 验收 |
+|----|------|-----|------|
+| 1 | ☑ | **`thinking.ts`** → **`internal/utils/thinking`**；**ultrathink** 关键词与 **`RABBIT_CODE_ULTRATHINK`** 在 **`EventKindUserSubmit.PhaseDetail`** 与 **`ApplyUserTextHints`** 中**或**关系 | **`go test ./internal/utils/thinking/... ./internal/query/engine/... -short`** |
+| 2 | ☐ | **`processUserInput`**：`TruncateHookOutput`（**`processuserinput`**）；全量 slash/附件/**`processTextPrompt`** 仍 TUI | **`PARITY_T1_THINKING_PROCESSUSERINPUT.md`** |
+| 3 | ☐ | **系统块 / interleaved thinking** 与 **`AnthropicAssistant.APIContextManagementOpts`**、展示层一致 | **H4** / T3 穿插 |
 
 ---
 
@@ -62,9 +70,10 @@
 #### H9 进度（Bash / 权限；Phase 6 headless 桥）
 
 - **`RABBIT_CODE_BASH_EXEC`**：**`query.BashExecToolRunner`**（**`sh -c`**，**`command` / `cmd`** JSON）；未开启时 **`BashStubToolRunner`**（**`PARITY_PHASE5_DEFERRED` P5 Tools**）。
-- **卫生**：命令串 **null 字节**拒绝（对齐 TS 侧路径/命令注入防护思路；**`PARITY_H9_BASH_PERMISSIONS.md` §3.0 序 1**）。
-- **Extract**：**`memdir.IsExtractReadOnlyBash`** — **`readOnlyValidation.ts`** 保守子集（**H8** 续已述）。
-- **全量**：**`src/tools/BashTool/*`**（**pathValidation**、**bashPermissions**、**sandbox** 等）仍 **Phase 6**；迭代顺序见 **`PARITY_H9_BASH_PERMISSIONS.md` §3.0**。
+- **卫生**：命令串 **null 字节**拒绝（**`BashExecToolRunner`** + **`IsExtractReadOnlyBash`**；**`PARITY_H9_BASH_PERMISSIONS.md` §3.0 序 1–2**）。
+- **Extract**：**`memdir.IsExtractReadOnlyBash`** — **`readOnlyCommandValidation` / `readOnlyValidation`** 保守子集（**git** **`stash list` / `remote` / `config --get`** 等；**§4**）。
+- **孤儿权限**：**`query.OrphanPermissionError`**、**`engine.Config.OrphanPermissionAdvisor`** → **`EventKindOrphanPermission`**（**§5**）。
+- **全量**：**`src/tools/BashTool/*`**（**pathValidation**、**bashPermissions**、**sandbox**、全量 **`canUseTool`**）仍 **Phase 6** / **PARITY_QUERY**；见 **`PARITY_H9_BASH_PERMISSIONS.md` §3.0**。
 
 #### H6 进度（迭代 14 起）
 
@@ -183,12 +192,18 @@
 
 | 阶段 | 代号 | 内容 | 主要 `src/` 参考 |
 |------|------|------|------------------|
-| A | **T1** | **`thinking.ts`、系统块、`processUserInput`** 与展示/输入一致 | `utils/thinking.ts`、`utils/processUserInput` |
+| A | **T1** | **`thinking.ts`、系统块、`processUserInput`** 与展示/输入一致（**§3.0 T1 子计划**、**`PARITY_T1_THINKING_PROCESSUSERINPUT.md`**） | `utils/thinking.ts`、`utils/processUserInput` |
 | B | **T2** | **完整 REPL `context.ts` 类子命令**（在现有 **`context break-cache`** 上扩展） | `context.ts` 等 |
 | C | **T3** | **预算 meter、附件 UX**（消费引擎暴露的预算信号） | 同 F.1，偏 UI |
 
 **穿插**：**T4**（**session restore 协调与工具**，`sessionRestore.ts` / `query.ts`）与 **T5**（**job 分类、磁盘 stopHooks、模板与 REPL 集成**）在 **T1→T2→T3** 推进过程中按需插入（例如 T1 后与 session 恢复 UI 绑定时做 T4；模板/命令面扩展时做 T5），不强制严格串行，但 **不应早于** 对应 headless 能力就绪（避免 UI 空转）。
 
+#### T1 进度（**§3.0 T1 子计划**）
+
+- **序 1 ☑**：**`internal/utils/thinking`** 对照 **`utils/thinking.ts`**（关键词、模型门控、默认 thinking、彩虹 token 名）；**`engine`** 在 **`Submit`** 与 **`ApplyUserTextHints`** 中对 **ultrathink** 使用 **`features.UltrathinkEnabled() || thinking.HasUltrathinkKeyword(...)`**。
+- **Hook 截断**：**`internal/utils/processuserinput`** **`TruncateHookOutput`**（**`processUserInput.ts`** **`MAX_HOOK_OUTPUT_LENGTH`**），供宿主 **`ProcessUserInputHook`** 输出收敛；全量 **`processUserInput`** 管线仍 **T1 序 2**。
+- **PARITY**：**`docs/phases/PARITY_T1_THINKING_PROCESSUSERINPUT.md`**。
+
 ---
 
-更新本表时同步 **PARITY_PHASE5_DEFERRED.md**、**PARITY_H9_BASH_PERMISSIONS.md**（H9 迭代）、**PHASE05_SPEC_AND_ACCEPTANCE.md** §6，并与模块根 **README.md**（**`engine.Config` highlights / Phase 5 headless**）交叉核对。
+更新本表时同步 **PARITY_PHASE5_DEFERRED.md**、**PARITY_H9_BASH_PERMISSIONS.md**（H9 迭代）、**PARITY_T1_THINKING_PROCESSUSERINPUT.md**（T1 迭代）、**PHASE05_SPEC_AND_ACCEPTANCE.md** §6，并与模块根 **README.md**（**`engine.Config` highlights / Phase 5 headless**）交叉核对。
