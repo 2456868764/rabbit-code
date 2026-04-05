@@ -20,6 +20,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/tools/todowritetool"
 	"github.com/2456868764/rabbit-code/internal/tools/toolsearchtool"
 	"github.com/2456868764/rabbit-code/internal/tools/webfetchtool"
+	"github.com/2456868764/rabbit-code/internal/tools/websearchtool"
 )
 
 // ErrMaxTurnsExceeded is returned when LoopState.MaxTurns > 0 and the cap is hit before another assistant call.
@@ -111,6 +112,7 @@ func (d *LoopDriver) RunToolStep(ctx context.Context, st *LoopState, name string
 			NonInteractive: d.NonInteractive,
 			Store:          d.TodoStore,
 		})
+		ctx = websearchtool.WithRunContext(ctx, &websearchtool.RunContext{})
 	}
 	if st != nil {
 		*st = ApplyTransition(*st, TranScheduleTools)
@@ -411,6 +413,10 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 				content = toolsearchtool.MapToolSearchToolResultForMessagesAPI(out)
 			} else if u.Name == webfetchtool.WebFetchToolName {
 				if s := webfetchtool.MapWebFetchToolResultForMessagesAPI(out); s != "" {
+					content = s
+				}
+			} else if u.Name == websearchtool.WebSearchToolName {
+				if s := websearchtool.MapWebSearchToolResultForMessagesAPI(out); s != "" {
 					content = s
 				}
 			}
