@@ -149,3 +149,8 @@ func getGlobExclusionsForPluginCache(ctx context.Context, rgPath, searchPath str
 	pluginExclReady = true
 	return append([]string(nil), pluginExclCached...)
 }
+
+// GlobExclusionsForPluginCache mirrors getGlobExclusionsForPluginCache for other ripgrep tools (e.g. GrepTool.ts).
+func GlobExclusionsForPluginCache(ctx context.Context, rgPath, searchPath string) []string {
+	return getGlobExclusionsForPluginCache(ctx, rgPath, searchPath)
+}
