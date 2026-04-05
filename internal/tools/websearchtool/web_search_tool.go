@@ -3,10 +3,7 @@ package websearchtool
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"strings"
 	"time"
-	"unicode/utf8"
 )
 
 // WebSearch implements tools.Tool (WebSearchTool.ts headless execution).
@@ -46,35 +43,19 @@ type output struct {
 
 const headlessNoBackend = "Web search is not available in this headless runner. Wire websearchtool.RunContext.ExecuteSearch to perform live search (Messages API web_search_20250305)."
 
-// ValidateInput mirrors WebSearchTool.validateInput plus z.string().min(2) on query.
-func ValidateInput(in Input) error {
-	q := strings.TrimSpace(in.Query)
-	if q == "" {
-		return fmt.Errorf("Error: Missing query")
-	}
-	if utf8.RuneCountInString(q) < 2 {
-		return fmt.Errorf("websearchtool: query must be at least 2 characters")
-	}
-	if len(in.AllowedDomains) > 0 && len(in.BlockedDomains) > 0 {
-		return fmt.Errorf("Error: Cannot specify both allowed_domains and blocked_domains in the same request")
-	}
-	return nil
-}
-
 // Run validates input and returns JSON output (Output schema upstream).
 func (w *WebSearch) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	start := time.Now()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	var in Input
-	if err := json.Unmarshal(inputJSON, &in); err != nil {
-		return nil, fmt.Errorf("websearchtool: invalid json: %w", err)
+	in, err := DecodeInputStrictJSON(inputJSON)
+	if err != nil {
+		return nil, err
 	}
 	if err := ValidateInput(in); err != nil {
 		return nil, err
 	}
-	query := strings.TrimSpace(in.Query)
 	rc := RunContextFrom(ctx)
 
 	var results []any
@@ -89,7 +70,7 @@ func (w *WebSearch) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	}
 
 	out := output{
-		Query:           query,
+		Query:           in.Query,
 		Results:         results,
 		DurationSeconds: time.Since(start).Seconds(),
 	}

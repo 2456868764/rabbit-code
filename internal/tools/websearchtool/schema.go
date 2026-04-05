@@ -13,7 +13,7 @@ type WebSearchToolSchema20250305 struct {
 func WebSearchToolSchemaFromInput(in Input) WebSearchToolSchema20250305 {
 	return WebSearchToolSchema20250305{
 		Type:           "web_search_20250305",
-		Name:           "web_search",
+		Name:           ServerToolSchemaName,
 		AllowedDomains: in.AllowedDomains,
 		BlockedDomains: in.BlockedDomains,
 		MaxUses:        MaxSearchUses,

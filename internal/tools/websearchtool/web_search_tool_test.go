@@ -13,10 +13,16 @@ func TestValidateInput(t *testing.T) {
 		t.Fatalf("valid: %v", err)
 	}
 	if err := ValidateInput(Input{Query: "  ab  "}); err != nil {
-		t.Fatalf("trimmed valid: %v", err)
+		t.Fatalf("spaces around query valid: %v", err)
+	}
+	if err := ValidateInput(Input{Query: "  "}); err != nil {
+		t.Fatalf("two spaces valid (upstream validateInput + zod min 2): %v", err)
 	}
 	if err := ValidateInput(Input{Query: ""}); err == nil || !strings.Contains(err.Error(), "Missing query") {
 		t.Fatalf("empty query: %v", err)
+	}
+	if err := ValidateInput(Input{Query: " "}); err == nil {
+		t.Fatal("single char query want zod min error")
 	}
 	if err := ValidateInput(Input{Query: "a"}); err == nil {
 		t.Fatal("short query want error")
@@ -27,6 +33,17 @@ func TestValidateInput(t *testing.T) {
 		BlockedDomains: []string{"b.com"},
 	}); err == nil || !strings.Contains(err.Error(), "both allowed_domains and blocked_domains") {
 		t.Fatalf("both domains: %v", err)
+	}
+	r := ValidateInputTS(Input{Query: "x", AllowedDomains: []string{"a"}, BlockedDomains: []string{"b"}})
+	if r.Result || r.ErrorCode != 2 {
+		t.Fatalf("TS validate %+v", r)
+	}
+}
+
+func TestDecodeInputStrictJSON_unknownKey(t *testing.T) {
+	_, err := DecodeInputStrictJSON([]byte(`{"query":"ab","extra":1}`))
+	if err == nil {
+		t.Fatal("want unknown field error")
 	}
 }
 

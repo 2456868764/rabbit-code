@@ -8,4 +8,6 @@ const (
 	MaxResultSizeChars   = 100_000
 	ToolSummaryMaxLength = 50
 	PermissionMessage    = "WebSearchTool requires permission."
+	// ErrQueryZodMin mirrors typical zod v4 min(2) failure wording for logs/tests.
+	ErrQueryZodMin = "websearchtool: query must be at least 2 characters"
 )
