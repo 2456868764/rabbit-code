@@ -22,7 +22,7 @@ make test-phase6
 | 范围 | 覆盖内容 |
 |------|----------|
 | 每工具子包 | **Run** 成功、权限拒绝、非法 JSON 输入（**AC6-1**） |
-| registry | 注册、按名查找、重复名策略、MCP 动态增删（**AC6-2**） |
+| **`internal/tools/registry`** | **`RegisterMCP` / `UnregisterMCP` / `ByName`（含 alias）/ `RunTool`**；实现 **`query.ToolRunner`**（见 **`registry_test.go`**） |
 
 ---
 

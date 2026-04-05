@@ -8,6 +8,7 @@ import (
 // Deps and interfaces below extend the narrow src/query/deps.ts QueryDeps pattern for headless I/O injection.
 
 // ToolRunner runs one tool invocation (Phase 6 wires real tools).
+// Use *registry.Registry from internal/tools/registry when dispatching named tools + dynamic MCP registration.
 type ToolRunner interface {
 	RunTool(ctx context.Context, name string, inputJSON []byte) (resultJSON []byte, err error)
 }
