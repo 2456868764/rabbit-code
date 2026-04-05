@@ -60,6 +60,14 @@ func AppendUserToolResultsMessage(messagesJSON json.RawMessage, results []ToolRe
 			"content":     r.Content,
 		})
 	}
+	return AppendUserMessageContentBlocks(messagesJSON, blocks)
+}
+
+// AppendUserMessageContentBlocks appends {"role":"user","content": blocks} (blocks are Messages API content items).
+func AppendUserMessageContentBlocks(messagesJSON json.RawMessage, blocks []any) (json.RawMessage, error) {
+	if len(blocks) == 0 {
+		return messagesJSON, nil
+	}
 	piece, err := json.Marshal(map[string]any{
 		"role":    "user",
 		"content": blocks,

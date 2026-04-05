@@ -11,6 +11,8 @@ import (
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
+	"github.com/2456868764/rabbit-code/internal/tools/filereadtool"
+	"github.com/2456868764/rabbit-code/internal/tools/filewritetool"
 )
 
 // ErrMaxTurnsExceeded is returned when LoopState.MaxTurns > 0 and the cap is hit before another assistant call.
@@ -330,7 +332,8 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 			st.SetMessagesJSON(msgs)
 			return msgs, lastAssistantText, ErrNoToolRunner
 		}
-		results := make([]ToolResultBlock, 0, len(turn.ToolUses))
+		toolBlocks := make([]any, 0, len(turn.ToolUses))
+		var followUp [][]any
 		for _, u := range turn.ToolUses {
 			if o := d.Observe; o != nil && o.OnToolStart != nil {
 				in := u.Input
@@ -354,12 +357,37 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 				}
 				o.OnToolDone(u.Name, u.ID, in, out)
 			}
-			results = append(results, ToolResultBlock{ToolUseID: u.ID, Content: string(out)})
+			content := any(string(out))
+			if u.Name == filereadtool.FileReadToolName {
+				c, sup := filereadtool.MapReadResultForMessagesAPI(out, filereadtool.MapReadResultOptions{
+					MainLoopModel: d.Model,
+				})
+				if c != nil {
+					content = c
+				}
+				followUp = append(followUp, sup...)
+			} else if u.Name == filewritetool.FileWriteToolName {
+				if s := filewritetool.MapWriteToolResultForMessagesAPI(out); s != "" {
+					content = s
+				}
+			}
+			toolBlocks = append(toolBlocks, map[string]any{
+				"type":        "tool_result",
+				"tool_use_id": u.ID,
+				"content":     content,
+			})
 		}
-		msgs, err = AppendUserToolResultsMessage(msgs, results)
+		msgs, err = AppendUserMessageContentBlocks(msgs, toolBlocks)
 		if err != nil {
 			st.SetMessagesJSON(msgs)
 			return msgs, lastAssistantText, err
+		}
+		for _, fb := range followUp {
+			msgs, err = AppendUserMessageContentBlocks(msgs, fb)
+			if err != nil {
+				st.SetMessagesJSON(msgs)
+				return msgs, lastAssistantText, err
+			}
 		}
 		st.SetMessagesJSON(msgs)
 		if o := d.Observe; o != nil && o.OnAfterToolResults != nil {

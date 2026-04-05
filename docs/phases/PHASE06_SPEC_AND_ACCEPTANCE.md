@@ -4,6 +4,12 @@
 
 **强制**：与 **`claude-code-sourcemap/restored-src/src/`**（简称 **`src/`**）语义对齐；平台豁免依 **[PARITY_CHECKLIST.md](../PARITY_CHECKLIST.md)**、**[ARCHITECTURE_BOUNDARIES.md](../ARCHITECTURE_BOUNDARIES.md)** 及本 SPEC 显式条款。
 
+### 工具实现原则：全量上游对齐（禁止 headless 子集）
+
+Phase 6 中**每一个**内置工具的 Go 实现，都必须以 **`src/tools/<ToolName>/`** 下对应 TypeScript 的**完整行为**为验收基准：与上游 **`call` / `validateInput` / 输入输出 Schema 及分支**对齐（错误类型与面向模型的提示在可比对范围内与 TS 一致）。**不得**把工具实现成或文档化成仅面向无 TUI 的 **headless 子集**（例如「先只做文本路径、其余 defer / stub」）。**Headless** 在本 Phase 只约束**呈现层**（如 **`UI.tsx` → `ui.go`** 可不绑 Ink、不强制复刻终端 UI），**不缩小**工具语义、JSON 结果形态或可执行分支。
+
+**`Read` + query 主循环**：**`internal/query/loop.go`** 对 **`Read`** 调用 **`filereadtool.MapReadResultForMessagesAPI(out, MapReadResultOptions{MainLoopModel: LoopDriver.Model})`**，对齐 **`mapToolResultToToolResultBlockParam`** + **`newMessages`**：**`pdf`** → 摘要 + 跟进 **`document`**；**`parts`** → 摘要 + 跟进多 **`image`**；**`image`** → **`tool_result.content`** 为 **`image`** 块数组；**`text`** → **`AddLineNumbers`** + 可选 **`CyberRiskMitigationReminder`**（**`ShouldIncludeCyberMitigation(MainLoopModel)`**），空内容/offset 越界为 TS 同款 **`system-reminder`** 文案；**`notebook`** → **`mapNotebookCellsToToolResult`** 等价（cell XML + outputs 的 text/image 块、相邻 **`text`** 合并）；**`file_unchanged`** → **`FileUnchangedStub`**。**`Write`**：**`filewritetool.MapWriteToolResultForMessagesAPI`** 对齐 **`mapToolResultToToolResultBlockParam`**（create/update 短文案）；**`query/loop.go`** 已接线。**其它工具**的 **`mapToolResult`** 仍待宿主路径补齐；仅消费 **`Run` JSON`** 的集成须在 **§6 / PARITY** 记载差异。
+
 ---
 
 ## 0. 迭代前核对声明（[PHASE_ITERATION_RULES.md](./PHASE_ITERATION_RULES.md)）
@@ -37,7 +43,7 @@
 | 状态 | 编号 | 功能项 | 说明 |
 |------|------|--------|------|
 | [~] | P6.0.1 | Registry List/ByName/动态 MCP 注册 | **`internal/tools.Tool`** + **`registry.Registry`**（**`ListNames` / `ByName` / `RegisterMCP` / `UnregisterMCP` / `RunTool`→**`query.ToolRunner`**）；**`getTools()`** 全量 feature 排序、**`refreshTools`**、API schema 聚合仍 defer |
-| [~] | P6.1 | 文件：read/write/edit/glob/grep/notebook | **Read**：**`filereadtool.FileRead`** + **`tools.Tool` / `Run`** + **≥3 单测** + **registry 集成测**；**write/edit/glob/grep/notebook** 仍占位；PDF/图/笔记本/权限/dedup/token 上限仍 defer |
+| [~] | P6.1 | 文件：read/write/edit/glob/grep/notebook | **Read**：**`filereadtool.FileRead`** 全量 **`FileReadTool.call`** 路径（文本 **`ReadFileInRange`**、`ipynb`、常见图片、PDF 内联 base64 / **`pages`+`pdftoppm`→`parts`**）；**`filereadtool.WithRunContext`** 可选 **`DenyRead` / `ReadFileState`（dedup）/ `CountTokens` / `MainLoopModel` / 限额覆盖 / `DisableReadDedup`**；**Write**：**`filewritetool.FileWrite`** 对齐 **`FileWriteTool.ts`** **`validateInput`**（含 **`ErrFileModifiedSinceRead`** 与 **`ErrFileUnexpectedlyModified`** 两段 staleness）、**`call`**（**`mkdir`→history 钩→临界区读盘**、**`writeTextContent`/`LF`** 语义等价 **`os.WriteFile`**、**`getPatchForDisplay`** 等价 **`GetPatchForDisplay`**、**`originalFile`** 与 read 侧一致的换行归一、可选 **`gitDiff`**（**`CLAUDE_CODE_REMOTE`**+**`QuartzLanternEnabled`**+**`FetchGitDiff`**）、**`WriteContext`** 可注入 **team mem / LSP·VSCode·fileHistory** 等价钩）；**`mapToolResult`** 见上文。**edit/glob/grep/notebook** 仍占位 |
 | [ ] | P6.2 | 执行：bash、powershell(平台)、lsp | 沙箱策略可配置；**`querydeps.Bash*`** 为 Phase 5 桥接，本 Phase 对齐 **`BashTool`/`PowerShellTool`/`LSPTool`** 全栈 |
 | [ ] | P6.3 | 网络：web_fetch、web_search | 代理与 allowlist |
 | [ ] | P6.4 | 任务：task_*、todo、brief、plan、worktree | 与 **`Task.ts` / `tasks/`** 包一致 |
@@ -79,7 +85,7 @@
 
 | 状态 | 编号 | 要求 |
 |------|------|------|
-| [~] | **AC6-1** | **每个工具** ≥3 单测：**Read** 已覆盖；其余文件工具待补。 |
+| [~] | **AC6-1** | **每个工具** ≥3 单测：**Read**、**Write** 已覆盖；其余文件工具待补。 |
 | [~] | **AC6-2** | registry 动态增删 MCP 工具后 query 可见（**`engine.Config.Deps.Tools`** 设为 **`registry.Registry`** 即 **`RunTool`** 可路由到新工具；默认宿主仍 **`BashStubToolRunner`** / **`BashExecToolRunner`**）。 |
 | [ ] | **AC6-3** | E2E：**`PHASE06_E2E_ACCEPTANCE.md` §2** fixture 矩阵与 SPEC 附录同步勾选。 |
 | [ ] | **AC6-F1**–**AC6-F23** | **§2 `P6.F.*`** 各标志在工具注册/执行路径上行为与 [SOURCE_FEATURE_FLAGS.md](../SOURCE_FEATURE_FLAGS.md) §2 对应行一致，或 PARITY **豁免**说明。 |
@@ -106,7 +112,7 @@
 
 | 域（架构 **§4**） | 还原路径（`src/tools/` 下目录） | Go 路径（`internal/tools/`） | 状态 |
 |------------------|--------------------------------|-----------------------------|------|
-| 文件与代码 | `FileReadTool`、`FileWriteTool`、`FileEditTool`、`GlobTool`、`GrepTool`、`NotebookEditTool` | `filereadtool`、`filewritetool`、`fileedittool`、`globtool`、`greptool`、`notebookedittool` | **部分**（**`filereadtool`**：**`file_read_tool.go`** 等对照 **`FileReadTool/`** 全 **`.ts` 基名**（**`UI.tsx`→`ui.go`** Ink 外子集）；**Read** 文本子路径 + 单测；**`Write`/`Edit`/…** 仍占位） |
+| 文件与代码 | `FileReadTool`、`FileWriteTool`、`FileEditTool`、`GlobTool`、`GrepTool`、`NotebookEditTool` | `filereadtool`、`filewritetool`、`fileedittool`、`globtool`、`greptool`、`notebookedittool` | **部分**（**`filereadtool`**：**`FileReadTool/`** 全量 **`call`** + **`mapToolResult`**；**`filewritetool`**：**`FileWriteTool.ts`** **`validate`/`call`/输出 Schema** 与 **`mapToolResult`** 对齐，服务侧经 **`WriteContext`** 注入；**`Edit`/glob/grep/notebook** 仍占位） |
 | 执行环境 | `BashTool`、`PowerShellTool`、`LSPTool` | `bashtool`、`powershelltool`、`lsptool` | **部分**（**`bashtool`/`powershelltool`** 仅 **toolname** 等；**`lsptool`** 占位） |
 | 网络 | `WebFetchTool`、`WebSearchTool` | `webfetchtool`、`websearchtool` | **部分**（prompt 级） |
 | 任务与规划 | `Task*`、`TodoWriteTool`、`EnterPlanModeTool`、`ExitPlanModeV2Tool`、`BriefTool` 等 | `taskcreatetool`、`taskgettool`、…、`todowritetool`、`enterplanmodetool`、`exitplanmodetool`、`brieftool` 等 | **未创建**（多为 **`.gitkeep` 占位**） |
@@ -147,5 +153,10 @@
 | **2026-04-01** | —（迭代前准备） | 补 **§0**、扩展 **§1 / §4**（`Tool.ts`·`tools.ts`·`tools/*` ↔ Go）、**§6** 基线；**`PHASE06_E2E_ACCEPTANCE.md` §0**；**`Makefile`** **`test-phase6`**。 | 自 **§三-3.0** 生成有序计划后从 **P6.0.1** 或架构选定的首模块开工 |
 | **2026-04-01** | commit | **Phase 6 迭代 1（P6.0.1 子集）**：**`internal/tools`** **`Tool`**；**`internal/tools/registry`**（**`ListNames` / `ByName` / `RegisterMCP` / `UnregisterMCP` / `RunTool`**）；单测 **`registry_test`** 断言 **`query.ToolRunner`**；**`query.Deps`** 注释接线。 | **P6.0.1** 收口 **getTools** 门控 / **P6.1** 首工具 **`Run`** + **AC6-1** |
 | **2026-04-01** | commit | **Phase 6 迭代 2（P6.1 / FileReadTool）**：**`filereadtool`** **`limits` / `image_processor` / `ui` / `file_read_tool`** + **`FileRead.Run`**（文本、**`offset`/`limit`**、设备路径拒绝、扩展名二进制拒绝）；**`registry_test`** **`Read`** 路由；**AC6-1**/**P6.1** 标 **`[~]`**。 | **P6.1** 其余工具；Read 的 PDF/图/权限/dedup/API tokenizer |
+| **2026-04-01** | commit | **Phase 6 迭代 3（P6.1 / Read 全量）**：**`filereadtool`** 对齐 **`FileReadTool.ts`**：**`notebook.go`**、**`image_read.go`**（**`golang.org/x/image`**）、**`pdf.go`**（**`pdfcpu`** 页数 + **`pdftoppm`** **`parts`**）、**`validate`/`token`/`path`**；**`WithRunContext`** 限额与 dedup；删除 **`image_processor` defer**；单测含 **`.ipynb`/`.png`**。 | **P6.1** 其余文件工具 |
+| **2026-04-01** | commit | **Phase 6 迭代 4（Read → transcript / Messages API）**：**`filereadtool/map_api_message.go`**（**`MapReadResultForMessagesAPI`**、**`PartsOutputDirToImageContentBlocks`**）；**`query.AppendUserMessageContentBlocks`**；**`LoopDriver`** 每轮工具结果对 **`Read`** 附加 **`document`/`image`** 跟进 **`user`** 消息。 | **`Read` 文本/notebook** 与 TS **`mapToolResult`** 字符串形态对齐；其它工具的 **`mapToolResult`** 层 |
+| **2026-04-01** | commit | **Phase 6 迭代 5（Read `mapToolResult` 文本/notebook）**：**`MapReadResultOptions{MainLoopModel}`**；**`text`**/**`notebook`**/**`file_unchanged`** 分支；**`query/loop.go`** 传入 **`d.Model`**；单测覆盖行号/cyber/空文件/offset、notebook 合并、**`FileUnchangedStub`**。 | **P6.1** **`Write`/`Edit`/glob/grep** 等文件工具；其它内置工具的 **`mapToolResult`** |
+| **2026-04-01** | commit | **Phase 6 迭代 6（P6.1 / Write 核心）**：**`internal/tools/filewritetool`**（**`FileWrite.Run`**、**`WriteContext`**、**`StructuredPatchFullReplace`**、staleness）；**`file_write_tool_test`**（新建/无 state 失败/有 state 更新/deny/坏 JSON）；**`registry_test`** **Read+Write** 集成。 | **Write** 的 **`mapToolResult`** 短文案（**`query/loop.go`**）；**Edit**/glob/grep/notebook |
+| **2026-04-01** | commit | **Phase 6 迭代 7（Write 与上游全量对齐）**：**`validateInput`/`call`** staleness 分两段；**`GetPatchForDisplay`**（**`diff`/`convertLeadingTabsToSpaces`/escape）；**`WriteContext`** 扩展（**`CheckTeamMemSecrets`**、**`BeforeFileEdited`**、**`AfterWrite`**、**`FileHistoryTrack`**、**`FetchGitDiff`**）；**`MapWriteToolResultForMessagesAPI`** + **loop** 接线；单测含 **mtime 严格校验**、**gitDiff**、**map**、patch。 | **Edit**/glob/grep/notebook；其它内置工具 **`mapToolResult`** |
 
 （后续行：每完成可合并条目追加一行。）

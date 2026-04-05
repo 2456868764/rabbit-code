@@ -10,6 +10,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/tools"
 	"github.com/2456868764/rabbit-code/internal/tools/filereadtool"
+	"github.com/2456868764/rabbit-code/internal/tools/filewritetool"
 	"github.com/2456868764/rabbit-code/internal/tools/registry"
 )
 
@@ -96,5 +97,39 @@ func TestRegistry_withFileReadTool(t *testing.T) {
 	var m map[string]any
 	if err := json.Unmarshal(out, &m); err != nil || m["type"] != "text" {
 		t.Fatalf("%v %s", err, out)
+	}
+}
+
+func TestRegistry_withFileReadAndWrite(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "rw.txt")
+	if err := os.WriteFile(p, []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	abs, _ := filepath.Abs(p)
+	st := filereadtool.NewReadFileStateMap()
+	fi, err := os.Stat(abs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.Set(abs, filereadtool.ReadFileStateEntry{
+		Content:       "a",
+		Timestamp:     fi.ModTime().UnixMilli(),
+		IsPartialView: false,
+	})
+	ctx := filereadtool.WithRunContext(context.Background(), &filereadtool.RunContext{ReadFileState: st})
+	r := registry.New(filereadtool.New(), filewritetool.New())
+	win, _ := json.Marshal(map[string]string{"file_path": abs, "content": "b"})
+	wout, err := r.RunTool(ctx, "Write", win)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wm map[string]any
+	if err := json.Unmarshal(wout, &wm); err != nil || wm["type"] != "update" {
+		t.Fatalf("%v %s", err, wout)
+	}
+	b, _ := os.ReadFile(p)
+	if string(b) != "b" {
+		t.Fatalf("disk %q", b)
 	}
 }

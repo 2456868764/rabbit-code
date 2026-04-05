@@ -9,7 +9,7 @@ import (
 // MaxOutputSizeBytes mirrors utils/file.ts MAX_OUTPUT_SIZE (0.25 MiB) for pre-read cap.
 const MaxOutputSizeBytes = 262144
 
-// DefaultMaxOutputTokens mirrors limits.ts DEFAULT_MAX_OUTPUT_TOKENS (post-read token cap deferred in headless).
+// DefaultMaxOutputTokens mirrors limits.ts DEFAULT_MAX_OUTPUT_TOKENS (post-read token cap for text/notebook).
 const DefaultMaxOutputTokens = 25000
 
 // EnvMaxOutputTokens mirrors CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS (limits.ts).
