@@ -89,6 +89,7 @@ type vertexStreamJSONBody struct {
 	ToolChoice        json.RawMessage `json:"tool_choice,omitempty"`
 	Thinking          json.RawMessage `json:"thinking,omitempty"`
 	Temperature       *float64        `json:"temperature,omitempty"`
+	Metadata          json.RawMessage `json:"metadata,omitempty"`
 	OutputConfig      *OutputConfig   `json:"output_config,omitempty"`
 	AnthropicBeta     []string        `json:"anthropic_beta,omitempty"`
 	ContextManagement json.RawMessage `json:"context_management,omitempty"`
@@ -102,6 +103,11 @@ func (c *Client) mergeStreamingBody(body MessagesStreamBody) MessagesStreamBody 
 	}
 	if features.AntiDistillationFakeToolsInBody() {
 		body.AntiDistillation = []string{"fake_tools"}
+	}
+	if len(bytes.TrimSpace(body.Metadata)) == 0 {
+		if meta, err := BuildMessagesAPIMetadata(c); err == nil && len(meta) > 0 {
+			body.Metadata = meta
+		}
 	}
 	return body
 }
@@ -119,6 +125,7 @@ func (c *Client) marshalMessagesStreamJSON(body MessagesStreamBody) ([]byte, err
 			ToolChoice:        append(json.RawMessage(nil), body.ToolChoice...),
 			Thinking:          append(json.RawMessage(nil), body.Thinking...),
 			Temperature:       body.Temperature,
+			Metadata:          append(json.RawMessage(nil), body.Metadata...),
 			OutputConfig:      body.OutputConfig,
 			AnthropicBeta:     append([]string(nil), body.AnthropicBeta...),
 			ContextManagement: append(json.RawMessage(nil), body.ContextManagement...),
@@ -199,6 +206,8 @@ type MessagesStreamBody struct {
 	Thinking json.RawMessage `json:"thinking,omitempty"`
 	// Temperature when thinking disabled (claude.ts parity for inner web search request).
 	Temperature *float64 `json:"temperature,omitempty"`
+	// Metadata is optional; when empty, marshal merges BuildMessagesAPIMetadata(c) (claude.ts getAPIMetadata).
+	Metadata json.RawMessage `json:"metadata,omitempty"`
 }
 
 // PostMessagesStream starts a streaming request. Caller must close resp.Body.
