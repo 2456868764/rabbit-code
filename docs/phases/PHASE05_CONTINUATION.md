@@ -10,7 +10,7 @@
 |----|------|-----|------|
 | 1 | ☑ | **`cmd/rabbit-code`**：`Bootstrap` 成功后凡退出路径经 **`app.QuitRuntime`** / **`app.FailBootstrap`**，确保 **`Runtime.Close`**（含未来 **`RegisterEngineShutdown`**）在 **`os.Exit` 前执行 | **`go test ./internal/app/... ./cmd/rabbit-code/... -short`**；手测 **`RABBIT_CODE_EXIT_AFTER_INIT=1`** 仍 0 |
 | 2 | ☑ | **H8 接线**：**`Bootstrap`** 成功后 **`app.WireHeadlessEngineForShutdown`**（最小 **`engine.New(parent, nil)`** + **`RegisterEngineShutdown`**）；**`cmd/rabbit-code`** 主路径在 **`QuitRuntime`** 前经 **`Runtime.Close`** drain | **`go test ./internal/app/... ./cmd/rabbit-code/... -short`** |
-| 3 | ☐ | **PARITY `[~]` 扫尾**：**`QueryEngineConfig` 1:1**、**`cost-tracker`**、**JSONL Map** — 按 **PARITY_PHASE5_DEFERRED** 目标 Phase 分步，不早于 headless 就绪项 | 更新 **PARITY_QUERY_QUERYENGINE.md** 格 |
+| 3 | ☑ | **PARITY `[~]` 文档扫尾**：**`QueryEngineConfig`** 字段级映射（**§4**）、**`cost-tracker`/`accumulateUsage`**（**§5** → **`internal/cost`**）、**JSONL Map**（**§6** → Phase 8）— 全量单 struct / USD 聚合 / JSONL 仍 Follow-on | **`PARITY_QUERY_QUERYENGINE.md`** §4–§7 已更新 |
 
 ---
 

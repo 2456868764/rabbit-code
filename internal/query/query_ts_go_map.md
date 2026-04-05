@@ -2,7 +2,7 @@
 
 Authority tree: `claude-code-sourcemap/restored-src/src/`.
 
-**全量功能对照与 PARITY 状态**：`docs/phases/PARITY_QUERY_QUERYENGINE.md`（遵守 **PARITY_PHASE5_DEFERRED.md**）。
+**全量功能对照与 PARITY 状态**：`docs/phases/PARITY_QUERY_QUERYENGINE.md`（**`QueryEngineConfig` 字段映射 §4**、**cost §5**、**JSONL §6**；遵守 **PARITY_PHASE5_DEFERRED.md**）。
 
 ## `src/query/*.ts`
 

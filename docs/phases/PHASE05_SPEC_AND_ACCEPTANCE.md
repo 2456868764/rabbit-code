@@ -178,5 +178,6 @@
 | **2026-04-01** | commit | **迭代 23（memdir §3.0 序 2）**：**`memory_scan.go`** **`MemoryHeader` / `ScanMemoryFiles`** 与 **`memoryScan.ts`** 对照注释（**`AbortSignal`↔`context`**、**`null`↔`""`**）；**`TestFormatMemoryManifest_noDescriptionLikeTSNull`**；**`MEMDIR_TS_PARITY`** 表与 §3.0 序 **2** ☑。 | **MEMDIR_TS_PARITY** §3.0 序 **3–4**（`memdir` / `paths`） |
 | **2026-04-01** | commit | **迭代 24（memdir §3.0 序 3–4）**：**`MEMDIR_TS_PARITY.md`** **§3.0 序 3–4** **`memdir.ts` / `paths.ts`** 行为对照表；主表 **`paths` / `memdir`** 余项 **[x]**；**`memdir.go`** / **`paths.go`** / **`doc.go`** 注释。 | **MEMDIR** §3.0 四行全 ☑；后续仅 Follow-on / 他 Phase |
 | **2026-04-01** | commit | **迭代 25（H8 / §3.0 #2）**：**`app.WireHeadlessEngineForShutdown`** + **`cmd/rabbit-code`** **`Bootstrap` 成功**后接线；**`headless_engine_test`**；**`PHASE05_CONTINUATION.md`** §3.0 项 2 ☑、H8「引擎接线」段；**`engine`/`query` doc**、**`query_ts_go_map.md`**。 | **§3.0** 项 3（PARITY Query 等）见 **PHASE05_CONTINUATION** |
+| **2026-04-01** | commit | **迭代 26（§3.0 #3）**：**`PARITY_QUERY_QUERYENGINE.md`** 增 **§4 `QueryEngineConfig` 字段映射**、**§5 cost-tracker/`internal/cost`**、**§6 JSONL Map（Phase 8）**；**§2** 表行交叉引用；**§7** 维护；**`PHASE05_CONTINUATION.md`** §3.0 项 3 ☑。 | **§3.0** 三行全 ☑；后续新项写入本表 §3.0 |
 
 （后续行：每完成可合并条目追加一行。）
