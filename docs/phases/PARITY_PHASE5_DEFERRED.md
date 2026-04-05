@@ -14,7 +14,7 @@ See **PHASE05_SPEC_AND_ACCEPTANCE.md** §2 **P5.F.*** and **`internal/features/r
 | **P5.F.4** | `ULTRATHINK` | Prepends thinking hint to resolved user text (`query`). |
 | **P5.F.5** | `ULTRAPLAN` | Appends plan hint to resolved user text (`query`). |
 | **P5.F.6** | `BREAK_CACHE_COMMAND` | **`EventKindBreakCacheCommand`** at start of each `runTurnLoop` Submit. CLI: **`rabbit-code context break-cache`** (**`internal/commands/breakcache`**，对齐 **`src/commands/break-cache`**). |
-| **P5.F.7** | `TEMPLATES` | **`EventKindTemplatesActive`** + names; loads **`<name>.md`** from **`RABBIT_CODE_TEMPLATE_DIR`** or **`engine.Config.TemplateDir`** when set. |
+| **P5.F.7** | `TEMPLATES` | **`EventKindTemplatesActive`** + names; loads **`<name>.md`** from **`RABBIT_CODE_TEMPLATE_DIR`** or **`engine.Config.TemplateDir`** when set; **`engine.Config.ExtraTemplateNames`** merges extra basenames into appendix / event (job-classifier hook). |
 | **P5.F.8** | `CACHED_MICROCOMPACT` | **`EventKindCachedMicrocompactActive`**; streaming request body sets **`anthropic_beta`** (placeholder string **`BetaCachedMicrocompactBody`** in `internal/anthropic/betas.go` until upstream names a dedicated cache-editing beta). |
 | **P5.F.9** | `PROMPT_CACHE_BREAK_DETECTION` | Per-Submit **`context`** callback → **`AnthropicAssistant`** → **`EventKindPromptCacheBreakDetected`** when SSE matches. Optional **`RABBIT_CODE_PROMPT_CACHE_BREAK_SUGGEST_COMPACT`**: after success, if break callback ran, emit reactive **`EventKindCompactSuggest`**. |
 | **P5.F.10** | `HISTORY_SNIP` | Each assistant round: if transcript JSON bytes exceed max, drop leading messages (`query.TrimTranscriptPrefixWhileOverBudget`) → **`EventKindHistorySnipApplied`**. Thresholds: **`RABBIT_CODE_HISTORY_SNIP_MAX_BYTES`** (default 32768), **`RABBIT_CODE_HISTORY_SNIP_MAX_ROUNDS`** (default 4). Scrollback / UI: **`messages.StripHistorySnipPieces`** strips `history_snip` content from `[]types.Message`. |
@@ -32,7 +32,7 @@ See **PHASE05_SPEC_AND_ACCEPTANCE.md** §2 **P5.F.*** and **`internal/features/r
 | Session coordinator / restore tools | 6 / 8 / 9 | Iter 12: **SESSION_RESTORE** text hint only |
 | `thinking.ts` / `processUserInput` TUI | 5 / 9 | Iter 12: **UserSubmit** **`PhaseDetail`** mode tags |
 | Full REPL `context.ts` | 10 | Iter 12: **`rabbit-code context break-cache`** JSON |
-| Job classifier, `stopHooks` from disk | 2 / 5 / 10 | Iter 12: template **`.md`** from dir only |
+| Job classifier, `stopHooks` from disk | 2 / 5 / 10 | Headless：**`engine.Config.ExtraTemplateNames`** 扩展 **F.7** 模板名；磁盘 **`stopHooks`** 仍 defer |
 | F.8 upstream-named cache-editing beta + full `microCompact.ts` / cache field parity | 4 / 6 | Placeholder beta only in headless path |
 | F.9 Auto-trim transcript + resend after break | 5 / 6 | Iter 12: compact **suggest** only |
 | **P5.2.2** snip metadata / persistence (UUID map, session round-trip) | 5 / 8 | Headless：**H7.6–H7.11**（重放、侧车 UUID、**`AnnotateTranscriptWithUUIDs`** / 多字段 strip）；**JSONL Map + parentUuid 重链** 仍 Phase 8 |
