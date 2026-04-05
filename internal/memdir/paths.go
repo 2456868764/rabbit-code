@@ -1,6 +1,11 @@
 package memdir
 
 // This file corresponds to restored-src/src/memdir/paths.ts (plus git root + sanitizePath helpers used by getAutoMemPath).
+//
+// Gate parity (details: MEMDIR_TS_PARITY.md §3.0 序 3–4 paths.ts):
+//   isAutoMemoryEnabled → internal/features.AutoMemoryEnabled / AutoMemoryEnabledFromMerged
+//   isExtractModeActive → memdir.IsExtractModeActive → features.ExtractMemoriesAllowed
+//   getAutoMemPath(project) → ResolveAutoMemDir / ResolveAutoMemDirWithOptions (+ TrustedAutoMemoryDirectory)
 
 import (
 	"fmt"

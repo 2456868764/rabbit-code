@@ -131,9 +131,9 @@ func TruncateEntrypointContent(raw string) EntrypointTruncation {
 	}
 }
 
-// BuildSearchingPastContextSection returns the "## Searching past context" block (memdir.ts)
-// when RABBIT_CODE_MEMORY_SEARCH_PAST_CONTEXT is truthy. useShellGrep selects shell grep form
-// vs Grep tool form (embedded-search / REPL parity).
+// BuildSearchingPastContextSection returns the "## Searching past context" block (memdir.ts buildSearchingPastContextSection).
+// TS gates on GrowthBook tengu_coral_fern; Go uses features.MemorySearchPastContextEnabled (RABBIT_CODE_MEMORY_SEARCH_PAST_CONTEXT).
+// useShellGrep selects shell grep vs Grep-tool wording (TS: hasEmbeddedSearchTools || isReplModeEnabled).
 func BuildSearchingPastContextSection(autoMemDir, projectDir string, useShellGrep bool) []string {
 	if !features.MemorySearchPastContextEnabled() {
 		return nil
@@ -238,7 +238,9 @@ func BuildMemoryPrompt(p BuildMemoryPromptInput) string {
 	return sb.String()
 }
 
-// LoadMemorySystemPrompt returns unified memory instructions for the Messages API system field.
+// LoadMemorySystemPrompt returns unified memory instructions for the Messages API system field (memdir.ts loadMemoryPrompt).
+// Extra Go gates: features.MemorySystemPromptInjectionEnabled (RABBIT_CODE_MEMORY_SYSTEM_PROMPT). TS telemetry (logMemoryDirCounts, tengu_* events) is omitted in headless.
+// Auto-only TS returns buildMemoryLines only and relies on claudemd for MEMORY.md; Go appends Private/Team MEMORY.md via AppendClaudeMdStyleMemoryEntrypoints for a single system string.
 func LoadMemorySystemPrompt(in MemorySystemPromptInput) (text string, ok bool) {
 	mem := strings.TrimSpace(in.MemoryDir)
 	if mem == "" || !features.AutoMemoryEnabledFromMerged(in.Merged) {
