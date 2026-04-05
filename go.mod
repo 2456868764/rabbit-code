@@ -9,7 +9,9 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.41.5
 	github.com/aws/aws-sdk-go-v2/config v1.32.13
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.13
+	github.com/dlclark/regexp2 v1.11.5
 	github.com/pdfcpu/pdfcpu v0.11.0
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/sergi/go-diff v1.3.1
 	go.uber.org/goleak v1.3.0
 	golang.org/x/image v0.33.0

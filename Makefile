@@ -2,7 +2,7 @@
 BIN := bin/rabbit-code
 MODULE := ./...
 
-.PHONY: build test test-race test-phase4 test-phase5 test-phase6 lint e2e e2e-tui clean assets-mascot
+.PHONY: build test test-race test-phase4 test-phase5 test-phase6 lint e2e e2e-tui clean assets-mascot gen-settings-schema
 
 # Write assets/rabbit-code-mascot.png using the same resolution order as CLI (assets/rabbit.png when cwd is module root).
 assets-mascot:
@@ -38,3 +38,7 @@ e2e-tui:
 
 clean:
 	rm -rf bin
+
+# Refresh embedded FileEdit settings JSON Schema (SchemaStore; same $id as CLAUDE_CODE_SETTINGS_SCHEMA_URL in upstream types).
+gen-settings-schema:
+	curl -fsSL "https://json.schemastore.org/claude-code-settings.json" -o internal/tools/fileedittool/settings_schema.json
