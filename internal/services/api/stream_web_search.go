@@ -1,18 +1,50 @@
 package anthropic
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
 	"strings"
+
+	"github.com/2456868764/rabbit-code/internal/tools/websearchtool"
 )
+
+// WebSearchReadOption configures ReadWebSearchAssistantBlocks (progress + fallback query).
+type WebSearchReadOption func(*webSearchReaderCfg)
+
+type webSearchReaderCfg struct {
+	fallbackQuery string
+	onProgress    func(websearchtool.WebSearchProgress)
+}
+
+// WebSearchReadFallbackQuery is the user query when resolving search_results_received (upstream toolUseQueries fallback).
+func WebSearchReadFallbackQuery(q string) WebSearchReadOption {
+	return func(c *webSearchReaderCfg) {
+		c.fallbackQuery = strings.TrimSpace(q)
+	}
+}
+
+// WebSearchReadOnProgress mirrors WebSearchTool.call onProgress (query_update, search_results_received).
+func WebSearchReadOnProgress(h func(websearchtool.WebSearchProgress)) WebSearchReadOption {
+	return func(c *webSearchReaderCfg) {
+		c.onProgress = h
+	}
+}
 
 // ReadWebSearchAssistantBlocks consumes SSE until EOF (after message_stop) and returns assistant
 // content blocks in index order (text, server_tool_use, web_search_tool_result) for
 // websearchtool.MakeOutputFromContentBlocks — analogue of accumulating event.message.content in WebSearchTool.call.
-func ReadWebSearchAssistantBlocks(ctx context.Context, body io.Reader) ([]json.RawMessage, UsageDelta, error) {
+func ReadWebSearchAssistantBlocks(ctx context.Context, body io.Reader, opts ...WebSearchReadOption) ([]json.RawMessage, UsageDelta, error) {
+	var cfg webSearchReaderCfg
+	for _, o := range opts {
+		if o != nil {
+			o(&cfg)
+		}
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -25,6 +57,7 @@ func ReadWebSearchAssistantBlocks(ctx context.Context, body io.Reader) ([]json.R
 	blocks := make(map[int]*wsBlockAcc)
 	var u UsageDelta
 	var haveUsage bool
+	var prog wsProgressEmitState
 
 	for ev := range ch {
 		switch ParseEventType(ev.JSON) {
@@ -37,9 +70,12 @@ func ReadWebSearchAssistantBlocks(ctx context.Context, body io.Reader) ([]json.R
 				<-errCh
 				return nil, u, err
 			}
+			if acc != nil && acc.typ == "web_search_tool_result" && cfg.onProgress != nil {
+				wsEmitWebSearchResultsProgress(acc.blockStart, cfg.fallbackQuery, &prog, cfg.onProgress)
+			}
 			blocks[idx] = acc
 		case "content_block_delta":
-			_ = wsApplyContentBlockDelta(ev.JSON, blocks)
+			wsApplyContentBlockDeltaWithProgress(ev.JSON, blocks, &prog, cfg.onProgress)
 		case "message_delta":
 			if ud, ok := ParseUsageDelta(ev.JSON); ok {
 				u = ud
@@ -71,11 +107,70 @@ func ReadWebSearchAssistantBlocks(ctx context.Context, body io.Reader) ([]json.R
 	return out, u, nil
 }
 
+type wsProgressEmitState struct {
+	counter       int
+	lastQueryByID map[string]string
+}
+
+func (s *wsProgressEmitState) lastQuery(id string) string {
+	if s.lastQueryByID == nil {
+		return ""
+	}
+	return s.lastQueryByID[id]
+}
+
+func (s *wsProgressEmitState) setLastQuery(id, q string) {
+	if s.lastQueryByID == nil {
+		s.lastQueryByID = make(map[string]string)
+	}
+	s.lastQueryByID[id] = q
+}
+
+func wsEmitWebSearchResultsProgress(blockJSON []byte, fallback string, st *wsProgressEmitState, on func(websearchtool.WebSearchProgress)) {
+	if on == nil {
+		return
+	}
+	var blk struct {
+		Type      string          `json:"type"`
+		ToolUseID string          `json:"tool_use_id"`
+		Content   json.RawMessage `json:"content"`
+	}
+	if err := json.Unmarshal(blockJSON, &blk); err != nil {
+		return
+	}
+	q := st.lastQuery(blk.ToolUseID)
+	if q == "" {
+		q = fallback
+	}
+	n := 0
+	raw := bytes.TrimSpace(blk.Content)
+	if len(raw) > 0 && raw[0] == '[' {
+		var arr []json.RawMessage
+		if err := json.Unmarshal(raw, &arr); err == nil {
+			n = len(arr)
+		}
+	}
+	st.counter++
+	tid := strings.TrimSpace(blk.ToolUseID)
+	if tid == "" {
+		tid = fmt.Sprintf("search-progress-%d", st.counter)
+	}
+	on(websearchtool.WebSearchProgress{
+		ToolUseID: tid,
+		Data: websearchtool.WebSearchProgressData{
+			Type:        "search_results_received",
+			ResultCount: n,
+			Query:       q,
+		},
+	})
+}
+
 type wsBlockAcc struct {
 	typ          string
 	text         strings.Builder
 	blockStart   json.RawMessage // full content_block JSON from content_block_start
 	serverInput  strings.Builder
+	serverToolID string
 }
 
 func wsParseContentBlockStart(jsonLine []byte) (int, *wsBlockAcc, error) {
@@ -100,7 +195,66 @@ func wsParseContentBlockStart(jsonLine []byte) (int, *wsBlockAcc, error) {
 		_ = json.Unmarshal(wrap.ContentBlock, &tb)
 		acc.text.WriteString(tb.Text)
 	}
+	if probe.Type == "server_tool_use" {
+		var sid struct {
+			ID string `json:"id"`
+		}
+		_ = json.Unmarshal(wrap.ContentBlock, &sid)
+		acc.serverToolID = strings.TrimSpace(sid.ID)
+	}
 	return wrap.Index, acc, nil
+}
+
+func wsApplyContentBlockDeltaWithProgress(jsonLine []byte, blocks map[int]*wsBlockAcc, st *wsProgressEmitState, onProgress func(websearchtool.WebSearchProgress)) error {
+	var wrap struct {
+		Index int `json:"index"`
+		Delta struct {
+			Type        string `json:"type"`
+			Text        string `json:"text"`
+			PartialJSON string `json:"partial_json"`
+		} `json:"delta"`
+	}
+	if err := json.Unmarshal(jsonLine, &wrap); err != nil {
+		return err
+	}
+	before := ""
+	if b, ok := blocks[wrap.Index]; ok && b != nil && b.typ == "server_tool_use" {
+		before = b.serverInput.String()
+	}
+	if err := wsApplyContentBlockDelta(jsonLine, blocks); err != nil {
+		return err
+	}
+	if wrap.Delta.Type != "input_json_delta" || onProgress == nil {
+		return nil
+	}
+	b, ok := blocks[wrap.Index]
+	if !ok || b == nil || b.typ != "server_tool_use" {
+		return nil
+	}
+	after := b.serverInput.String()
+	if after == before {
+		return nil
+	}
+	q, ok := websearchtool.ExtractQueryFromPartialWebSearchInputJSON(after)
+	if !ok {
+		return nil
+	}
+	id := b.serverToolID
+	if id != "" && st.lastQuery(id) == q {
+		return nil
+	}
+	if id != "" {
+		st.setLastQuery(id, q)
+	}
+	st.counter++
+	onProgress(websearchtool.WebSearchProgress{
+		ToolUseID: fmt.Sprintf("search-progress-%d", st.counter),
+		Data: websearchtool.WebSearchProgressData{
+			Type:  "query_update",
+			Query: q,
+		},
+	})
+	return nil
 }
 
 func wsApplyContentBlockDelta(jsonLine []byte, blocks map[int]*wsBlockAcc) error {

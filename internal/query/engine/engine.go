@@ -17,6 +17,7 @@ import (
 	anthropic "github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 	"github.com/2456868764/rabbit-code/internal/tools/todowritetool"
+	"github.com/2456868764/rabbit-code/internal/tools/websearchtool"
 	"github.com/2456868764/rabbit-code/internal/utils/processuserinput"
 	"github.com/2456868764/rabbit-code/internal/utils/thinking"
 )
@@ -686,6 +687,18 @@ func (e *Engine) loopObservers() *query.LoopObservers {
 				ToolResultJSON: string(result),
 			})
 			e.recordPostCompactReadTool(name, inputJSON, result)
+		},
+		OnWebSearchProgress: func(outer string, ev websearchtool.WebSearchProgress) {
+			b, err := json.Marshal(ev)
+			if err != nil {
+				return
+			}
+			e.trySend(EngineEvent{
+				Kind:        EventKindWebSearchProgress,
+				ToolUseID:   outer,
+				PhaseDetail: string(b),
+				ToolName:    websearchtool.WebSearchToolName,
+			})
 		},
 		OnToolError: func(name, id string, err error) {
 			e.trySend(EngineEvent{

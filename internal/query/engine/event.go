@@ -29,6 +29,8 @@ const (
 	EventKindTokenBudgetContinue
 	// EventKindTokenBudgetCompleted reports stop after budget continuations or diminishing returns (H5.5); PhaseDetail holds key=value telemetry.
 	EventKindTokenBudgetCompleted
+	// EventKindWebSearchProgress reports inner web search stream progress; ToolUseID=outer tool_use id, PhaseDetail=json of websearchtool.WebSearchProgress.
+	EventKindWebSearchProgress
 )
 
 // EngineEvent is a single unit on the engine event channel.

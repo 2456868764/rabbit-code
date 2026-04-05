@@ -36,7 +36,7 @@ func TestLoopDriver_RunToolStep_state(t *testing.T) {
 	var tools mockToolRunner
 	d := LoopDriver{Deps: Deps{Tools: tools}}
 	st := LoopState{}
-	out, err := d.RunToolStep(context.Background(), &st, "bash", []byte(`{}`))
+	out, err := d.RunToolStep(context.Background(), &st, "bash", "", []byte(`{}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func (errToolRunner) RunTool(context.Context, string, []byte) ([]byte, error) {
 func TestLoopDriver_RunToolStep_toolErrorUndoesSchedule(t *testing.T) {
 	d := LoopDriver{Deps: Deps{Tools: errToolRunner{}}}
 	st := LoopState{}
-	_, err := d.RunToolStep(context.Background(), &st, "bash", []byte(`{}`))
+	_, err := d.RunToolStep(context.Background(), &st, "bash", "", []byte(`{}`))
 	if err == nil {
 		t.Fatal("expected error")
 	}

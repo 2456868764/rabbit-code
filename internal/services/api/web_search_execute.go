@@ -18,6 +18,8 @@ type WebSearchCallParams struct {
 	MainLoopModel  string
 	SmallFastModel string
 	MaxTokens      int
+	// OnWebSearchProgress optional stream progress (query_update, search_results_received).
+	OnWebSearchProgress func(websearchtool.WebSearchProgress)
 }
 
 // ExecuteWebSearchToolCall mirrors WebSearchTool.call: inner Messages stream with web_search_20250305 tool,
@@ -98,7 +100,10 @@ func ExecuteWebSearchToolCall(ctx context.Context, c *Client, in websearchtool.I
 	}
 	defer resp.Body.Close()
 
-	blocks, u, err := ReadWebSearchAssistantBlocks(ctx, resp.Body)
+	blocks, u, err := ReadWebSearchAssistantBlocks(ctx, resp.Body,
+		WebSearchReadFallbackQuery(in.Query),
+		WebSearchReadOnProgress(p.OnWebSearchProgress),
+	)
 	if err != nil {
 		return nil, err
 	}

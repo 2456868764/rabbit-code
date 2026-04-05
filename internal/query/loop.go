@@ -103,7 +103,8 @@ func (d *LoopDriver) RunAssistantStep(ctx context.Context, messagesJSON json.Raw
 }
 
 // RunToolStep invokes Tools.RunTool and applies schedule/done transitions when st is non-nil.
-func (d *LoopDriver) RunToolStep(ctx context.Context, st *LoopState, name string, input []byte) ([]byte, error) {
+// toolUseID is the assistant tool_use id for this call (WebSearch progress chrome); may be empty in tests.
+func (d *LoopDriver) RunToolStep(ctx context.Context, st *LoopState, name, toolUseID string, input []byte) ([]byte, error) {
 	if d.Deps.Tools == nil {
 		return nil, ErrNoToolRunner
 	}
@@ -114,10 +115,18 @@ func (d *LoopDriver) RunToolStep(ctx context.Context, st *LoopState, name string
 			NonInteractive: d.NonInteractive,
 			Store:          d.TodoStore,
 		})
-		ctx = websearchtool.WithRunContext(ctx, &websearchtool.RunContext{
-			ExecuteSearch: d.WebSearchExecute,
-		})
+		var onWS func(websearchtool.WebSearchProgress)
+		if d.Observe != nil && d.Observe.OnWebSearchProgress != nil {
+			outer := toolUseID
+			onWS = func(ev websearchtool.WebSearchProgress) {
+				d.Observe.OnWebSearchProgress(outer, ev)
+			}
 		}
+		ctx = websearchtool.WithRunContext(ctx, &websearchtool.RunContext{
+			ExecuteSearch:       d.WebSearchExecute,
+			OnWebSearchProgress: onWS,
+		})
+	}
 	if st != nil {
 		*st = ApplyTransition(*st, TranScheduleTools)
 	}
@@ -365,7 +374,7 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 				}
 				o.OnToolStart(u.Name, u.ID, in)
 			}
-			out, err := d.RunToolStep(ctx, st, u.Name, u.Input)
+			out, err := d.RunToolStep(ctx, st, u.Name, u.ID, u.Input)
 			if err != nil {
 				if o := d.Observe; o != nil && o.OnToolError != nil {
 					o.OnToolError(u.Name, u.ID, err)
@@ -464,6 +473,8 @@ type LoopObservers struct {
 	OnToolStart     func(name, toolUseID string, input []byte)
 	OnToolDone      func(name, toolUseID string, inputJSON, result []byte)
 	OnToolError     func(name, toolUseID string, err error)
+	// OnWebSearchProgress mirrors WebSearchTool.call onProgress (inner stream); outerToolUseID is the main-loop WebSearch tool_use id.
+	OnWebSearchProgress func(outerToolUseID string, ev websearchtool.WebSearchProgress)
 	// OnAfterToolResults runs after tool results are appended to the transcript and state is mirrored, before next-turn reset (query.ts skillPrefetch / taskSummary timing).
 	OnAfterToolResults         func(ctx context.Context, st *LoopState, transcriptJSON json.RawMessage) error
 	OnHistorySnip              func(bytesBefore, bytesAfter, rounds int, snipID string)

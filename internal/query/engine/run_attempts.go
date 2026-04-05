@@ -50,10 +50,15 @@ func (e *Engine) loopDriver() query.LoopDriver {
 		}
 		if aa, ok := turn.(*anthropic.AnthropicAssistant); ok && aa.Client != nil {
 			d.WebSearchExecute = func(ctx context.Context, in websearchtool.Input) ([]any, error) {
+				var onP func(websearchtool.WebSearchProgress)
+				if rc := websearchtool.RunContextFrom(ctx); rc != nil {
+					onP = rc.OnWebSearchProgress
+				}
 				return anthropic.ExecuteWebSearchToolCall(ctx, aa.Client, in, anthropic.WebSearchCallParams{
-					Policy:        aa.Policy,
-					MainLoopModel: e.model,
-					MaxTokens:     e.maxTokens,
+					Policy:              aa.Policy,
+					MainLoopModel:       e.model,
+					MaxTokens:           e.maxTokens,
+					OnWebSearchProgress: onP,
 				})
 			}
 		}
