@@ -9,7 +9,7 @@
 | 序 | 状态 | 项 | 验收 |
 |----|------|-----|------|
 | 1 | ☑ | **`rabbit-code context budget`**：stdin **resolved submit body**；**`query.BuildSubmitTokenBudgetSnapshotPayload`** → JSON **`kind`=`submit_token_budget_snapshot`**（**`total_tokens`** / **`inject_raw_bytes`** / **`mode_detail`** ↔ **`EngineEvent`** **H5.3**）；默认模式读 **`RABBIT_CODE_TOKEN_SUBMIT_ESTIMATE_MODE`**（不必 **`TOKEN_BUDGET=1`**，便于脚本诊断） | **`go test ./internal/query/... ./internal/commands/contextcmd/... -short`** |
-| 2 | ☐ | Bubble Tea **meter** 订阅 **`EventKindSubmitTokenBudgetSnapshot`**；附件条 UI；**`utils/attachments.ts`** 全量仍 Follow-on | **Phase 9** |
+| 2 | ☑ | **`SubmitChromeTeaModel`** + **`SubmitChromeState`**：Bubble Tea **`EngineEventMsg`** 链式监听；**`EventKindSubmitTokenBudgetSnapshot`** + **`EventKindMemdirInject`** → 单行 status；全量 **`attachments.ts`** / REPL 合成仍 Phase 9 | **`go test ./internal/app/... -short`** |
 
 ---
 
@@ -19,7 +19,7 @@
 |-------------|-----|------|
 | **`query.ts`** submit 路径 token 估计 + **`tokenBudget`** | **`engine`** **`EventKindSubmitTokenBudgetSnapshot`** | **[x]** 引擎 |
 | 脚本 / SDK 诊断 | **`context budget`** | **[x]** headless |
-| TUI meter | — | **T3 序 2** |
+| TUI meter | **`app.SubmitChromeTeaModel`** / **`SubmitChromeState`** | **[x]** 子模型 |
 
 ---
 

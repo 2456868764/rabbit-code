@@ -186,5 +186,6 @@
 | **2026-04-01** | commit | **迭代 31（T2 §3.0 序 1–2）**：**`internal/commands/contextcmd`**（**`rabbit-code context`** **`help`** / **`break-cache`** / **`report`**）；**`report`** → **`query.BuildHeadlessContextReport`** JSON；**`PARITY_T2_CONTEXT_CLI.md`**；**`PHASE05_CONTINUATION`** T2 表；**README** 映射一行。 | **T2** 序 **3**（Markdown / **`analyzeContext`** 全量 / TUI 网格） |
 | **2026-04-01** | commit | **迭代 32（T2 §3.0 序 3）**：**`query.FormatHeadlessContextReportMarkdown`**、**`HeadlessContextReport.ResolvedTokenUsage`**；**`context report-md`**；**`-microcompact`**（**`MicrocompactMessagesAPIJSON`**）；**PARITY** / **CONTINUATION** T2 全 ☑。 | **T3** 预算 UI；**`analyzeContext.ts`** 全分类 / **`context.tsx`** |
 | **2026-04-01** | commit | **迭代 33（T3 §3.0 序 1）**：**`query.BuildSubmitTokenBudgetSnapshotPayload`**、**`SubmitTokenBudgetSnapshotPayload`**；**`context budget`** CLI；**`PARITY_T3_BUDGET_METER.md`**；**CONTINUATION** T3 表与进度。 | **T3** 序 **2**（Ink meter / 附件 UX） |
+| **2026-04-01** | commit | **迭代 34（T3 §3.0 序 2）**：**`app.SubmitChromeState`**、**`SubmitChromeTeaModel`**、**`EngineEventMsg`**（Bubble Tea v2 **`tea.View`**）；预算 + memdir 条；单测；**PARITY** / **CONTINUATION** T3 全 ☑。 | **Phase 9** 主 REPL 合成；**`attachments.ts`** 全量 |
 
 （后续行：每完成可合并条目追加一行。）

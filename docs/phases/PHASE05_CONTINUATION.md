@@ -41,7 +41,7 @@
 | 序 | 状态 | 项 | 验收 |
 |----|------|-----|------|
 | 1 | ☑ | **`context budget`**：**`query.BuildSubmitTokenBudgetSnapshotPayload`** ↔ **`EventKindSubmitTokenBudgetSnapshot`**（**H5.3** JSON 脚本面） | **`go test ./internal/query/... ./internal/commands/contextcmd/... -short`** |
-| 2 | ☐ | Ink **meter** / 附件展示消费 **`EngineEvent`**；全量 **`attachments.ts`** UX 仍 Follow-on | **Phase 9 TUI** |
+| 2 | ☑ | **`SubmitChromeTeaModel`**（**`EngineEvent`** → budget + memdir 条）；主 REPL **`tea.Batch`** 合成仍 Phase 9；**`attachments.ts`** 全量仍 Follow-on | **`PARITY_T3_BUDGET_METER.md`** |
 
 ---
 
@@ -209,7 +209,7 @@
 |------|------|------|------------------|
 | A | **T1** | **`thinking.ts`、系统块、`processUserInput`** 与展示/输入一致（**§3.0 T1 子计划**、**`PARITY_T1_THINKING_PROCESSUSERINPUT.md`**） | `utils/thinking.ts`、`utils/processUserInput` |
 | B | **T2** | **完整 REPL `context.ts` 类子命令**（在现有 **`context break-cache`** 上扩展） | `context.ts` 等 |
-| C | **T3** | **预算 meter、附件 UX**（消费引擎暴露的预算信号） | 同 F.1，偏 UI |
+| C | **T3** | **预算 meter、附件 UX**：**`SubmitChromeTeaModel`** / **`context budget`**；主 REPL 合成仍 Phase 9 | **`PARITY_T3_BUDGET_METER.md`** |
 
 **穿插**：**T4**（**session restore 协调与工具**，`sessionRestore.ts` / `query.ts`）与 **T5**（**job 分类、磁盘 stopHooks、模板与 REPL 集成**）在 **T1→T2→T3** 推进过程中按需插入（例如 T1 后与 session 恢复 UI 绑定时做 T4；模板/命令面扩展时做 T5），不强制严格串行，但 **不应早于** 对应 headless 能力就绪（避免 UI 空转）。
 
@@ -229,6 +229,7 @@
 #### T3 进度（**§3.0 T3 子计划**）
 
 - **序 1 ☑**：**`context budget`** + **`query.SubmitTokenBudgetSnapshotPayload`** / **`BuildSubmitTokenBudgetSnapshotPayload`**（对齐引擎 **`EventKindSubmitTokenBudgetSnapshot`** 三整数字段语义）。
+- **序 2 ☑**：**`internal/app`** **`SubmitChromeState`** / **`SubmitChromeTeaModel`**（**`EngineEventMsg`**、链式 **`listenOneEngineEvent`**）；消费 **budget snapshot** 与 **`EventKindMemdirInject`**。**§3.0 T3 两行全 ☑**；主会话 **Bubble Tea** 合成仍 Phase 9。
 - **PARITY**：**`docs/phases/PARITY_T3_BUDGET_METER.md`**。
 
 ---
