@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query"
 )
 
@@ -86,6 +87,23 @@ func TestRun_report_md_markdown(t *testing.T) {
 	}
 	if !strings.Contains(s, "Estimated usage by category") {
 		t.Fatal("missing category table")
+	}
+}
+
+func TestRun_budget_json(t *testing.T) {
+	t.Setenv(features.EnvTokenSubmitEstimateMode, "bytes4")
+	in := strings.NewReader("hello")
+	var out, errBuf bytes.Buffer
+	code := Run([]string{"budget"}, in, &out, &errBuf)
+	if code != 0 {
+		t.Fatalf("code=%d err=%q", code, errBuf.String())
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(out.Bytes(), &m); err != nil {
+		t.Fatal(err)
+	}
+	if m["kind"] != query.SubmitTokenBudgetSnapshotKind {
+		t.Fatalf("%v", m)
 	}
 }
 

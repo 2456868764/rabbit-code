@@ -78,7 +78,7 @@ func main() {
 		app.RunAPIPreconnect(ctx, rt)
 	}
 
-	fmt.Fprintf(os.Stderr, "rabbit-code — Phase 1 bootstrap OK. Commands: version | config dump | probe | context (break-cache|report|report-md|help) | set | wizard | sync | %s=1\n", app.ExitAfterInitEnv)
+	fmt.Fprintf(os.Stderr, "rabbit-code — Phase 1 bootstrap OK. Commands: version | config dump | probe | context (break-cache|report|report-md|budget|help) | set | wizard | sync | %s=1\n", app.ExitAfterInitEnv)
 	app.QuitRuntime(rt, 0)
 }
 

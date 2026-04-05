@@ -1,6 +1,10 @@
 package query
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/2456868764/rabbit-code/internal/features"
+)
 
 func TestCheckTokenBudget_skipsWithAgentID(t *testing.T) {
 	tr := NewBudgetTracker()
@@ -99,6 +103,25 @@ func TestEstimateResolvedSubmitTextTokens_structuredJSON(t *testing.T) {
 func TestEstimateSubmitTokenBudgetTotal(t *testing.T) {
 	if n := EstimateSubmitTokenBudgetTotal("bytes4", "abcde", 4); n != 3 {
 		t.Fatalf("got %d", n)
+	}
+}
+
+func TestBuildSubmitTokenBudgetSnapshotPayload_envMode(t *testing.T) {
+	t.Setenv(features.EnvTokenSubmitEstimateMode, "structured")
+	p := BuildSubmitTokenBudgetSnapshotPayload(`[{"role":"user","content":"hi"}]`, 8, "")
+	if p.Kind != SubmitTokenBudgetSnapshotKind || p.ModeDetail != "structured" {
+		t.Fatalf("%+v", p)
+	}
+	if p.InjectRawBytes != 8 || p.TotalTokens <= 0 {
+		t.Fatalf("%+v", p)
+	}
+}
+
+func TestBuildSubmitTokenBudgetSnapshotPayload_modeOverride(t *testing.T) {
+	t.Setenv(features.EnvTokenSubmitEstimateMode, "bytes4")
+	p := BuildSubmitTokenBudgetSnapshotPayload("abcd", 0, "structured")
+	if p.ModeDetail != "structured" {
+		t.Fatalf("%+v", p)
 	}
 }
 

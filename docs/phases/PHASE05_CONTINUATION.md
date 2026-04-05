@@ -36,6 +36,13 @@
 | 2 | ☑ | **`context report`**：**stdin** Messages JSON + **`query.BuildHeadlessContextReport`** JSON | **`PARITY_T2_CONTEXT_CLI.md`** |
 | 3 | ☑ | **`report-md`** + **`FormatHeadlessContextReportMarkdown`**；**`-microcompact`**；全量 **`analyzeContextUsage`** / Ink 网格仍 Follow-on | **`PARITY_T2_CONTEXT_CLI.md`** |
 
+### §3.0 T3 子计划（**TUI 表行 C**：预算 meter / 附件 UX）
+
+| 序 | 状态 | 项 | 验收 |
+|----|------|-----|------|
+| 1 | ☑ | **`context budget`**：**`query.BuildSubmitTokenBudgetSnapshotPayload`** ↔ **`EventKindSubmitTokenBudgetSnapshot`**（**H5.3** JSON 脚本面） | **`go test ./internal/query/... ./internal/commands/contextcmd/... -short`** |
+| 2 | ☐ | Ink **meter** / 附件展示消费 **`EngineEvent`**；全量 **`attachments.ts`** UX 仍 Follow-on | **Phase 9 TUI** |
+
 ---
 
 | # | 项 | 说明 | 目标 Phase / 状态 |
@@ -219,6 +226,11 @@
 - **序 1–3 ☑**：**`contextcmd`**：**`report-md`**、**`query.FormatHeadlessContextReportMarkdown`**（对照 **`context-noninteractive.ts`** 表头 + 分类子集）；**`-microcompact`** → **`compact.MicrocompactMessagesAPIJSON`**。**§3.0 T2 三行全 ☑**；全量 **`analyzeContext.ts`** 分类 / **`context.tsx`** 仍 **PARITY** / **T3**。
 - **PARITY**：**`docs/phases/PARITY_T2_CONTEXT_CLI.md`**。
 
+#### T3 进度（**§3.0 T3 子计划**）
+
+- **序 1 ☑**：**`context budget`** + **`query.SubmitTokenBudgetSnapshotPayload`** / **`BuildSubmitTokenBudgetSnapshotPayload`**（对齐引擎 **`EventKindSubmitTokenBudgetSnapshot`** 三整数字段语义）。
+- **PARITY**：**`docs/phases/PARITY_T3_BUDGET_METER.md`**。
+
 ---
 
-更新本表时同步 **PARITY_PHASE5_DEFERRED.md**、**PARITY_H9_BASH_PERMISSIONS.md**（H9 迭代）、**PARITY_T1_THINKING_PROCESSUSERINPUT.md**（T1 迭代）、**PARITY_T2_CONTEXT_CLI.md**（T2 迭代）、**PHASE05_SPEC_AND_ACCEPTANCE.md** §6，并与模块根 **README.md**（**`engine.Config` highlights / Phase 5 headless**）交叉核对。
+更新本表时同步 **PARITY_PHASE5_DEFERRED.md**、**PARITY_H9_BASH_PERMISSIONS.md**（H9 迭代）、**PARITY_T1_THINKING_PROCESSUSERINPUT.md**（T1 迭代）、**PARITY_T2_CONTEXT_CLI.md**（T2 迭代）、**PARITY_T3_BUDGET_METER.md**（T3 迭代）、**PHASE05_SPEC_AND_ACCEPTANCE.md** §6，并与模块根 **README.md**（**`engine.Config` highlights / Phase 5 headless**）交叉核对。

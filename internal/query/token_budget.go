@@ -2,11 +2,13 @@ package query
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
 )
 
@@ -242,4 +244,44 @@ func EstimateSubmitTokenBudgetTotal(mode, resolved string, injectRawBytes int) i
 		return EstimateUTF8BytesAsTokens(resolved) + EstimateAttachmentRawBytesAsTokens(injectRawBytes)
 	}
 	return EstimateResolvedSubmitTextTokens(mode, resolved) + EstimateAttachmentRawBytesAsTokens(injectRawBytes)
+}
+
+// SubmitTokenBudgetSnapshotKind is the JSON kind for headless/T3 consumers (mirrors engine EventKindSubmitTokenBudgetSnapshot).
+const SubmitTokenBudgetSnapshotKind = "submit_token_budget_snapshot"
+
+// SubmitTokenBudgetSnapshotPayload mirrors engine.EngineEvent for EventKindSubmitTokenBudgetSnapshot (PhaseAuxInt / PhaseAuxInt2 / PhaseDetail).
+type SubmitTokenBudgetSnapshotPayload struct {
+	Kind           string `json:"kind"`
+	TotalTokens    int    `json:"total_tokens"`
+	InjectRawBytes int    `json:"inject_raw_bytes"`
+	ModeDetail     string `json:"mode_detail"`
+}
+
+// BuildSubmitTokenBudgetSnapshotPayload builds the same combined estimate as engine.runTurnLoop uses for the budget snapshot (H5.3 / T3).
+// modeOverride empty uses RABBIT_CODE_TOKEN_SUBMIT_ESTIMATE_MODE (structured|api|bytes4) so CLI diagnostics work without TOKEN_BUDGET=1;
+// when the engine runs with token budget enabled, features.SubmitTokenEstimateMode() matches this for the same env.
+func BuildSubmitTokenBudgetSnapshotPayload(resolved string, injectRawBytes int, modeOverride string) SubmitTokenBudgetSnapshotPayload {
+	mode := strings.TrimSpace(modeOverride)
+	if mode == "" {
+		mode = submitTokenEstimateModeFromEnv()
+	} else {
+		mode = strings.ToLower(mode)
+	}
+	total := EstimateSubmitTokenBudgetTotal(mode, resolved, injectRawBytes)
+	return SubmitTokenBudgetSnapshotPayload{
+		Kind:           SubmitTokenBudgetSnapshotKind,
+		TotalTokens:    total,
+		InjectRawBytes: injectRawBytes,
+		ModeDetail:     mode,
+	}
+}
+
+func submitTokenEstimateModeFromEnv() string {
+	s := strings.ToLower(strings.TrimSpace(os.Getenv(features.EnvTokenSubmitEstimateMode)))
+	switch s {
+	case "structured", "api":
+		return s
+	default:
+		return "bytes4"
+	}
 }
