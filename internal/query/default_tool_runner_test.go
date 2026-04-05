@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/tools/greptool"
 )
@@ -46,6 +47,17 @@ func TestNewDefaultToolRunner_bashFallback(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "hi") && !strings.Contains(string(out), "stub") {
 		t.Fatalf("unexpected: %s", out)
+	}
+}
+
+func TestNewDefaultToolRunner_embeddedOmitsGrep(t *testing.T) {
+	t.Setenv(features.EnvEmbeddedSearchTools, "1")
+	t.Setenv("CLAUDE_CODE_ENTRYPOINT", "")
+	t.Setenv("RABBIT_CODE_ENTRYPOINT", "")
+	tr := query.NewDefaultToolRunner()
+	_, err := tr.RunTool(context.Background(), greptool.GrepToolName, []byte(`{"pattern":"x","path":"."}`))
+	if err == nil || !strings.Contains(err.Error(), "unknown tool") {
+		t.Fatalf("grep should be unregistered: %v", err)
 	}
 }
 

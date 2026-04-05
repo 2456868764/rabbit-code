@@ -25,6 +25,7 @@ func NewDefaultToolRunner() ToolRunner {
 }
 
 // NewDefaultToolRunnerForModel builds the default registry; mainLoopModel seeds WebSearch gating (Vertex 4.x, Bedrock off, etc.).
+// Glob and Grep are omitted when features.HasEmbeddedSearchTools() matches embeddedTools.ts (EMBEDDED_SEARCH_TOOLS + entrypoint).
 // and ToolSearch when features.ToolSearchEnabledOptimistic() matches upstream (utils/toolSearch.ts),
 // plus BashExecToolRunner for tool name "bash" when not handled by the registry.
 func NewDefaultToolRunnerForModel(mainLoopModel string) ToolRunner {
@@ -32,12 +33,15 @@ func NewDefaultToolRunnerForModel(mainLoopModel string) ToolRunner {
 		filereadtool.New(),
 		filewritetool.New(),
 		fileedittool.New(),
-		globtool.New(),
-		greptool.New(),
+	}
+	if !features.HasEmbeddedSearchTools() {
+		builtins = append(builtins, globtool.New(), greptool.New())
+	}
+	builtins = append(builtins,
 		notebookedittool.New(),
 		todowritetool.New(),
 		webfetchtool.New(),
-	}
+	)
 	if features.WebSearchToolEnabled(ResolveMainLoopModel(mainLoopModel)) {
 		builtins = append(builtins, websearchtool.New())
 	}

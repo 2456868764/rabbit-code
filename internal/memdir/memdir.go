@@ -278,11 +278,11 @@ func LoadMemorySystemPrompt(in MemorySystemPromptInput) (text string, ok bool) {
 			ProjectDir:            proj,
 			ExtraGuidelines:       extra,
 			SkipIndex:             skipIdx,
-			UseShellGrepForSearch: false,
+			UseShellGrepForSearch: features.UseShellGrepForMemoryPrompts(),
 		})
 	default:
 		extra := features.CoworkMemoryExtraGuidelineLines()
-		body = BuildMemoryLinesAutoOnly(autoMemDisplayName, memWithSep, proj, extra, skipIdx, false)
+		body = BuildMemoryLinesAutoOnly(autoMemDisplayName, memWithSep, proj, extra, skipIdx, features.UseShellGrepForMemoryPrompts())
 	}
 	if strings.TrimSpace(body) == "" {
 		return "", false
