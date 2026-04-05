@@ -46,6 +46,36 @@ func TestGrep_strictJSON(t *testing.T) {
 	}
 }
 
+func TestGrep_filesWithMatches_NODE_ENV_test_sortsByPath(t *testing.T) {
+	if _, err := exec.LookPath("rg"); err != nil {
+		t.Skip("no ripgrep")
+	}
+	t.Setenv("NODE_ENV", "test")
+	dir := t.TempDir()
+	for _, name := range []string{"z.txt", "a.txt"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("needle\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	g := greptool.New()
+	out, err := g.Run(context.Background(), []byte(`{"pattern":"needle","path":`+mustJSON(t, dir)+`}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var o struct {
+		Filenames []string `json:"filenames"`
+	}
+	if err := json.Unmarshal(out, &o); err != nil {
+		t.Fatal(err)
+	}
+	if len(o.Filenames) != 2 {
+		t.Fatalf("got %v", o.Filenames)
+	}
+	if !strings.Contains(o.Filenames[0], "a.txt") || !strings.Contains(o.Filenames[1], "z.txt") {
+		t.Fatalf("want lexicographic order a then z, got %v", o.Filenames)
+	}
+}
+
 func TestGrep_filesWithMatches(t *testing.T) {
 	if _, err := exec.LookPath("rg"); err != nil {
 		t.Skip("no ripgrep")

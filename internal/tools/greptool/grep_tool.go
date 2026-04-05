@@ -173,7 +173,7 @@ func applyHeadLimit[T any](items []T, headLimit *int, offset int) (out []T, appl
 		return items[offset:], nil, offOut
 	}
 	limit := defaultHeadLimit
-	if headLimit != nil {
+	if headLimit != nil && *headLimit > 0 {
 		limit = *headLimit
 	}
 	off := offset
@@ -283,6 +283,11 @@ func (g *Grep) runRipgrep(ctx context.Context, rgPath, target string, args []str
 		lines, err = try([]string{"-j", "1"})
 	}
 	return lines, err
+}
+
+// grepSortByFilenameInTest mirrors GrepTool.ts (NODE_ENV === 'test' → localeCompare on rg paths).
+func grepSortByFilenameInTest() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("NODE_ENV")), "test")
 }
 
 func appendIgnoreGlobs(args []string, gc *GrepContext, cwd string) []string {
@@ -512,27 +517,33 @@ func (g *Grep) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 			}
 			paths = append(paths, p)
 		}
-		type scored struct {
-			path  string
-			mtime int64
-		}
-		sc := make([]scored, 0, len(paths))
-		for _, p := range paths {
-			var mt int64
-			if fi, err := os.Stat(p); err == nil {
-				mt = fi.ModTime().UnixNano()
+		var ordered []string
+		if grepSortByFilenameInTest() {
+			ordered = append([]string(nil), paths...)
+			sort.Strings(ordered)
+		} else {
+			type scored struct {
+				path  string
+				mtime int64
 			}
-			sc = append(sc, scored{path: p, mtime: mt})
-		}
-		sort.Slice(sc, func(i, j int) bool {
-			if sc[i].mtime != sc[j].mtime {
-				return sc[i].mtime > sc[j].mtime
+			sc := make([]scored, 0, len(paths))
+			for _, p := range paths {
+				var mt int64
+				if fi, err := os.Stat(p); err == nil {
+					mt = fi.ModTime().UnixNano()
+				}
+				sc = append(sc, scored{path: p, mtime: mt})
 			}
-			return sc[i].path < sc[j].path
-		})
-		ordered := make([]string, len(sc))
-		for i := range sc {
-			ordered[i] = sc[i].path
+			sort.Slice(sc, func(i, j int) bool {
+				if sc[i].mtime != sc[j].mtime {
+					return sc[i].mtime > sc[j].mtime
+				}
+				return sc[i].path < sc[j].path
+			})
+			ordered = make([]string, len(sc))
+			for i := range sc {
+				ordered[i] = sc[i].path
+			}
 		}
 		finalPaths, al, ao := applyHeadLimit(ordered, in.HeadLimit, offset)
 		relNames := make([]string, len(finalPaths))
