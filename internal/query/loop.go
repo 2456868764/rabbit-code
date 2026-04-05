@@ -18,6 +18,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/tools/greptool"
 	"github.com/2456868764/rabbit-code/internal/tools/notebookedittool"
 	"github.com/2456868764/rabbit-code/internal/tools/todowritetool"
+	"github.com/2456868764/rabbit-code/internal/tools/toolsearchtool"
 )
 
 // ErrMaxTurnsExceeded is returned when LoopState.MaxTurns > 0 and the cap is hit before another assistant call.
@@ -405,6 +406,8 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 				if s := todowritetool.MapTodoWriteToolResultForMessagesAPI(out); s != "" {
 					content = s
 				}
+			} else if u.Name == toolsearchtool.ToolSearchToolName {
+				content = toolsearchtool.MapToolSearchToolResultForMessagesAPI(out)
 			}
 			toolBlocks = append(toolBlocks, map[string]any{
 				"type":        "tool_result",

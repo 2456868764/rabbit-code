@@ -3,6 +3,8 @@ package query
 import (
 	"context"
 
+	"github.com/2456868764/rabbit-code/internal/features"
+	"github.com/2456868764/rabbit-code/internal/tools"
 	"github.com/2456868764/rabbit-code/internal/tools/fileedittool"
 	"github.com/2456868764/rabbit-code/internal/tools/filereadtool"
 	"github.com/2456868764/rabbit-code/internal/tools/filewritetool"
@@ -11,12 +13,14 @@ import (
 	"github.com/2456868764/rabbit-code/internal/tools/notebookedittool"
 	"github.com/2456868764/rabbit-code/internal/tools/registry"
 	"github.com/2456868764/rabbit-code/internal/tools/todowritetool"
+	"github.com/2456868764/rabbit-code/internal/tools/toolsearchtool"
 )
 
 // NewDefaultToolRunner returns a ToolRunner with Phase-6 builtins (Read, Write, Edit, Glob, Grep, NotebookEdit, TodoWrite)
+// and ToolSearch when features.ToolSearchEnabledOptimistic() matches upstream (utils/toolSearch.ts),
 // plus BashExecToolRunner for tool name "bash" when not handled by the registry.
 func NewDefaultToolRunner() ToolRunner {
-	reg := registry.New(
+	builtins := []tools.Tool{
 		filereadtool.New(),
 		filewritetool.New(),
 		fileedittool.New(),
@@ -24,7 +28,11 @@ func NewDefaultToolRunner() ToolRunner {
 		greptool.New(),
 		notebookedittool.New(),
 		todowritetool.New(),
-	)
+	}
+	if features.ToolSearchEnabledOptimistic() {
+		builtins = append(builtins, toolsearchtool.New())
+	}
+	reg := registry.New(builtins...)
 	return &registryBashToolRunner{reg: reg}
 }
 
