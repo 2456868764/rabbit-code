@@ -177,5 +177,6 @@
 | **2026-04-01** | commit | **迭代 22（memdir §3.0 / §3.2）**：**`internal/memdir/MEMDIR_TS_PARITY.md`** 写入 **§3.0 有序计划** 与 **§3.2 单次核对**；**`FindRelevantMemoriesClassic`**（**`findRelevantMemories.ts`** 形参薄委托）+ 单测；**`PHASE05_CONTINUATION.md`** H8 子计划指针；**`doc.go`**；**`go build ./...`**、**`go test ./... -short`**。 | **MEMDIR_TS_PARITY** §3.0 序 **2–4**（`memoryScan` / `memdir` / `paths`） |
 | **2026-04-01** | commit | **迭代 23（memdir §3.0 序 2）**：**`memory_scan.go`** **`MemoryHeader` / `ScanMemoryFiles`** 与 **`memoryScan.ts`** 对照注释（**`AbortSignal`↔`context`**、**`null`↔`""`**）；**`TestFormatMemoryManifest_noDescriptionLikeTSNull`**；**`MEMDIR_TS_PARITY`** 表与 §3.0 序 **2** ☑。 | **MEMDIR_TS_PARITY** §3.0 序 **3–4**（`memdir` / `paths`） |
 | **2026-04-01** | commit | **迭代 24（memdir §3.0 序 3–4）**：**`MEMDIR_TS_PARITY.md`** **§3.0 序 3–4** **`memdir.ts` / `paths.ts`** 行为对照表；主表 **`paths` / `memdir`** 余项 **[x]**；**`memdir.go`** / **`paths.go`** / **`doc.go`** 注释。 | **MEMDIR** §3.0 四行全 ☑；后续仅 Follow-on / 他 Phase |
+| **2026-04-01** | commit | **迭代 25（H8 / §3.0 #2）**：**`app.WireHeadlessEngineForShutdown`** + **`cmd/rabbit-code`** **`Bootstrap` 成功**后接线；**`headless_engine_test`**；**`PHASE05_CONTINUATION.md`** §3.0 项 2 ☑、H8「引擎接线」段；**`engine`/`query` doc**、**`query_ts_go_map.md`**。 | **§3.0** 项 3（PARITY Query 等）见 **PHASE05_CONTINUATION** |
 
 （后续行：每完成可合并条目追加一行。）

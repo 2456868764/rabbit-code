@@ -9,7 +9,7 @@
 | 序 | 状态 | 项 | 验收 |
 |----|------|-----|------|
 | 1 | ☑ | **`cmd/rabbit-code`**：`Bootstrap` 成功后凡退出路径经 **`app.QuitRuntime`** / **`app.FailBootstrap`**，确保 **`Runtime.Close`**（含未来 **`RegisterEngineShutdown`**）在 **`os.Exit` 前执行 | **`go test ./internal/app/... ./cmd/rabbit-code/... -short`**；手测 **`RABBIT_CODE_EXIT_AFTER_INIT=1`** 仍 0 |
-| 2 | ☐ | **H8 接线**：在首个持有 **`engine.Engine`** 的宿主路径调用 **`RegisterEngineShutdown`** | 有 Engine 的集成测或 E2E 子集 |
+| 2 | ☑ | **H8 接线**：**`Bootstrap`** 成功后 **`app.WireHeadlessEngineForShutdown`**（最小 **`engine.New(parent, nil)`** + **`RegisterEngineShutdown`**）；**`cmd/rabbit-code`** 主路径在 **`QuitRuntime`** 前经 **`Runtime.Close`** drain | **`go test ./internal/app/... ./cmd/rabbit-code/... -short`** |
 | 3 | ☐ | **PARITY `[~]` 扫尾**：**`QueryEngineConfig` 1:1**、**`cost-tracker`**、**JSONL Map** — 按 **PARITY_PHASE5_DEFERRED** 目标 Phase 分步，不早于 headless 就绪项 | 更新 **PARITY_QUERY_QUERYENGINE.md** 格 |
 
 ---
@@ -157,7 +157,7 @@
 
 **引擎 / 产品接线**
 
-- **进程退出前 drain**：**`Engine.DrainExtractMemories`** 已有；宿主在 **`engine.New`** 后调用 **`app.(*Runtime).RegisterEngineShutdown(engine)`** 可在 **`Runtime.Close`** 时 bounded drain（**`internal/app/engine_shutdown.go`**）。**`cmd/rabbit-code`** 主路径经 **`app.QuitRuntime`/`FailBootstrap`** 在 **`os.Exit` 前调用 `Close`**，故注册后 drain 会运行；**当前 main 仍无 Engine**，注册调用点在 REPL 合入时补上。
+- **进程退出前 drain**：**`Engine.DrainExtractMemories`** 已有；**`cmd/rabbit-code`** 在 **`Bootstrap` 成功**后调用 **`app.WireHeadlessEngineForShutdown`**（**`engine.New` + `RegisterEngineShutdown`**），**`QuitRuntime`/`FailBootstrap`** 在 **`os.Exit` 前 `Runtime.Close`** 时 bounded drain（**`internal/app/engine_shutdown.go`**）。全功能 REPL 若持有独立 **`Engine`** 实例，仍应 **`RegisterEngineShutdown`** 该实例（或复用同一 **`Runtime`** 接线）。
 
 **其它**
 

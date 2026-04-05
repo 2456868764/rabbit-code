@@ -56,6 +56,9 @@ func main() {
 	rt, err := app.Bootstrap(ctx)
 	if err != nil {
 		app.PrintBootstrapFailure(err)
+	} else {
+		// H8: register extract drain before any path that may os.Exit (PHASE05_CONTINUATION §3.0 #2).
+		app.WireHeadlessEngineForShutdown(rt, ctx)
 	}
 
 	if os.Getenv(app.ExitAfterInitEnv) == "1" {

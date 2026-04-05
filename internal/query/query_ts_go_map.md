@@ -33,7 +33,7 @@ Authority tree: `claude-code-sourcemap/restored-src/src/`.
 | TS | Go |
 |----|-----|
 | 包整体 | `internal/query/engine/*.go` |
-| 退出 drain（extract fork） | `Engine.DrainExtractMemories`；宿主 **`RegisterEngineShutdown`**；**`cmd/rabbit-code`** 经 **`app.QuitRuntime`/`FailBootstrap`** 保证 **`Runtime.Close`** 先于 **`os.Exit`** |
+| 退出 drain（extract fork） | `Engine.DrainExtractMemories`；**`app.WireHeadlessEngineForShutdown`**（**`Bootstrap` 后**）或 **`RegisterEngineShutdown`**；**`cmd/rabbit-code`** 经 **`QuitRuntime`/`FailBootstrap`** 保证 **`Runtime.Close`** 先于 **`os.Exit`** |
 | `taskBudget.total` | `engine.Config.TaskBudgetTotal` → `query.LoopDriver` → `anthropic.WithPerTurnTaskBudget`（`internal/services/api/task_budget_context.go`） |
 | `processUserInput` / 模板附录扩展 | `engine.Config.ProcessUserInputHook`、`ExtraTemplateNames`（`engine.go`） |
 
