@@ -10,6 +10,7 @@ import (
 
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/tools/websearchtool"
+	"github.com/2456868764/rabbit-code/internal/utils/thinking"
 )
 
 // WebSearchCallParams configures ExecuteWebSearchToolCall (WebSearchTool.call analogue).
@@ -51,14 +52,25 @@ func ExecuteWebSearchToolCall(ctx context.Context, c *Client, in websearchtool.I
 		small = smallFastModelFromEnv()
 	}
 
-	var toolChoice, thinking json.RawMessage
+	var toolChoice, thinkingField json.RawMessage
 	var temperature *float64
 	if usePlum {
 		model = small
 		toolChoice = json.RawMessage(`{"type":"tool","name":"web_search"}`)
-		thinking = json.RawMessage(`{"type":"disabled"}`)
+		thinkingField = json.RawMessage(`{"type":"disabled"}`)
 		t := 1.0
 		temperature = &t
+	} else {
+		th, hasThink, err := thinking.MessagesAPIThinkingField(model, thinking.Provider(c.Provider), maxTok)
+		if err != nil {
+			return nil, err
+		}
+		if hasThink {
+			thinkingField = th
+		} else {
+			t := 1.0
+			temperature = &t
+		}
 	}
 
 	userLine := websearchtool.InnerSearchUserContent(in.Query)
@@ -89,7 +101,7 @@ func ExecuteWebSearchToolCall(ctx context.Context, c *Client, in websearchtool.I
 		System:      sys,
 		Tools:       tools,
 		ToolChoice:  toolChoice,
-		Thinking:    thinking,
+		Thinking:    thinkingField,
 		Temperature: temperature,
 	}
 	body.AnthropicBeta = AppendBetaUnique(body.AnthropicBeta, BetaWebSearch)
