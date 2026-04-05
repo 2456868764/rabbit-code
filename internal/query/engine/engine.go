@@ -14,10 +14,10 @@ import (
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/memdir"
 	"github.com/2456868764/rabbit-code/internal/query"
-	"github.com/2456868764/rabbit-code/internal/utils/processuserinput"
-	"github.com/2456868764/rabbit-code/internal/utils/thinking"
 	anthropic "github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
+	"github.com/2456868764/rabbit-code/internal/utils/processuserinput"
+	"github.com/2456868764/rabbit-code/internal/utils/thinking"
 )
 
 // StopHookFunc runs after each Submit’s RunTurnLoop attempt finishes (success or failure). Hooks run in slice order; legacy StopHook is appended after StopHooks (P5.1.4).
@@ -254,11 +254,11 @@ type Engine struct {
 	postCompactDeltaAttach  []json.RawMessage
 	postCompactWorkspaceDir string
 
-	commandLifecycleNotify           func(uuid string, phase string)
-	processUserInputHook             ProcessUserInputHook
-	truncateProcessUserInputHook     bool
-	extraTemplateNames               ExtraTemplateNames
-	afterToolResultsHook   AfterToolResultsHook
+	commandLifecycleNotify       func(uuid string, phase string)
+	processUserInputHook         ProcessUserInputHook
+	truncateProcessUserInputHook bool
+	extraTemplateNames           ExtraTemplateNames
+	afterToolResultsHook         AfterToolResultsHook
 }
 
 // NewEngine is equivalent to New(parent, nil) (stub assistant).
@@ -288,6 +288,9 @@ func New(parent context.Context, cfg *Config) *Engine {
 			if aa, ok := deps.Assistant.(*anthropic.AnthropicAssistant); ok {
 				deps.Turn = aa
 			}
+		}
+		if deps.Tools == nil && (deps.Turn != nil || deps.Assistant != nil) {
+			deps.Tools = query.NewDefaultToolRunner()
 		}
 		e.deps = deps
 		if cfg.Model != "" {

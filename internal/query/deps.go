@@ -9,6 +9,7 @@ import (
 
 // ToolRunner runs one tool invocation (Phase 6 wires real tools).
 // Use *registry.Registry from internal/tools/registry when dispatching named tools + dynamic MCP registration.
+// NewDefaultToolRunner provides Read/Write/Edit/Glob/Grep plus bash fallback; engine.New sets it when Tools is nil and Turn/Assistant is set.
 type ToolRunner interface {
 	RunTool(ctx context.Context, name string, inputJSON []byte) (resultJSON []byte, err error)
 }
