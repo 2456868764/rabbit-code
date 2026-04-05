@@ -1,4 +1,4 @@
-// Package filereadtool mirrors restored-src/src/tools/FileReadTool/prompt.ts (exported tool name only).
+// Package filereadtool mirrors restored-src/src/tools/FileReadTool/ (FileReadTool.ts, limits.ts, imageProcessor.ts, prompt.ts, UI.tsx → ui.go 非 Ink 子集).
 package filereadtool
 
 // FileReadToolName is FILE_READ_TOOL_NAME upstream.

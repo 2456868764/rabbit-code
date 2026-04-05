@@ -22,7 +22,8 @@ make test-phase6
 | 范围 | 覆盖内容 |
 |------|----------|
 | 每工具子包 | **Run** 成功、权限拒绝、非法 JSON 输入（**AC6-1**） |
-| **`internal/tools/registry`** | **`RegisterMCP` / `UnregisterMCP` / `ByName`（含 alias）/ `RunTool`**；实现 **`query.ToolRunner`**（见 **`registry_test.go`**） |
+| **`internal/tools/registry`** | **`RegisterMCP` / `UnregisterMCP` / `ByName`（含 alias）/ `RunTool`**；实现 **`query.ToolRunner`**（见 **`registry_test.go`**）；含 **`Read`** 内置路由测 |
+| **`internal/tools/filereadtool`** | **`FileRead.Run`**：成功读、坏 JSON/空路径、**`.exe`** 拒绝、**`/dev/zero`**（非 Windows）、**offset** 越界 |
 
 ---
 

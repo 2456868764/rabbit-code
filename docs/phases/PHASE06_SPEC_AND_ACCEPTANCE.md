@@ -37,7 +37,7 @@
 | 状态 | 编号 | 功能项 | 说明 |
 |------|------|--------|------|
 | [~] | P6.0.1 | Registry List/ByName/动态 MCP 注册 | **`internal/tools.Tool`** + **`registry.Registry`**（**`ListNames` / `ByName` / `RegisterMCP` / `UnregisterMCP` / `RunTool`→**`query.ToolRunner`**）；**`getTools()`** 全量 feature 排序、**`refreshTools`**、API schema 聚合仍 defer |
-| [ ] | P6.1 | 文件：read/write/edit/glob/grep/notebook | 各工具独立单测；Go 侧已有子包占位 / 少量 **prompt/constants**，缺统一 **`Run`** 与 **AC6-1** 矩阵 |
+| [~] | P6.1 | 文件：read/write/edit/glob/grep/notebook | **Read**：**`filereadtool.FileRead`** + **`tools.Tool` / `Run`** + **≥3 单测** + **registry 集成测**；**write/edit/glob/grep/notebook** 仍占位；PDF/图/笔记本/权限/dedup/token 上限仍 defer |
 | [ ] | P6.2 | 执行：bash、powershell(平台)、lsp | 沙箱策略可配置；**`querydeps.Bash*`** 为 Phase 5 桥接，本 Phase 对齐 **`BashTool`/`PowerShellTool`/`LSPTool`** 全栈 |
 | [ ] | P6.3 | 网络：web_fetch、web_search | 代理与 allowlist |
 | [ ] | P6.4 | 任务：task_*、todo、brief、plan、worktree | 与 **`Task.ts` / `tasks/`** 包一致 |
@@ -79,7 +79,7 @@
 
 | 状态 | 编号 | 要求 |
 |------|------|------|
-| [ ] | **AC6-1** | **每个工具** ≥3 单测（成功/拒绝/坏输入）。 |
+| [~] | **AC6-1** | **每个工具** ≥3 单测：**Read** 已覆盖；其余文件工具待补。 |
 | [~] | **AC6-2** | registry 动态增删 MCP 工具后 query 可见（**`engine.Config.Deps.Tools`** 设为 **`registry.Registry`** 即 **`RunTool`** 可路由到新工具；默认宿主仍 **`BashStubToolRunner`** / **`BashExecToolRunner`**）。 |
 | [ ] | **AC6-3** | E2E：**`PHASE06_E2E_ACCEPTANCE.md` §2** fixture 矩阵与 SPEC 附录同步勾选。 |
 | [ ] | **AC6-F1**–**AC6-F23** | **§2 `P6.F.*`** 各标志在工具注册/执行路径上行为与 [SOURCE_FEATURE_FLAGS.md](../SOURCE_FEATURE_FLAGS.md) §2 对应行一致，或 PARITY **豁免**说明。 |
@@ -106,7 +106,7 @@
 
 | 域（架构 **§4**） | 还原路径（`src/tools/` 下目录） | Go 路径（`internal/tools/`） | 状态 |
 |------------------|--------------------------------|-----------------------------|------|
-| 文件与代码 | `FileReadTool`、`FileWriteTool`、`FileEditTool`、`GlobTool`、`GrepTool`、`NotebookEditTool` | `filereadtool`、`filewritetool`、`fileedittool`、`globtool`、`greptool`、`notebookedittool` | **部分**（多数为 prompt/constants 或空包，缺 **AC6-1**） |
+| 文件与代码 | `FileReadTool`、`FileWriteTool`、`FileEditTool`、`GlobTool`、`GrepTool`、`NotebookEditTool` | `filereadtool`、`filewritetool`、`fileedittool`、`globtool`、`greptool`、`notebookedittool` | **部分**（**`filereadtool`**：**`file_read_tool.go`** 等对照 **`FileReadTool/`** 全 **`.ts` 基名**（**`UI.tsx`→`ui.go`** Ink 外子集）；**Read** 文本子路径 + 单测；**`Write`/`Edit`/…** 仍占位） |
 | 执行环境 | `BashTool`、`PowerShellTool`、`LSPTool` | `bashtool`、`powershelltool`、`lsptool` | **部分**（**`bashtool`/`powershelltool`** 仅 **toolname** 等；**`lsptool`** 占位） |
 | 网络 | `WebFetchTool`、`WebSearchTool` | `webfetchtool`、`websearchtool` | **部分**（prompt 级） |
 | 任务与规划 | `Task*`、`TodoWriteTool`、`EnterPlanModeTool`、`ExitPlanModeV2Tool`、`BriefTool` 等 | `taskcreatetool`、`taskgettool`、…、`todowritetool`、`enterplanmodetool`、`exitplanmodetool`、`brieftool` 等 | **未创建**（多为 **`.gitkeep` 占位**） |
@@ -146,5 +146,6 @@
 |------|---------------|------|------|
 | **2026-04-01** | —（迭代前准备） | 补 **§0**、扩展 **§1 / §4**（`Tool.ts`·`tools.ts`·`tools/*` ↔ Go）、**§6** 基线；**`PHASE06_E2E_ACCEPTANCE.md` §0**；**`Makefile`** **`test-phase6`**。 | 自 **§三-3.0** 生成有序计划后从 **P6.0.1** 或架构选定的首模块开工 |
 | **2026-04-01** | commit | **Phase 6 迭代 1（P6.0.1 子集）**：**`internal/tools`** **`Tool`**；**`internal/tools/registry`**（**`ListNames` / `ByName` / `RegisterMCP` / `UnregisterMCP` / `RunTool`**）；单测 **`registry_test`** 断言 **`query.ToolRunner`**；**`query.Deps`** 注释接线。 | **P6.0.1** 收口 **getTools** 门控 / **P6.1** 首工具 **`Run`** + **AC6-1** |
+| **2026-04-01** | commit | **Phase 6 迭代 2（P6.1 / FileReadTool）**：**`filereadtool`** **`limits` / `image_processor` / `ui` / `file_read_tool`** + **`FileRead.Run`**（文本、**`offset`/`limit`**、设备路径拒绝、扩展名二进制拒绝）；**`registry_test`** **`Read`** 路由；**AC6-1**/**P6.1** 标 **`[~]`**。 | **P6.1** 其余工具；Read 的 PDF/图/权限/dedup/API tokenizer |
 
 （后续行：每完成可合并条目追加一行。）

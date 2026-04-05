@@ -2,10 +2,14 @@ package registry_test
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/2456868764/rabbit-code/internal/query"
 	"github.com/2456868764/rabbit-code/internal/tools"
+	"github.com/2456868764/rabbit-code/internal/tools/filereadtool"
 	"github.com/2456868764/rabbit-code/internal/tools/registry"
 )
 
@@ -73,5 +77,24 @@ func TestToolsMatchesName(t *testing.T) {
 	x := stubTool{name: "A", alias: "a"}
 	if !tools.MatchesName(x, "A") || !tools.MatchesName(x, "a") || tools.MatchesName(x, "b") {
 		t.Fatal()
+	}
+}
+
+func TestRegistry_withFileReadTool(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "x.txt")
+	if err := os.WriteFile(p, []byte("ok"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	abs, _ := filepath.Abs(p)
+	r := registry.New(filereadtool.New())
+	in, _ := json.Marshal(map[string]string{"file_path": abs})
+	out, err := r.RunTool(context.Background(), "Read", in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(out, &m); err != nil || m["type"] != "text" {
+		t.Fatalf("%v %s", err, out)
 	}
 }
