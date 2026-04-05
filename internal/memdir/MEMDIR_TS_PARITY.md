@@ -11,7 +11,7 @@
 | 序 | 状态 | 项 | 验收 |
 |----|------|-----|------|
 | 1 | ☑ | **`findRelevantMemories`**：TS 形参 ↔ **`FindRelevantMemoriesClassic`**（`ctx`↔`AbortSignal`）+ 通用 **`FindRelevantMemoriesOpts`** | 下表 **`findRelevantMemories`** 为 **[x]**；**`go test ./internal/memdir/... -short`** |
-| 2 | ☐ | **`memoryScan`**：**`MemoryHeader` / `scanMemoryFiles`** — `[~]` 收口（`description: null` ↔ 空串、`FormatMemoryManifest` 已对齐处标 **[x]**；**`AbortSignal` ↔ `context`** 在注释/PARITY 写死） | 表行 **[x]** 或 **defer** 指 **`PARITY_PHASE5_DEFERRED`** |
+| 2 | ☑ | **`memoryScan`**：**`MemoryHeader` / `scanMemoryFiles`** — `description: null` ↔ **`Description == ""`**；**`AbortSignal` ↔ `context`**；**`FormatMemoryManifest`** 与 TS 一致（单测 **`TestFormatMemoryManifest_noDescriptionLikeTSNull`**） | 下表 **`MemoryHeader` / `scanMemoryFiles`** 为 **[x]** |
 | 3 | ☐ | **`memdir.ts`**：**`buildMemoryPrompt` / `buildSearchingPastContextSection`** 与 TS 差异表 | 表行或 defer |
 | 4 | ☐ | **`paths.ts`**：**`isAutoMemoryEnabled` / `isExtractModeActive` / `getAutoMemPath`** 与 **`internal/features`**、env 对照 | 表行或 defer |
 
@@ -106,7 +106,7 @@ Legend：**[x]** 已对齐或 env 等价，**[~]** 子集/签名差异，**[ ]**
 
 | TS | Go | 状态 |
 |----|-----|------|
-| `MemoryHeader` / `scanMemoryFiles` | `MemoryHeader` / `ScanMemoryFiles` | **[~]** ctx vs AbortSignal |
+| `MemoryHeader` / `scanMemoryFiles` | `MemoryHeader` / `ScanMemoryFiles` | **[x]**（**`context.Context`** ↔ **`AbortSignal`**；**`description: null`** ↔ **`Description == ""`**；**`type` undefined** ↔ **`Type == ""`**；见 **`memory_scan.go`** 注释） |
 | `formatMemoryManifest` | `FormatMemoryManifest` | **[x]** |
 | `memoryAge*` | `MemoryAge*` 等 | **[x]** |
 

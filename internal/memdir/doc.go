@@ -21,7 +21,7 @@
 //	find_relevant_memories.go  — findRelevantMemories.ts
 //	memdir.go                  — memdir.ts
 //	memory_age.go              — memoryAge.ts
-//	memory_scan.go             — memoryScan.ts
+//	memory_scan.go             — memoryScan.ts（ScanMemoryFiles：ctx ↔ AbortSignal；Description 空 ↔ TS description null）
 //	memory_types.go            — memoryTypes.ts
 //	paths.go                   — paths.ts
 //	team_mem_paths.go          — teamMemPaths.ts

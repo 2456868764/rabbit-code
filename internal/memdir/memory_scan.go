@@ -18,21 +18,30 @@ const MaxMemoryFiles = 200
 // FrontmatterMaxLines limits how many lines we read for YAML frontmatter parsing.
 const FrontmatterMaxLines = 30
 
-// MemoryHeader mirrors memdir/memoryScan.ts MemoryHeader (headless subset).
+// MemoryHeader mirrors memoryScan.ts MemoryHeader (field names differ by Go idiom only).
+//
+// TS uses description: string | null and type: MemoryType | undefined. In Go, an absent
+// or empty description is represented as Description == "" (equivalent to TS null for
+// FormatMemoryManifest and other truthy checks). Unknown or unset type is Type == "" (TS undefined).
 type MemoryHeader struct {
-	Filename    string // path relative to memoryDir
-	FilePath    string // absolute path
-	MtimeMs     int64
-	Description string
-	Type        string // optional frontmatter type string
+	Filename    string // path relative to memoryDir (TS filename)
+	FilePath    string // absolute path (TS filePath)
+	MtimeMs     int64  // TS mtimeMs
+	Description string // TS description null ↔ empty string
+	Type        string // TS type undefined ↔ empty string (ParseMemoryType)
 }
 
 // ScanMemoryFiles walks memoryDir recursively for .md files, skips basename MEMORY.md,
 // reads frontmatter headers, returns up to MaxMemoryFiles sorted newest-first.
 //
+// Cancellation: TS scanMemoryFiles(memoryDir, signal) aborts in-flight reads via AbortSignal;
+// the Go API uses context.Context—callers should pass a ctx cancelled when the signal aborts
+// (e.g. engine ties ctx to the same lifetime as the upstream AbortSignal).
+//
 // It always returns a nil error. On failure (missing directory, walk errors, context
 // cancellation), it returns (nil, nil), matching memoryScan.ts scanMemoryFiles outer
-// try/catch that resolves to an empty array.
+// try/catch that resolves to an empty array. Per-file read failures in TS are dropped via
+// Promise.allSettled; Go skips entries that fail stat/read similarly.
 func ScanMemoryFiles(ctx context.Context, memoryDir string) ([]MemoryHeader, error) {
 	out := scanMemoryFilesCollect(ctx, memoryDir)
 	return out, nil

@@ -175,5 +175,6 @@
 | **2026-04-01** | commit | **迭代 20（H6 headless 完成）**：**`StopHooksAfterSuccessfulTurn`**、**`ContinueReasonStopHookPrevented`**；**`ToolUseContextMirror`** **`SessionID`**/**`Debug`**/**`AbortSignalAborted`**；**§2 P5.1.1→`[x]`**。 | TS **`ToolUseContext`** 全量 / 磁盘 stopHooks 链见 **PARITY** |
 | **2026-04-01** | commit | **迭代 21（§3.0 计划项 1）**：**`app.QuitRuntime`** / **`app.FailBootstrap`**；**`cmd/rabbit-code`** 主路径不再 **`os.Exit` 跳过 `defer rt.Close()`**；**`PrintBootstrapFailure`** 委托 **`FailBootstrap(nil,·)`**；对齐 **H8** 退出清理与 **`RegisterEngineShutdown`** 前提。 | **§3.0 计划** 项 2（Engine 宿主注册）见 **PHASE05_CONTINUATION.md** |
 | **2026-04-01** | commit | **迭代 22（memdir §3.0 / §3.2）**：**`internal/memdir/MEMDIR_TS_PARITY.md`** 写入 **§3.0 有序计划** 与 **§3.2 单次核对**；**`FindRelevantMemoriesClassic`**（**`findRelevantMemories.ts`** 形参薄委托）+ 单测；**`PHASE05_CONTINUATION.md`** H8 子计划指针；**`doc.go`**；**`go build ./...`**、**`go test ./... -short`**。 | **MEMDIR_TS_PARITY** §3.0 序 **2–4**（`memoryScan` / `memdir` / `paths`） |
+| **2026-04-01** | commit | **迭代 23（memdir §3.0 序 2）**：**`memory_scan.go`** **`MemoryHeader` / `ScanMemoryFiles`** 与 **`memoryScan.ts`** 对照注释（**`AbortSignal`↔`context`**、**`null`↔`""`**）；**`TestFormatMemoryManifest_noDescriptionLikeTSNull`**；**`MEMDIR_TS_PARITY`** 表与 §3.0 序 **2** ☑。 | **MEMDIR_TS_PARITY** §3.0 序 **3–4**（`memdir` / `paths`） |
 
 （后续行：每完成可合并条目追加一行。）

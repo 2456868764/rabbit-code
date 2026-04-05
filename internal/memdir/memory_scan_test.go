@@ -113,3 +113,16 @@ func TestFormatMemoryManifest(t *testing.T) {
 		t.Fatalf("%q", s)
 	}
 }
+
+// TS formatMemoryManifest appends ": description" only when description is truthy; null ↔ Description == "".
+func TestFormatMemoryManifest_noDescriptionLikeTSNull(t *testing.T) {
+	s := FormatMemoryManifest([]MemoryHeader{
+		{Filename: "bare.md", MtimeMs: 1_700_000_000_000, Description: "", Type: ""},
+	})
+	if strings.Contains(s, "): ") {
+		t.Fatalf("expected no description suffix after timestamp (TS null), got %q", s)
+	}
+	if !strings.Contains(s, "bare.md") {
+		t.Fatalf("%q", s)
+	}
+}
