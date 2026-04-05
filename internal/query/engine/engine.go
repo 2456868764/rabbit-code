@@ -20,6 +20,12 @@ import (
 	"github.com/2456868764/rabbit-code/internal/utils/thinking"
 )
 
+// persistSnap is an immutable point-in-time snapshot published via atomic.Pointer (overlapping Submits may defer-Store concurrently).
+type persistSnap struct {
+	autoCompact *compact.AutoCompactTracking
+	snipLog     []query.SnipRemovalEntry
+}
+
 // StopHookFunc runs after each Submit’s RunTurnLoop attempt finishes (success or failure). Hooks run in slice order; legacy StopHook is appended after StopHooks (P5.1.4).
 type StopHookFunc func(ctx context.Context, st query.LoopState, err error)
 
@@ -234,10 +240,9 @@ type Engine struct {
 	// mirrored onto st.AutoCompactTracking.ConsecutiveFailures when st != nil.
 	autoCompactConsecutiveFailures int
 	restoredAutoCompactTracking    *compact.AutoCompactTracking
-	lastAutoCompactTracking        *compact.AutoCompactTracking // snapshot after last Submit for persistence
-	lastSnipRemovalLog             []query.SnipRemovalEntry     // snapshot after last Submit (H7)
-	persistSnapshotMu              sync.Mutex                   // last* fields: Done may be observed before defer runs (overlapping Submits)
-	restoredSnipRemovalLog         []query.SnipRemovalEntry
+	// persistSnapshot: latest loop persist state (atomic store avoids data race when Done arrives before another Submit's defer runs).
+	persistSnapshot        atomic.Pointer[persistSnap]
+	restoredSnipRemovalLog []query.SnipRemovalEntry
 	// streamOutputTotal accumulates UsageDelta.OutputTokens via chained Anthropic OnStreamUsage (H5.5).
 	streamOutputTotal atomic.Int64
 
@@ -805,12 +810,10 @@ func (e *Engine) runTurnLoop(userText string, consumedCommandUUIDs []string) {
 	query.MirrorAutocompactConsecutiveFailures(st, e.autoCompactConsecutiveFailures)
 	var loopErr error
 	defer func() {
-		tr := compact.CloneAutoCompactTracking(st.AutoCompactTracking)
-		sn := query.CloneSnipRemovalLog(st.SnipRemovalLog)
-		e.persistSnapshotMu.Lock()
-		e.lastAutoCompactTracking = tr
-		e.lastSnipRemovalLog = sn
-		e.persistSnapshotMu.Unlock()
+		e.persistSnapshot.Store(&persistSnap{
+			autoCompact: compact.CloneAutoCompactTracking(st.AutoCompactTracking),
+			snipLog:     query.CloneSnipRemovalLog(st.SnipRemovalLog),
+		})
 		e.invokeStopHooks(st, loopErr)
 	}()
 
@@ -1128,18 +1131,20 @@ func (e *Engine) trySend(ev EngineEvent) bool {
 // AutoCompactTrackingForPersistence returns a deep copy of autocompact tracking after the last completed Submit
 // (for session save). Nil if no Submit has finished.
 func (e *Engine) AutoCompactTrackingForPersistence() *compact.AutoCompactTracking {
-	e.persistSnapshotMu.Lock()
-	p := e.lastAutoCompactTracking
-	e.persistSnapshotMu.Unlock()
-	return compact.CloneAutoCompactTracking(p)
+	s := e.persistSnapshot.Load()
+	if s == nil {
+		return nil
+	}
+	return compact.CloneAutoCompactTracking(s.autoCompact)
 }
 
 // SnipRemovalLogForPersistence returns a deep copy of the snip removal log after the last completed Submit (H7 session sidecar).
 func (e *Engine) SnipRemovalLogForPersistence() []query.SnipRemovalEntry {
-	e.persistSnapshotMu.Lock()
-	s := e.lastSnipRemovalLog
-	e.persistSnapshotMu.Unlock()
-	return query.CloneSnipRemovalLog(s)
+	s := e.persistSnapshot.Load()
+	if s == nil {
+		return nil
+	}
+	return query.CloneSnipRemovalLog(s.snipLog)
 }
 
 // LastAssistantAtForPersistence returns the wall-clock time of the last model assistant message used for
