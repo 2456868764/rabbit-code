@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+// Upstream: FileEditTool/UI.tsx presentation; string mapping matches FileEditTool.mapToolResultToToolResultBlockParam.
+//
 // MapEditToolResultForMessagesAPI mirrors FileEditTool.mapToolResultToToolResultBlockParam.
 func MapEditToolResultForMessagesAPI(outJSON []byte) string {
 	var m struct {

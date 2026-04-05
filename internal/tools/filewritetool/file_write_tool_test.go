@@ -105,6 +105,18 @@ func TestFileWrite_badJSON(t *testing.T) {
 	}
 }
 
+func TestFileWrite_strictJSONUnknownField(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "n.txt")
+	abs, _ := filepath.Abs(p)
+	fw := filewritetool.New()
+	in, _ := json.Marshal(map[string]any{"file_path": abs, "content": "x", "extra": 1})
+	_, err := fw.Run(context.Background(), in)
+	if err == nil || !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("got %v", err)
+	}
+}
+
 func TestFileWrite_modifiedSinceRead_validateStrictMtime(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "x.txt")

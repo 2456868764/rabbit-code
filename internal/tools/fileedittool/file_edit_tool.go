@@ -1,6 +1,7 @@
 package fileedittool
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -29,6 +30,19 @@ type editInput struct {
 	OldString  string `json:"old_string"`
 	NewString  string `json:"new_string"`
 	ReplaceAll bool   `json:"replace_all"`
+}
+
+func parseEditInputJSON(b []byte) (editInput, error) {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+	var in editInput
+	if err := dec.Decode(&in); err != nil {
+		return editInput{}, err
+	}
+	if dec.More() {
+		return editInput{}, errors.New("fileedittool: invalid json: extra data after input object")
+	}
+	return in, nil
 }
 
 func isUncPath(p string) bool {
@@ -134,8 +148,8 @@ func (f *FileEdit) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	var in editInput
-	if err := json.Unmarshal(inputJSON, &in); err != nil {
+	in, err := parseEditInputJSON(inputJSON)
+	if err != nil {
 		return nil, fmt.Errorf("fileedittool: invalid json: %w", err)
 	}
 	path := strings.TrimSpace(in.FilePath)

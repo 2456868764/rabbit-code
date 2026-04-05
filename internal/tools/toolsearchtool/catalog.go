@@ -26,9 +26,9 @@ type ToolEntry struct {
 // DefaultCatalog lists Phase-6 builtins + deferred tools (prompt bodies for scoring).
 func DefaultCatalog() []ToolEntry {
 	return []ToolEntry{
-		{Name: filereadtool.FileReadToolName, SearchHint: "read files, images, PDFs, notebooks", Description: "Read tool: read text files, images, PDFs, and Jupyter notebooks from disk."},
-		{Name: filewritetool.FileWriteToolName, SearchHint: "create or overwrite files", Description: "Write tool: create new files or overwrite existing file content."},
-		{Name: fileedittool.FileEditToolName, SearchHint: "modify file contents in place", Description: fileedittool.PromptDescription},
+		{Name: filereadtool.FileReadToolName, SearchHint: "read files, images, PDFs, notebooks", Description: filereadtool.Description},
+		{Name: filewritetool.FileWriteToolName, SearchHint: "create or overwrite files", Description: filewritetool.GetWriteToolDescription()},
+		{Name: fileedittool.FileEditToolName, SearchHint: "modify file contents in place", Description: fileedittool.GetEditToolPrompt()},
 		{Name: globtool.GlobToolName, SearchHint: "find files by name pattern or wildcard", Description: globtool.Description},
 		{Name: greptool.GrepToolName, SearchHint: "search file contents with regex (ripgrep)", Description: greptool.GetDescription()},
 		{Name: notebookedittool.NotebookEditToolName, SearchHint: "edit Jupyter notebook cells (.ipynb)", Description: notebookedittool.ToolDescription},

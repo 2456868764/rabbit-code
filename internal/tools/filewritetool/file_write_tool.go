@@ -1,6 +1,7 @@
 package filewritetool
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -25,6 +26,19 @@ func (f *FileWrite) Aliases() []string { return nil }
 type writeInput struct {
 	FilePath string `json:"file_path"`
 	Content  string `json:"content"`
+}
+
+func parseWriteInputJSON(b []byte) (writeInput, error) {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+	var in writeInput
+	if err := dec.Decode(&in); err != nil {
+		return writeInput{}, err
+	}
+	if dec.More() {
+		return writeInput{}, errors.New("filewritetool: invalid json: extra data after input object")
+	}
+	return in, nil
 }
 
 func isUncPath(p string) bool {
@@ -113,8 +127,8 @@ func (f *FileWrite) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	var in writeInput
-	if err := json.Unmarshal(inputJSON, &in); err != nil {
+	in, err := parseWriteInputJSON(inputJSON)
+	if err != nil {
 		return nil, fmt.Errorf("filewritetool: invalid json: %w", err)
 	}
 	path := strings.TrimSpace(in.FilePath)

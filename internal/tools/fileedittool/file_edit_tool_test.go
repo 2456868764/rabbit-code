@@ -83,6 +83,15 @@ func TestFileEdit_sameStrings(t *testing.T) {
 	}
 }
 
+func TestFileEdit_strictJSONUnknownField(t *testing.T) {
+	fe := fileedittool.New()
+	in, _ := json.Marshal(map[string]any{"file_path": "/tmp/x", "old_string": "a", "new_string": "b", "replace_all": false, "extra": 1})
+	_, err := fe.Run(context.Background(), in)
+	if err == nil || !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("got %v", err)
+	}
+}
+
 func TestFileEdit_notFoundIncludesSuggestPathUnderCwd(t *testing.T) {
 	root := t.TempDir()
 	repo := filepath.Join(root, "repo")

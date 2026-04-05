@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+// Upstream: FileWriteTool/UI.tsx presentation; string mapping matches FileWriteTool.mapToolResultToToolResultBlockParam.
+//
 // MapWriteToolResultForMessagesAPI mirrors FileWriteTool.mapToolResultToToolResultBlockParam (string tool_result for transcript).
 func MapWriteToolResultForMessagesAPI(outJSON []byte) string {
 	var m struct {

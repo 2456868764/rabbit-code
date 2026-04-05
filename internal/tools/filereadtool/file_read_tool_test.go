@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/2456868764/rabbit-code/internal/tools"
@@ -55,6 +56,20 @@ func TestFileRead_Run_badInput(t *testing.T) {
 	_, err = fr.Run(context.Background(), []byte(`{"file_path":""}`))
 	if err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestFileRead_Run_strictJSONUnknownField(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "a.txt")
+	if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	abs, _ := filepath.Abs(p)
+	fr := filereadtool.New()
+	_, err := fr.Run(context.Background(), []byte(`{"file_path":`+jsonQuote(abs)+`,"extra":1}`))
+	if err == nil || !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("got %v", err)
 	}
 }
 

@@ -1,6 +1,7 @@
 package filereadtool
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -41,13 +42,26 @@ type readInput struct {
 	Pages    *string `json:"pages,omitempty"`
 }
 
+func parseReadInputJSON(b []byte) (readInput, error) {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+	var in readInput
+	if err := dec.Decode(&in); err != nil {
+		return readInput{}, err
+	}
+	if dec.More() {
+		return readInput{}, errors.New("filereadtool: invalid json: extra data after input object")
+	}
+	return in, nil
+}
+
 // Run implements tools.Tool (full FileReadTool callInner parity: text, notebook, image, PDF).
 func (f *FileRead) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	var in readInput
-	if err := json.Unmarshal(inputJSON, &in); err != nil {
+	in, err := parseReadInputJSON(inputJSON)
+	if err != nil {
 		return nil, fmt.Errorf("filereadtool: invalid json: %w", err)
 	}
 	path := strings.TrimSpace(in.FilePath)
