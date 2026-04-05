@@ -83,6 +83,41 @@ func TestFileEdit_sameStrings(t *testing.T) {
 	}
 }
 
+func TestFileEdit_notFoundIncludesSuggestPathUnderCwd(t *testing.T) {
+	root := t.TempDir()
+	repo := filepath.Join(root, "repo")
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(repo, "missing_segment.go")
+	if err := os.WriteFile(target, []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wrong, err := filepath.Abs(filepath.Join(root, "missing_segment.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldWd, _ := os.Getwd()
+	if err := os.Chdir(repo); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(oldWd) }()
+
+	fe := fileedittool.New()
+	in, _ := json.Marshal(map[string]any{"file_path": wrong, "old_string": "x", "new_string": "y", "replace_all": false})
+	_, err = fe.Run(context.Background(), in)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "File does not exist") || !strings.Contains(msg, "Did you mean") {
+		t.Fatalf("got %q", msg)
+	}
+	if !strings.Contains(msg, "missing_segment.go") {
+		t.Fatalf("expected suggested filename in message: %q", msg)
+	}
+}
+
 func TestFileEdit_createEmptyPath(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "new.txt")

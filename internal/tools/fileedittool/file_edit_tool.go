@@ -148,14 +148,16 @@ func (f *FileEdit) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	}
 
 	wc := filewritetool.WriteContextFrom(ctx)
+	in = NormalizeSingleFileEditInput(path, abs, in, wc)
+
+	if in.OldString == in.NewString {
+		return nil, errors.New("No changes to make: old_string and new_string are exactly the same.")
+	}
+
 	if wc != nil && wc.CheckTeamMemSecrets != nil {
 		if msg := wc.CheckTeamMemSecrets(abs, in.NewString); msg != "" {
 			return nil, errors.New(msg)
 		}
-	}
-
-	if in.OldString == in.NewString {
-		return nil, errors.New("No changes to make: old_string and new_string are exactly the same.")
 	}
 
 	deny := denyEditFromCtx(ctx)
@@ -165,7 +167,8 @@ func (f *FileEdit) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 
 	st := readFileStateFromCtx(ctx)
 
-	if !isUncPath(abs) {
+	skipLocalFs := isUncPath(abs)
+	if !skipLocalFs {
 		fi, statErr := os.Stat(abs)
 		if statErr == nil && !fi.IsDir() && fi.Size() > MaxEditFileSize {
 			return nil, fmt.Errorf("File is too large to edit (%s). Maximum editable file size is %s.",
@@ -173,62 +176,62 @@ func (f *FileEdit) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 		}
 	}
 
-	if isUncPath(abs) {
-		return nil, errors.New("fileedittool: Edit on UNC paths is not supported in this build.")
-	}
+	if !skipLocalFs {
+		var fileExists bool
+		var norm string
 
-	var fileExists bool
-	var norm string
-
-	fi, statErr := os.Stat(abs)
-	if statErr != nil && os.IsNotExist(statErr) {
-		fileExists = false
-	} else if statErr != nil {
-		return nil, statErr
-	} else if fi.IsDir() {
-		return nil, fmt.Errorf("fileedittool: path is a directory: %s", abs)
-	} else {
-		fileExists = true
-		var rerr error
-		norm, _, _, rerr = filewritetool.ReadNormalizedFileWithContext(abs, wc)
-		if rerr != nil {
-			return nil, rerr
-		}
-	}
-
-	if !fileExists {
-		if in.OldString == "" {
-			// create path — validated; proceed to call
+		fi, statErr := os.Stat(abs)
+		if statErr != nil && os.IsNotExist(statErr) {
+			fileExists = false
+		} else if statErr != nil {
+			return nil, statErr
+		} else if fi.IsDir() {
+			return nil, fmt.Errorf("fileedittool: path is a directory: %s", abs)
 		} else {
-			msg := fmt.Sprintf("File does not exist. %s %s.", FileNotFoundCwdNote, mustGetwd())
-			if sim := FindSimilarFile(abs); sim != "" {
-				msg += fmt.Sprintf(" Did you mean %s?", sim)
+			fileExists = true
+			var rerr error
+			norm, _, _, rerr = filewritetool.ReadNormalizedFileWithContext(abs, wc)
+			if rerr != nil {
+				return nil, rerr
 			}
-			return nil, errors.New(msg)
 		}
-	} else {
-		if in.OldString == "" {
-			if strings.TrimSpace(norm) != "" {
-				return nil, errors.New("Cannot create new file - file already exists.")
+
+		if !fileExists {
+			if in.OldString == "" {
+				// create path — validated; proceed to call
+			} else {
+				msg := fmt.Sprintf("File does not exist. %s %s.", FileNotFoundCwdNote, mustGetwd())
+				if sug, ok := SuggestPathUnderCwd(abs); ok {
+					msg += fmt.Sprintf(" Did you mean %s?", sug)
+				} else if sim := FindSimilarFile(abs); sim != "" {
+					msg += fmt.Sprintf(" Did you mean %s?", sim)
+				}
+				return nil, errors.New(msg)
 			}
 		} else {
-			if strings.EqualFold(filepath.Ext(abs), ".ipynb") {
-				return nil, fmt.Errorf("File is a Jupyter Notebook. Use the %s to edit this file.", notebookedittool.NotebookEditToolName)
-			}
-			if err := validateEditExistingReadState(abs, st, norm); err != nil {
-				return nil, err
-			}
-			act := FindActualString(norm, in.OldString)
-			if act == "" && in.OldString != "" {
-				return nil, fmt.Errorf("String to replace not found in file.\nString: %s", in.OldString)
-			}
-			matches := strings.Count(norm, act)
-			if in.OldString != "" && matches > 1 && !in.ReplaceAll {
-				return nil, fmt.Errorf("Found %d matches of the string to replace, but replace_all is false. To replace all occurrences, set replace_all to true. To replace only one occurrence, please provide more context to uniquely identify the instance.\nString: %s", matches, in.OldString)
-			}
-			after := simulateReplace(norm, act, in.NewString, in.ReplaceAll)
-			if err := validateSettingsFileEdit(abs, norm, after); err != nil {
-				return nil, err
+			if in.OldString == "" {
+				if strings.TrimSpace(norm) != "" {
+					return nil, errors.New("Cannot create new file - file already exists.")
+				}
+			} else {
+				if strings.EqualFold(filepath.Ext(abs), ".ipynb") {
+					return nil, fmt.Errorf("File is a Jupyter Notebook. Use the %s to edit this file.", notebookedittool.NotebookEditToolName)
+				}
+				if err := validateEditExistingReadState(abs, st, norm); err != nil {
+					return nil, err
+				}
+				act := FindActualString(norm, in.OldString)
+				if act == "" && in.OldString != "" {
+					return nil, fmt.Errorf("String to replace not found in file.\nString: %s", in.OldString)
+				}
+				matches := strings.Count(norm, act)
+				if in.OldString != "" && matches > 1 && !in.ReplaceAll {
+					return nil, fmt.Errorf("Found %d matches of the string to replace, but replace_all is false. To replace all occurrences, set replace_all to true. To replace only one occurrence, please provide more context to uniquely identify the instance.\nString: %s", matches, in.OldString)
+				}
+				after := simulateReplace(norm, act, in.NewString, in.ReplaceAll)
+				if err := validateSettingsFileEdit(abs, norm, after); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -267,15 +270,17 @@ func (f *FileEdit) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 		if rerr != nil {
 			return nil, rerr
 		}
-		if st == nil {
-			return nil, errors.New(filewritetool.ErrFileUnexpectedlyModified)
-		}
-		fi3, err := os.Stat(abs)
-		if err != nil {
-			return nil, err
-		}
-		if err := criticalEditStaleness(abs, st, originalContents, modTimeMillis(fi3)); err != nil {
-			return nil, err
+		if existsNow && !isUncPath(abs) {
+			if st == nil {
+				return nil, errors.New(filewritetool.ErrFileUnexpectedlyModified)
+			}
+			fi3, err := os.Stat(abs)
+			if err != nil {
+				return nil, err
+			}
+			if err := criticalEditStaleness(abs, st, originalContents, modTimeMillis(fi3)); err != nil {
+				return nil, err
+			}
 		}
 	}
 
