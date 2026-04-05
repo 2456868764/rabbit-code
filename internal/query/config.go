@@ -82,6 +82,11 @@ func fastModeEnabledFromEnv() bool {
 	return s == "" || !envTruthy(s)
 }
 
+// FastModeGateEnabled mirrors QueryRuntimeGates.FastModeEnabled without building a full QueryConfig (anthropic Policy.FastMode parity).
+func FastModeGateEnabled() bool {
+	return fastModeEnabledFromEnv()
+}
+
 // BuildQueryConfig mirrors buildQueryConfig (src/query/config.ts).
 // sessionID should match bootstrap getSessionId(); pass "" when no session id is wired yet.
 func BuildQueryConfig(sessionID string) QueryConfig {

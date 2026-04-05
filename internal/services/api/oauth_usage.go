@@ -73,10 +73,11 @@ func FetchUtilization(ctx context.Context, rt http.RoundTripper, oauthBase, bear
 	req = req.WithContext(cctx)
 	// Align transient retries with Messages (429/529/5xx) via DoRequest (usage.ts + withRetry parity).
 	pol := Policy{
-		MaxAttempts: 4,
-		Retry529429: true,
-		Unattended:  features.UnattendedRetryEnabled(),
-		FastRetry:   features.FastRetryEnabled(),
+		MaxAttempts:         4,
+		Retry529429:         true,
+		Unattended:          features.UnattendedRetryEnabled(),
+		FastRetry:           features.FastRetryEnabled(),
+		StrictForeground529: features.StrictForeground529Enabled(),
 	}
 	resp, err := DoRequest(cctx, rt, req, pol)
 	if err != nil {

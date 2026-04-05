@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"strings"
+
+	"github.com/2456868764/rabbit-code/internal/features"
 )
 
 // EnvClaudeCodeExtraMetadata mirrors process.env.CLAUDE_CODE_EXTRA_METADATA (claude.ts getAPIMetadata).
@@ -28,7 +30,11 @@ func BuildMessagesAPIMetadata(c *Client) (json.RawMessage, error) {
 		}
 	}
 	inner["device_id"] = LoadOrCreateDeviceID()
-	inner["account_uuid"] = strings.TrimSpace(os.Getenv(EnvRabbitOAuthAccountUUID))
+	au := strings.TrimSpace(os.Getenv(EnvRabbitOAuthAccountUUID))
+	if au == "" {
+		au = features.OAuthAccountUUIDFromProfile()
+	}
+	inner["account_uuid"] = au
 	sid := ""
 	if c != nil {
 		sid = strings.TrimSpace(c.SessionID)

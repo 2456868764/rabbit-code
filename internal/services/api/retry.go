@@ -108,6 +108,15 @@ type Policy struct {
 	StrictForeground529 bool
 	// InitialConsecutive529Errors pre-seeds the 529 retry budget consumed elsewhere (withRetry.ts initialConsecutive529Errors; e.g. streaming 529 before a non-streaming fallback).
 	InitialConsecutive529Errors int
+	// FastMode when true requests body speed=fast when org/cooldown/provider gates pass (claude.ts retryContext.fastMode).
+	FastMode bool
+	// AgenticQuery when true allows session-latched AFK beta merge (isAgenticQuery); DefaultPolicy sets true.
+	AgenticQuery bool
+	// EffortToken / AppliedEffortPercent are forwarded for tracing and parity with withRetry.ts effort logging (optional).
+	EffortToken            string
+	AppliedEffortPercent   int
+	// RequestID correlates non-streaming fallback analytics (originatingRequestId).
+	RequestID string
 }
 
 // DefaultPolicy returns default retry behavior for foreground streams.
@@ -118,6 +127,7 @@ func DefaultPolicy() Policy {
 		Unattended:          features.UnattendedRetryEnabled(),
 		FastRetry:           features.FastRetryEnabled(),
 		StrictForeground529: features.StrictForeground529Enabled(),
+		AgenticQuery:        true,
 	}
 }
 

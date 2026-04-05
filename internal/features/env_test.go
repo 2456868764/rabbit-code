@@ -2,6 +2,7 @@ package features
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -77,6 +78,22 @@ func TestAttributionHeaderPromptEnabled(t *testing.T) {
 	}
 }
 
+func TestOAuthAccountUUIDFromProfile(t *testing.T) {
+	t.Setenv(EnvRabbitOAuthProfilePath, "")
+	if s := OAuthAccountUUIDFromProfile(); s != "" {
+		t.Fatalf("want empty, got %q", s)
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "profile.json")
+	if err := os.WriteFile(path, []byte(`{"accountUuid":"uuid-from-file"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(EnvRabbitOAuthProfilePath, path)
+	if s := OAuthAccountUUIDFromProfile(); s != "uuid-from-file" {
+		t.Fatalf("got %q", s)
+	}
+}
+
 func TestAntiDistillationFakeToolsInBody(t *testing.T) {
 	t.Setenv(EnvAntiDistillation, "")
 	t.Setenv(EnvAntiDistillationFakeTools, "1")
@@ -86,6 +103,39 @@ func TestAntiDistillationFakeToolsInBody(t *testing.T) {
 	t.Setenv(EnvAntiDistillation, "1")
 	if !AntiDistillationFakeToolsInBody() {
 		t.Fatal("both on")
+	}
+}
+
+func TestAntiDistillationFakeToolsInBody_tenguGrowthBookPath(t *testing.T) {
+	t.Setenv(EnvAntiDistillation, "1")
+	t.Setenv(EnvAntiDistillationFakeTools, "")
+	t.Setenv(EnvTenguAntiDistillFakeToolInjection, "1")
+	t.Setenv(EnvRabbitCodeEntrypoint, "")
+	t.Setenv(EnvUseBedrock, "")
+	t.Setenv(EnvUseVertex, "")
+	t.Setenv(EnvUseFoundry, "")
+	if !AntiDistillationFakeToolsInBody() {
+		t.Fatal("expected tengu+cli(default)+1p path on")
+	}
+	t.Setenv(EnvRabbitCodeEntrypoint, "sdk")
+	if AntiDistillationFakeToolsInBody() {
+		t.Fatal("non-cli entrypoint should skip tengu path")
+	}
+}
+
+func TestFastModeOrganizationAvailable_envMirrors(t *testing.T) {
+	t.Setenv("RABBIT_CODE_DISABLE_FAST_MODE", "")
+	t.Setenv("CLAUDE_CODE_DISABLE_FAST_MODE", "")
+	t.Setenv(EnvFastModeUnavailableReason, "")
+	t.Setenv(EnvTenguPenguinsOff, "")
+	t.Setenv(EnvExtraUsageDisabled, "")
+	t.Setenv(EnvTenguMarbleSandcastle, "")
+	if !FastModeOrganizationAvailable() {
+		t.Fatal("expected available baseline")
+	}
+	t.Setenv(EnvTenguPenguinsOff, "rollout")
+	if FastModeOrganizationAvailable() {
+		t.Fatal("penguins off should block")
 	}
 }
 

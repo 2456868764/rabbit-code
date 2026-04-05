@@ -90,6 +90,9 @@ func (a *AnthropicAssistant) attachAPIContextManagement(model string, body *Mess
 	if a.APIContextManagementOpts != nil {
 		opts = *a.APIContextManagementOpts
 	}
+	if features.ThinkingClearAllLatched() || a.Client.ThinkingClearLatched() {
+		opts.ClearAllThinking = true
+	}
 	cm := compact.GetAPIContextManagement(opts)
 	if cm == nil {
 		return
@@ -128,7 +131,7 @@ func (a *AnthropicAssistant) StreamAssistant(ctx context.Context, model string, 
 	}
 	body := a.streamBody(model, maxTokens, messagesJSON)
 	applyPerTurnTaskBudgetFromContext(ctx, &body)
-	text, _, err := a.Client.PostMessagesStreamReadAssistant(ctx, body, pol, a.readOpts(ctx)...)
+	text, _, err := a.Client.PostMessagesStreamReadAssistantWithNonStreamFallback(ctx, body, pol, a.readOpts(ctx)...)
 	if err == nil {
 		a.markMicrocompactAfterSuccessfulAPI()
 	}

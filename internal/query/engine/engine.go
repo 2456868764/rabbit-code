@@ -755,19 +755,24 @@ func (e *Engine) anthropicClientPtr() *anthropic.Client {
 }
 
 func (e *Engine) anthropicPolicy() anthropic.Policy {
-	if a, ok := e.deps.Turn.(*anthropic.AnthropicAssistant); ok && a != nil && a.Policy.MaxAttempts != 0 {
-		return a.Policy
+	var a *anthropic.AnthropicAssistant
+	if x, ok := e.deps.Turn.(*anthropic.AnthropicAssistant); ok && x != nil && x.Policy.MaxAttempts != 0 {
+		a = x
+	} else if x, ok := e.deps.Assistant.(*anthropic.AnthropicAssistant); ok && x != nil && x.Policy.MaxAttempts != 0 {
+		a = x
+	} else if x, ok := e.deps.Turn.(*anthropic.AnthropicAssistant); ok && x != nil {
+		a = x
+	} else if x, ok := e.deps.Assistant.(*anthropic.AnthropicAssistant); ok && x != nil {
+		a = x
 	}
-	if a, ok := e.deps.Assistant.(*anthropic.AnthropicAssistant); ok && a != nil && a.Policy.MaxAttempts != 0 {
-		return a.Policy
+	if a == nil {
+		return anthropic.Policy{}
 	}
-	if a, ok := e.deps.Turn.(*anthropic.AnthropicAssistant); ok && a != nil {
-		return a.Policy
+	p := a.Policy
+	if p.QuerySource == "" && e.querySource != "" {
+		p.QuerySource = anthropic.QuerySource(strings.TrimSpace(e.querySource))
 	}
-	if a, ok := e.deps.Assistant.(*anthropic.AnthropicAssistant); ok && a != nil {
-		return a.Policy
-	}
-	return anthropic.Policy{}
+	return p
 }
 
 // chainStreamUsage wraps Anthropic Client.OnStreamUsage to accumulate OutputTokens for H5.5 turn budget tracking.

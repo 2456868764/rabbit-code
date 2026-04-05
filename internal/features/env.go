@@ -4,6 +4,7 @@
 package features
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -81,12 +82,31 @@ const (
 	EnvE2EMockAPI             = "RABBIT_CODE_E2E_MOCK_API"
 	// EnvOAuthBaseURL overrides console base for usage.ts fetchUtilization (default https://console.anthropic.com).
 	EnvOAuthBaseURL = "RABBIT_CODE_OAUTH_BASE_URL"
+	// EnvRabbitOAuthProfilePath points to JSON with OAuth profile fields (account_uuid / accountUuid; getOauthAccountInfo parity).
+	EnvRabbitOAuthProfilePath = "RABBIT_CODE_OAUTH_PROFILE_PATH"
 	// EnvHTTPUserAgent overrides default User-Agent for API HTTP clients (utils/http.ts).
 	EnvHTTPUserAgent = "RABBIT_CODE_USER_AGENT"
 	// DefaultHTTPUserAgent is used when EnvHTTPUserAgent is unset (rabbit-code/api).
 	DefaultHTTPUserAgent = "rabbit-code/api"
 	// EnvStrictForeground529 sets DefaultPolicy().StrictForeground529 (withRetry.ts FOREGROUND_529_RETRY_SOURCES gate for HTTP 529).
 	EnvStrictForeground529 = "RABBIT_CODE_STRICT_FOREGROUND_529"
+	// EnvTranscriptClassifier enables session-latched AFK beta merge (feature TRANSCRIPT_CLASSIFIER / claude.ts).
+	EnvTranscriptClassifier = "RABBIT_CODE_TRANSCRIPT_CLASSIFIER"
+	// EnvNonStreamFallbackOnStreamError enables non-streaming retry after stream read failure (executeNonStreamingRequest).
+	EnvNonStreamFallbackOnStreamError = "RABBIT_CODE_NONSTREAM_FALLBACK_ON_STREAM_ERROR"
+	// EnvTenguAntiDistillFakeToolInjection mirrors GrowthBook tengu_anti_distill_fake_tool_injection (with ANTI_DISTILLATION_CC).
+	EnvTenguAntiDistillFakeToolInjection = "RABBIT_CODE_TENGU_ANTI_DISTILL_FAKE_TOOL_INJECTION"
+	// EnvRabbitCodeEntrypoint gates TS-style anti-distill body injection (default cli when unset for rabbit-code CLI parity).
+	EnvRabbitCodeEntrypoint = "RABBIT_CODE_ENTRYPOINT"
+	// EnvTenguPenguinsOff mirrors tengu_penguins_off: non-empty means fast mode speed is suppressed (org unavailable reason).
+	EnvTenguPenguinsOff = "RABBIT_CODE_TENGU_PENGUINS_OFF"
+	// EnvTenguMarbleSandcastle mirrors tengu_marble_sandcastle (native binary fast-mode gate) when truthy and not bundled.
+	EnvTenguMarbleSandcastle = "RABBIT_CODE_TENGU_MARBLE_SANDCASTLE"
+	EnvBundledMode = "RABBIT_CODE_BUNDLED_MODE"
+	// EnvFastModeUnavailableReason forces fast-mode body speed off (explicit orchestration / debug).
+	EnvFastModeUnavailableReason = "RABBIT_CODE_FAST_MODE_UNAVAILABLE_REASON"
+	// EnvExtraUsageDisabled mirrors extra-usage / overage off for fast-mode body gating in headless runs.
+	EnvExtraUsageDisabled = "RABBIT_CODE_EXTRA_USAGE_DISABLED"
 	// EnvAttributionHeader when set to a falsy value disables the billing attribution system line (CLAUDE_CODE_ATTRIBUTION_HEADER); unset = enabled.
 	EnvAttributionHeader = "RABBIT_CODE_ATTRIBUTION_HEADER"
 	// EnvDisableKeepAliveOnECONNRESET when truthy wraps *http.Transport to set DisableKeepAlives after ECONNRESET/EPIPE (proxy.ts disableKeepAlive + withRetry.ts stale socket path).
@@ -126,8 +146,28 @@ func SkipFoundryAuth() bool    { return truthy(os.Getenv(EnvSkipFoundryAuth)) }
 func AntiDistillationCC() bool { return truthy(os.Getenv(EnvAntiDistillation)) }
 
 // AntiDistillationFakeToolsInBody mirrors getExtraBodyParams anti_distillation: opt-in body field when CC is on.
+// Legacy: RABBIT_CODE_ANTI_DISTILLATION_FAKE_TOOLS alone. TS-aligned: GrowthBook env + cli entrypoint + 1P provider.
 func AntiDistillationFakeToolsInBody() bool {
-	return AntiDistillationCC() && truthy(os.Getenv(EnvAntiDistillationFakeTools))
+	if !AntiDistillationCC() {
+		return false
+	}
+	if truthy(os.Getenv(EnvAntiDistillationFakeTools)) {
+		return true
+	}
+	if !truthy(os.Getenv(EnvTenguAntiDistillFakeToolInjection)) {
+		return false
+	}
+	ep := strings.TrimSpace(os.Getenv(EnvRabbitCodeEntrypoint))
+	if ep == "" {
+		ep = "cli"
+	}
+	if !strings.EqualFold(ep, "cli") {
+		return false
+	}
+	if UseBedrock() || UseVertex() || UseFoundry() {
+		return false
+	}
+	return true
 }
 
 // AntiDistillationRequestHeader returns the header name/value to send when ANTI_DISTILLATION_CC is enabled.
@@ -162,6 +202,31 @@ func OAuthBetaAppendNames() []string {
 	return out
 }
 
+type oauthProfileFile struct {
+	AccountUUID  string `json:"account_uuid"`
+	AccountUUID2 string `json:"accountUuid"`
+}
+
+// OAuthAccountUUIDFromProfile reads RABBIT_CODE_OAUTH_PROFILE_PATH from the environment and parses account UUID from that JSON file.
+func OAuthAccountUUIDFromProfile() string {
+	path := strings.TrimSpace(os.Getenv(EnvRabbitOAuthProfilePath))
+	if path == "" {
+		return ""
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || len(data) == 0 {
+		return ""
+	}
+	var p oauthProfileFile
+	if err := json.Unmarshal(data, &p); err != nil {
+		return ""
+	}
+	if s := strings.TrimSpace(p.AccountUUID); s != "" {
+		return s
+	}
+	return strings.TrimSpace(p.AccountUUID2)
+}
+
 func NativeClientAttestation() bool {
 	return truthy(os.Getenv(EnvNativeAttestation))
 }
@@ -193,6 +258,37 @@ func E2EMockAPI() bool {
 // StrictForeground529Enabled when true, DefaultPolicy uses strict 529 retry whitelist (see anthropic.foreground529RetrySources).
 func StrictForeground529Enabled() bool {
 	return truthy(os.Getenv(EnvStrictForeground529))
+}
+
+// TranscriptClassifierEnabled mirrors feature TRANSCRIPT_CLASSIFIER for AFK session beta merge.
+func TranscriptClassifierEnabled() bool {
+	return truthy(os.Getenv(EnvTranscriptClassifier))
+}
+
+// NonStreamFallbackOnStreamError enables PostMessagesStreamReadAssistantWithNonStreamFallback.
+func NonStreamFallbackOnStreamError() bool {
+	return truthy(os.Getenv(EnvNonStreamFallbackOnStreamError))
+}
+
+// FastModeOrganizationAvailable is false when GrowthBook / env mirrors mark fast-mode speed unavailable (fastMode.ts subset).
+func FastModeOrganizationAvailable() bool {
+	if strings.TrimSpace(os.Getenv(EnvFastModeUnavailableReason)) != "" {
+		return false
+	}
+	if strings.TrimSpace(os.Getenv(EnvTenguPenguinsOff)) != "" {
+		return false
+	}
+	if truthy(os.Getenv(EnvExtraUsageDisabled)) {
+		return false
+	}
+	if truthy(os.Getenv(EnvTenguMarbleSandcastle)) && !truthy(os.Getenv(EnvBundledMode)) {
+		return false
+	}
+	s := firstNonEmptyEnvPair("RABBIT_CODE_DISABLE_FAST_MODE", "CLAUDE_CODE_DISABLE_FAST_MODE")
+	if s != "" && truthy(s) {
+		return false
+	}
+	return true
 }
 
 // DisableKeepAliveOnECONNRESETEnabled gates Client transport wrapping (see anthropic.keepAliveResetTransport).

@@ -10,9 +10,28 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/2456868764/rabbit-code/internal/features"
 )
+
+// LLMSpanInfo is emitted before DoRequest when LLMSpanStart is set (tracing / newContext parity).
+type LLMSpanInfo struct {
+	Model        string
+	Streaming    bool
+	BodyBytes    int
+	EffortToken  string
+	RequestID    string
+	QuerySource  QuerySource
+}
+
+// LLMSpanEndInfo is emitted after DoRequest returns when LLMSpanEnd is set.
+type LLMSpanEndInfo struct {
+	Streaming  bool
+	StatusCode int
+	Err        error
+	Duration   time.Duration
+}
 
 // Client is a minimal Messages API HTTP client (services/api/claude.ts + client.ts).
 type Client struct {
@@ -35,6 +54,18 @@ type Client struct {
 	CompactionAccumulator *strings.Builder
 	// ToolInputJSONByBlock maps content_block index → accumulator for input_json_delta partial_json (parallel tool calls use distinct indices).
 	ToolInputJSONByBlock map[int]*strings.Builder
+	// LLMDeriveContext optionally wraps ctx per Messages request (OpenTelemetry / newContext analogue).
+	LLMDeriveContext func(ctx context.Context, model string, streaming bool) context.Context
+	// LLMSpanStart / LLMSpanEnd bracket DoRequest for LLM spans.
+	LLMSpanStart func(ctx context.Context, info LLMSpanInfo)
+	LLMSpanEnd   func(ctx context.Context, info LLMSpanEndInfo)
+
+	sessionLatchMu           sync.Mutex
+	sessionLatchedBetas      []string
+	thinkingClearLatched     bool
+	afkHeaderLatched         bool
+	cacheEditingHeaderLatched bool
+	envSessionLatchesLoaded  bool
 
 	transportMu  sync.Mutex
 	cachedBaseRT http.RoundTripper
@@ -102,7 +133,7 @@ type vertexStreamJSONBody struct {
 // EnvRabbitMessagesAPISpeed sets MessagesStreamBody.Speed when non-empty (claude.ts fast-mode body.speed).
 const EnvRabbitMessagesAPISpeed = "RABBIT_CODE_MESSAGES_API_SPEED"
 
-func (c *Client) mergeStreamingBody(body MessagesStreamBody) MessagesStreamBody {
+func (c *Client) mergeStreamingBody(body MessagesStreamBody, pol Policy) MessagesStreamBody {
 	if c.Provider == ProviderBedrock && len(c.bedrockBodyBetas) > 0 && len(body.AnthropicBeta) == 0 {
 		body.AnthropicBeta = append([]string(nil), c.bedrockBodyBetas...)
 	}
@@ -114,22 +145,45 @@ func (c *Client) mergeStreamingBody(body MessagesStreamBody) MessagesStreamBody 
 			body.Metadata = meta
 		}
 	}
-	if body.Speed == "" {
+	if strings.TrimSpace(body.Speed) == "" {
 		if s := strings.TrimSpace(os.Getenv(EnvRabbitMessagesAPISpeed)); s != "" {
 			body.Speed = s
 		}
 	}
+	body.Speed = c.effectiveBodySpeed(body, pol)
 	return body
 }
 
-func (c *Client) marshalMessagesStreamJSON(body MessagesStreamBody) ([]byte, error) {
-	body = c.mergeStreamingBody(body)
-	body.Stream = true
+func (c *Client) effectiveBodySpeed(body MessagesStreamBody, pol Policy) string {
+	if c == nil {
+		return strings.TrimSpace(body.Speed)
+	}
+	speed := strings.TrimSpace(body.Speed)
+	wantFast := pol.FastMode || strings.EqualFold(speed, "fast")
+	if !wantFast {
+		return speed
+	}
+	if c.Provider != ProviderAnthropic {
+		return ""
+	}
+	if !features.FastModeOrganizationAvailable() || IsFastModeCooldown() {
+		return ""
+	}
+	return "fast"
+}
+
+func (c *Client) marshalMessagesStreamJSON(body MessagesStreamBody, pol Policy) ([]byte, error) {
+	return c.marshalMessagesJSON(body, true, pol)
+}
+
+func (c *Client) marshalMessagesJSON(body MessagesStreamBody, stream bool, pol Policy) ([]byte, error) {
+	body = c.mergeStreamingBody(body, pol)
+	body.Stream = stream
 	extra := extraBodyParamsFromEnv()
 	if c.Provider == ProviderVertex && envVertexProjectID() != "" {
 		vb := vertexStreamJSONBody{
 			MaxTokens:         body.MaxTokens,
-			Stream:            true,
+			Stream:            stream,
 			Messages:          body.Messages,
 			System:            body.System,
 			Tools:             append(json.RawMessage(nil), body.Tools...),
@@ -244,28 +298,7 @@ type MessagesStreamBody struct {
 	Speed string `json:"speed,omitempty"`
 }
 
-// PostMessagesStream starts a streaming request. Caller must close resp.Body.
-func (c *Client) PostMessagesStream(ctx context.Context, body MessagesStreamBody, pol Policy) (*http.Response, error) {
-	if c.HTTPClient == nil {
-		c.HTTPClient = http.DefaultClient
-	}
-	raw, err := c.marshalMessagesStreamJSON(body)
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.messagesURL(body), bytes.NewReader(raw))
-	if err != nil {
-		return nil, err
-	}
-	payload := raw
-	req.GetBody = func() (io.ReadCloser, error) {
-		return io.NopCloser(bytes.NewReader(payload)), nil
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "text/event-stream")
-	if req.Header.Get("anthropic-version") == "" {
-		req.Header.Set("anthropic-version", "2023-06-01")
-	}
+func (c *Client) messagesBetaHeader(body MessagesStreamBody, pol Policy) string {
 	betaVal := c.BetaHeader
 	if body.OutputConfig != nil && body.OutputConfig.TaskBudget != nil {
 		betaVal = MergeBetaHeaderAppend(betaVal, BetaTaskBudgets)
@@ -274,6 +307,14 @@ func (c *Client) PostMessagesStream(ctx context.Context, body MessagesStreamBody
 		betaVal = MergeBetaHeaderAppend(betaVal, extra)
 	}
 	betaVal = mergeBodyAnthropicBetasIntoHeader(betaVal, body.AnthropicBeta, c.Provider)
+	betaVal = c.mergeSessionLatchedBetas(betaVal, pol)
+	return betaVal
+}
+
+func (c *Client) applyMessagesRequestHeaders(req *http.Request, betaVal string) {
+	if req.Header.Get("anthropic-version") == "" {
+		req.Header.Set("anthropic-version", "2023-06-01")
+	}
 	if betaVal != "" {
 		req.Header.Set("anthropic-beta", betaVal)
 	}
@@ -300,7 +341,165 @@ func (c *Client) PostMessagesStream(ctx context.Context, body MessagesStreamBody
 	for k, v := range c.ExtraHeaders {
 		req.Header[k] = append([]string(nil), v...)
 	}
-	return DoRequest(ctx, c.effectiveTransport(), req, pol)
+}
+
+// PostMessages starts a non-streaming JSON request (executeNonStreamingRequest / anthropic.beta.messages.create stream:false).
+func (c *Client) PostMessages(ctx context.Context, body MessagesStreamBody, pol Policy) (*http.Response, error) {
+	if c.HTTPClient == nil {
+		c.HTTPClient = http.DefaultClient
+	}
+	raw, err := c.marshalMessagesJSON(body, false, pol)
+	if err != nil {
+		return nil, err
+	}
+	reqCtx := ctx
+	if c.LLMDeriveContext != nil {
+		reqCtx = c.LLMDeriveContext(ctx, body.Model, false)
+	}
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, c.messagesURL(body), bytes.NewReader(raw))
+	if err != nil {
+		return nil, err
+	}
+	payload := raw
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(payload)), nil
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	betaVal := c.messagesBetaHeader(body, pol)
+	c.applyMessagesRequestHeaders(req, betaVal)
+	start := time.Now()
+	if c.LLMSpanStart != nil {
+		c.LLMSpanStart(reqCtx, LLMSpanInfo{
+			Model:       body.Model,
+			Streaming:   false,
+			BodyBytes:   len(raw),
+			EffortToken: pol.EffortToken,
+			RequestID:   pol.RequestID,
+			QuerySource: pol.QuerySource,
+		})
+	}
+	resp, err := DoRequest(reqCtx, c.effectiveTransport(), req, pol)
+	if c.LLMSpanEnd != nil {
+		sc := 0
+		if resp != nil {
+			sc = resp.StatusCode
+		}
+		c.LLMSpanEnd(reqCtx, LLMSpanEndInfo{Streaming: false, StatusCode: sc, Err: err, Duration: time.Since(start)})
+	}
+	return resp, err
+}
+
+// PostMessagesReadAssistantNonStream posts stream:false and decodes the JSON message (text blocks + usage).
+func (c *Client) PostMessagesReadAssistantNonStream(ctx context.Context, body MessagesStreamBody, pol Policy, _ ...ReadAssistantOption) (string, UsageDelta, error) {
+	nsCtx := ctx
+	if d := NonStreamingFallbackTimeout(); d > 0 {
+		var cancel context.CancelFunc
+		nsCtx, cancel = context.WithTimeout(ctx, d)
+		defer cancel()
+	}
+	resp, err := c.PostMessages(nsCtx, body, pol)
+	if err != nil {
+		return "", UsageDelta{}, err
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", UsageDelta{}, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", UsageDelta{}, fmt.Errorf("messages non-stream: status %d: %s", resp.StatusCode, string(b))
+	}
+	text, u, err := DecodeNonStreamingMessageResponse(b)
+	if err != nil {
+		return "", UsageDelta{}, err
+	}
+	if c.OnStreamUsage != nil {
+		c.OnStreamUsage(u)
+	}
+	return text, u, nil
+}
+
+// PostMessagesStream starts a streaming request. Caller must close resp.Body.
+func (c *Client) PostMessagesStream(ctx context.Context, body MessagesStreamBody, pol Policy) (*http.Response, error) {
+	if c.HTTPClient == nil {
+		c.HTTPClient = http.DefaultClient
+	}
+	raw, err := c.marshalMessagesStreamJSON(body, pol)
+	if err != nil {
+		return nil, err
+	}
+	reqCtx := ctx
+	if c.LLMDeriveContext != nil {
+		reqCtx = c.LLMDeriveContext(ctx, body.Model, true)
+	}
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, c.messagesURL(body), bytes.NewReader(raw))
+	if err != nil {
+		return nil, err
+	}
+	payload := raw
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(payload)), nil
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	betaVal := c.messagesBetaHeader(body, pol)
+	c.applyMessagesRequestHeaders(req, betaVal)
+	start := time.Now()
+	if c.LLMSpanStart != nil {
+		c.LLMSpanStart(reqCtx, LLMSpanInfo{
+			Model:       body.Model,
+			Streaming:   true,
+			BodyBytes:   len(raw),
+			EffortToken: pol.EffortToken,
+			RequestID:   pol.RequestID,
+			QuerySource: pol.QuerySource,
+		})
+	}
+	resp, err := DoRequest(reqCtx, c.effectiveTransport(), req, pol)
+	if c.LLMSpanEnd != nil {
+		sc := 0
+		if resp != nil {
+			sc = resp.StatusCode
+		}
+		c.LLMSpanEnd(reqCtx, LLMSpanEndInfo{Streaming: true, StatusCode: sc, Err: err, Duration: time.Since(start)})
+	}
+	return resp, err
+}
+
+// PostMessagesStreamReadAssistantWithNonStreamFallback tries streaming first; on stream read failure with RABBIT_CODE_NONSTREAM_FALLBACK_ON_STREAM_ERROR, retries non-streaming (executeNonStreamingRequest).
+func (c *Client) PostMessagesStreamReadAssistantWithNonStreamFallback(ctx context.Context, body MessagesStreamBody, pol Policy, extra ...ReadAssistantOption) (string, UsageDelta, error) {
+	if !features.NonStreamFallbackOnStreamError() {
+		return c.PostMessagesStreamReadAssistant(ctx, body, pol, extra...)
+	}
+	resp, err := c.PostMessagesStream(ctx, body, pol)
+	if err != nil {
+		return "", UsageDelta{}, err
+	}
+	var ropts []ReadAssistantOption
+	if c.ThinkingAccumulator != nil {
+		ropts = append(ropts, WithThinkingAccumulator(c.ThinkingAccumulator))
+	}
+	if c.CompactionAccumulator != nil {
+		ropts = append(ropts, WithCompactionAccumulator(c.CompactionAccumulator))
+	}
+	if len(c.ToolInputJSONByBlock) > 0 {
+		ropts = append(ropts, WithToolInputAccumulators(c.ToolInputJSONByBlock))
+	}
+	ropts = append(ropts, extra...)
+	text, u, err := ReadAssistantStream(ctx, resp.Body, ropts...)
+	resp.Body.Close()
+	if err == nil {
+		if c.OnStreamUsage != nil {
+			c.OnStreamUsage(u)
+		}
+		return text, u, nil
+	}
+	if ctx.Err() != nil {
+		return text, u, err
+	}
+	bodyNS := AdjustMessagesStreamBodyForNonStreaming(body)
+	return c.PostMessagesReadAssistantNonStream(ctx, bodyNS, pol, extra...)
 }
 
 // PostMessagesStreamReadAssistant posts, reads the SSE body to completion, closes the response, then

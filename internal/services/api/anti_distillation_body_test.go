@@ -56,7 +56,7 @@ func TestMarshalMessagesStreamJSON_vertexIncludesAntiDistillation(t *testing.T) 
 	cl.BaseURL = "https://example.com"
 	raw, err := cl.marshalMessagesStreamJSON(MessagesStreamBody{
 		Model: "m", MaxTokens: 1, Messages: []byte(`[]`),
-	})
+	}, Policy{})
 	if err != nil {
 		t.Fatal(err)
 	}

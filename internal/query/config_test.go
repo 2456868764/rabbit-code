@@ -49,3 +49,15 @@ func TestBuildQueryConfig_isAnt(t *testing.T) {
 		t.Fatal("isAnt")
 	}
 }
+
+func TestFastModeGateEnabled_matchesQueryConfig(t *testing.T) {
+	t.Setenv(envDisableFastModeRabbit, "")
+	t.Setenv(envDisableFastModeClaude, "")
+	if !FastModeGateEnabled() {
+		t.Fatal("gate on when disable unset")
+	}
+	t.Setenv(envDisableFastModeClaude, "true")
+	if FastModeGateEnabled() {
+		t.Fatal("gate off when disable truthy")
+	}
+}
