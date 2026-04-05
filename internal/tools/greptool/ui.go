@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+// Upstream: GrepTool/UI.tsx mapToolResultToToolResultBlockParam (string content for Messages API).
+
 // MapGrepToolResultForMessagesAPI mirrors GrepTool.ts mapToolResultToToolResultBlockParam (headless string).
 func MapGrepToolResultForMessagesAPI(out []byte) string {
 	var o struct {

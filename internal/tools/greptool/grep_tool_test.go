@@ -33,6 +33,48 @@ func TestMapGrepToolResultForMessagesAPI_contentMode(t *testing.T) {
 	if s != "x:1:hi" {
 		t.Fatalf("got %q", s)
 	}
+	s2 := greptool.MapGrepToolResultForMessagesAPI([]byte(`{"mode":"content","content":"a","appliedLimit":10,"appliedOffset":5}`))
+	if !strings.Contains(s2, "pagination = limit: 10, offset: 5") {
+		t.Fatalf("want pagination in content map: %q", s2)
+	}
+}
+
+func TestMapGrepToolResultForMessagesAPI_countMode(t *testing.T) {
+	s := greptool.MapGrepToolResultForMessagesAPI([]byte(`{"mode":"count","numFiles":2,"numMatches":5,"content":"a:1\nb:4"}`))
+	if !strings.Contains(s, "a:1") || !strings.Contains(s, "Found 5 total occurrences across 2 files.") {
+		t.Fatalf("got %q", s)
+	}
+	s1 := greptool.MapGrepToolResultForMessagesAPI([]byte(`{"mode":"count","numFiles":1,"numMatches":1,"content":"x:1"}`))
+	if !strings.Contains(s1, "1 total occurrence") || !strings.Contains(s1, "1 file.") {
+		t.Fatalf("got %q", s1)
+	}
+	s3 := greptool.MapGrepToolResultForMessagesAPI([]byte(`{"mode":"count","numFiles":1,"numMatches":2,"content":"x:2","appliedLimit":3}`))
+	if !strings.Contains(s3, "with pagination = limit: 3") {
+		t.Fatalf("got %q", s3)
+	}
+}
+
+func TestMapGrepToolResultForMessagesAPI_filesMode_singleFilePlural(t *testing.T) {
+	s := greptool.MapGrepToolResultForMessagesAPI([]byte(`{"mode":"files_with_matches","numFiles":1,"filenames":["only.go"]}`))
+	if !strings.Contains(s, "Found 1 file\n") {
+		t.Fatalf("got %q", s)
+	}
+}
+
+func TestGrep_missingPattern(t *testing.T) {
+	g := greptool.New()
+	_, err := g.Run(context.Background(), []byte(`{"pattern":"   "}`))
+	if err == nil || !strings.Contains(err.Error(), "missing pattern") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestGrep_invalidOutputMode(t *testing.T) {
+	g := greptool.New()
+	_, err := g.Run(context.Background(), []byte(`{"pattern":"x","output_mode":"bogus"}`))
+	if err == nil || !strings.Contains(err.Error(), "invalid output_mode") {
+		t.Fatalf("got %v", err)
+	}
 }
 
 func TestGrep_strictJSON(t *testing.T) {
