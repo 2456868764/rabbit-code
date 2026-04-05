@@ -236,6 +236,7 @@ type Engine struct {
 	restoredAutoCompactTracking    *compact.AutoCompactTracking
 	lastAutoCompactTracking        *compact.AutoCompactTracking // snapshot after last Submit for persistence
 	lastSnipRemovalLog             []query.SnipRemovalEntry     // snapshot after last Submit (H7)
+	persistSnapshotMu              sync.Mutex                   // last* fields: Done may be observed before defer runs (overlapping Submits)
 	restoredSnipRemovalLog         []query.SnipRemovalEntry
 	// streamOutputTotal accumulates UsageDelta.OutputTokens via chained Anthropic OnStreamUsage (H5.5).
 	streamOutputTotal atomic.Int64
@@ -804,8 +805,12 @@ func (e *Engine) runTurnLoop(userText string, consumedCommandUUIDs []string) {
 	query.MirrorAutocompactConsecutiveFailures(st, e.autoCompactConsecutiveFailures)
 	var loopErr error
 	defer func() {
-		e.lastAutoCompactTracking = compact.CloneAutoCompactTracking(st.AutoCompactTracking)
-		e.lastSnipRemovalLog = query.CloneSnipRemovalLog(st.SnipRemovalLog)
+		tr := compact.CloneAutoCompactTracking(st.AutoCompactTracking)
+		sn := query.CloneSnipRemovalLog(st.SnipRemovalLog)
+		e.persistSnapshotMu.Lock()
+		e.lastAutoCompactTracking = tr
+		e.lastSnipRemovalLog = sn
+		e.persistSnapshotMu.Unlock()
 		e.invokeStopHooks(st, loopErr)
 	}()
 
@@ -1123,12 +1128,18 @@ func (e *Engine) trySend(ev EngineEvent) bool {
 // AutoCompactTrackingForPersistence returns a deep copy of autocompact tracking after the last completed Submit
 // (for session save). Nil if no Submit has finished.
 func (e *Engine) AutoCompactTrackingForPersistence() *compact.AutoCompactTracking {
-	return compact.CloneAutoCompactTracking(e.lastAutoCompactTracking)
+	e.persistSnapshotMu.Lock()
+	p := e.lastAutoCompactTracking
+	e.persistSnapshotMu.Unlock()
+	return compact.CloneAutoCompactTracking(p)
 }
 
 // SnipRemovalLogForPersistence returns a deep copy of the snip removal log after the last completed Submit (H7 session sidecar).
 func (e *Engine) SnipRemovalLogForPersistence() []query.SnipRemovalEntry {
-	return query.CloneSnipRemovalLog(e.lastSnipRemovalLog)
+	e.persistSnapshotMu.Lock()
+	s := e.lastSnipRemovalLog
+	e.persistSnapshotMu.Unlock()
+	return query.CloneSnipRemovalLog(s)
 }
 
 // LastAssistantAtForPersistence returns the wall-clock time of the last model assistant message used for
