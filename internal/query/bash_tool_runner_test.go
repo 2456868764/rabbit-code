@@ -67,10 +67,10 @@ func TestBashExecToolRunner_runsEcho(t *testing.T) {
 	if err := json.Unmarshal(out, &m); err != nil {
 		t.Fatal(err)
 	}
-	if m["ok"] != true {
-		t.Fatalf("%s", out)
-	}
 	if s, _ := m["stdout"].(string); !strings.Contains(s, "rabbit") {
-		t.Fatalf("stdout %q", s)
+		t.Fatalf("stdout %q full %s", s, out)
+	}
+	if m["interrupted"] != false {
+		t.Fatalf("interrupted: %v", m["interrupted"])
 	}
 }

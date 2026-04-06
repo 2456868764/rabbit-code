@@ -5,6 +5,7 @@ import (
 
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/tools"
+	"github.com/2456868764/rabbit-code/internal/tools/bashtool"
 	"github.com/2456868764/rabbit-code/internal/tools/fileedittool"
 	"github.com/2456868764/rabbit-code/internal/tools/filereadtool"
 	"github.com/2456868764/rabbit-code/internal/tools/filewritetool"
@@ -27,9 +28,10 @@ func NewDefaultToolRunner() ToolRunner {
 // NewDefaultToolRunnerForModel builds the default registry; mainLoopModel seeds WebSearch gating (Vertex 4.x, Bedrock off, etc.).
 // Glob and Grep are omitted when features.HasEmbeddedSearchTools() matches embeddedTools.ts (EMBEDDED_SEARCH_TOOLS + entrypoint).
 // and ToolSearch when features.ToolSearchEnabledOptimistic() matches upstream (utils/toolSearch.ts),
-// plus BashExecToolRunner for tool name "bash" when not handled by the registry.
+// Builtin **Bash** (name **Bash**, alias **bash**) is always registered; **BashExecToolRunner** only runs when a non-registry runner is wired and the tool name is **bash**/**Bash**.
 func NewDefaultToolRunnerForModel(mainLoopModel string) ToolRunner {
 	builtins := []tools.Tool{
+		bashtool.New(),
 		filereadtool.New(),
 		filewritetool.New(),
 		fileedittool.New(),

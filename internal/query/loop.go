@@ -11,6 +11,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/services/api"
 	"github.com/2456868764/rabbit-code/internal/services/compact"
+	"github.com/2456868764/rabbit-code/internal/tools/bashtool"
 	"github.com/2456868764/rabbit-code/internal/tools/fileedittool"
 	"github.com/2456868764/rabbit-code/internal/tools/filereadtool"
 	"github.com/2456868764/rabbit-code/internal/tools/filewritetool"
@@ -390,7 +391,11 @@ func (d *LoopDriver) runTurnLoop(ctx context.Context, st *LoopState, userText st
 				o.OnToolDone(u.Name, u.ID, in, out)
 			}
 			content := any(string(out))
-			if u.Name == filereadtool.FileReadToolName {
+			if u.Name == bashtool.BashToolName || u.Name == "bash" {
+				if s := bashtool.MapBashToolResultForMessagesAPI(out); s != "" {
+					content = s
+				}
+			} else if u.Name == filereadtool.FileReadToolName {
 				c, sup := filereadtool.MapReadResultForMessagesAPI(out, filereadtool.MapReadResultOptions{
 					MainLoopModel: d.Model,
 				})

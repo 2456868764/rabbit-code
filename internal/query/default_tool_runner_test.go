@@ -39,13 +39,14 @@ func TestNewDefaultToolRunner_Grep(t *testing.T) {
 	}
 }
 
-func TestNewDefaultToolRunner_bashFallback(t *testing.T) {
+func TestNewDefaultToolRunner_bash(t *testing.T) {
+	t.Setenv(features.EnvBashExec, "1")
 	tr := query.NewDefaultToolRunner()
 	out, err := tr.RunTool(context.Background(), "bash", []byte(`{"command":"echo hi"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(out), "hi") && !strings.Contains(string(out), "stub") {
+	if !strings.Contains(string(out), "hi") {
 		t.Fatalf("unexpected: %s", out)
 	}
 }
