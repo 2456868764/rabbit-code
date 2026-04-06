@@ -55,31 +55,53 @@ func SplitPipeSegments(command string) []string {
 	return parts
 }
 
-// ValidatePipePermissionPreflight mirrors segmented checks in bashCommandHelpers.ts when pipeSegments.length > 1.
+// ValidatePipePermissionPreflight mirrors bashCommandHelpers.ts pipe segments + readOnlyValidation cd+git rule on every segment (including non-piped compounds).
 func ValidatePipePermissionPreflight(command string) error {
 	segs := SplitPipeSegments(command)
-	if len(segs) <= 1 {
-		return nil
+	if len(segs) == 0 || (len(segs) == 1 && strings.TrimSpace(segs[0]) == "") {
+		segs = []string{strings.TrimSpace(command)}
 	}
-	var pureCdSegs int
-	for _, seg := range segs {
-		if IsNormalizedCdCommand(strings.TrimSpace(seg)) {
-			pureCdSegs++
+	if len(segs) > 1 {
+		var pureCdSegs int
+		var anyCd, anyGit bool
+		for _, seg := range segs {
+			if IsNormalizedCdCommand(strings.TrimSpace(seg)) {
+				pureCdSegs++
+			}
+			for _, sub := range SplitCommandDeprecated(seg) {
+				t := strings.TrimSpace(sub)
+				if IsNormalizedCdCommand(t) {
+					anyCd = true
+				}
+				if IsNormalizedGitCommand(t) {
+					anyGit = true
+				}
+			}
+		}
+		if pureCdSegs > 1 {
+			return errors.New("bashtool: multiple directory changes in one command require approval for clarity")
+		}
+		if anyCd && anyGit {
+			return errors.New("bashtool: compound commands with cd and git require approval to prevent bare repository attacks")
 		}
 	}
-	if pureCdSegs > 1 {
-		return errors.New("bashtool: multiple directory changes in one command require approval for clarity")
-	}
-	hasCd, hasGit := false, false
 	for _, seg := range segs {
-		for _, sub := range SplitCommandDeprecated(seg) {
-			t := strings.TrimSpace(sub)
-			if IsNormalizedCdCommand(t) {
-				hasCd = true
-			}
-			if IsNormalizedGitCommand(t) {
-				hasGit = true
-			}
+		if err := validateSegmentCdGitCompound(seg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateSegmentCdGitCompound(seg string) error {
+	hasCd, hasGit := false, false
+	for _, sub := range SplitCommandDeprecated(seg) {
+		t := strings.TrimSpace(sub)
+		if IsNormalizedCdCommand(t) {
+			hasCd = true
+		}
+		if IsNormalizedGitCommand(t) {
+			hasGit = true
 		}
 	}
 	if hasCd && hasGit {

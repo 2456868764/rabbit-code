@@ -447,6 +447,10 @@ const (
 	EnvBashSandboxEnabled = "RABBIT_CODE_BASH_SANDBOX_ENABLED"
 	// EnvBashAllowUnsandboxed when truthy, dangerouslyDisableSandbox can force ShouldUseSandbox false.
 	EnvBashAllowUnsandboxed = "RABBIT_CODE_BASH_ALLOW_UNSANDBOXED"
+	// EnvBashOriginalWorkdir optional absolute path: read-only git + sandbox policy requires cwd to match (readOnlyValidation.ts getOriginalCwd).
+	EnvBashOriginalWorkdir = "RABBIT_CODE_BASH_ORIGINAL_WORKDIR"
+	// EnvBashWorkdirRoot optional absolute path: pathValidation.ts-style restriction for cd/ls/cat paths under this root.
+	EnvBashWorkdirRoot = "RABBIT_CODE_BASH_WORKDIR_ROOT"
 	EnvSnipCompact                    = "RABBIT_CODE_SNIP_COMPACT"
 	EnvSnipCompactMaxBytes            = "RABBIT_CODE_SNIP_COMPACT_MAX_BYTES"
 	EnvSnipCompactMaxRounds           = "RABBIT_CODE_SNIP_COMPACT_MAX_ROUNDS"
@@ -1134,6 +1138,16 @@ func BashSandboxPolicyEnabled() bool {
 }
 func BashAllowUnsandboxedOverride() bool {
 	return truthy(os.Getenv(EnvBashAllowUnsandboxed))
+}
+
+// BashOriginalWorkdir returns RABBIT_CODE_BASH_ORIGINAL_WORKDIR when set (bash read-only / sandbox git gate).
+func BashOriginalWorkdir() string {
+	return strings.TrimSpace(os.Getenv(EnvBashOriginalWorkdir))
+}
+
+// BashWorkdirRoot returns RABBIT_CODE_BASH_WORKDIR_ROOT when set (optional path allowlist root for bashtool).
+func BashWorkdirRoot() string {
+	return strings.TrimSpace(os.Getenv(EnvBashWorkdirRoot))
 }
 
 func SnipCompactMaxBytes() int {

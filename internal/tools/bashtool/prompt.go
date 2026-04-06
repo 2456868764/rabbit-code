@@ -19,8 +19,8 @@ const (
 	fileReadToolName  = "Read"
 	fileWriteToolName = "Write"
 	fileEditToolName  = "Edit"
-	globToolName = "Glob"
-	grepToolName = "Grep"
+	globToolName      = "Glob"
+	grepToolName      = "Grep"
 )
 
 // ToolDescription returns API/catalog description; upstream uses per-invocation description or fallback.

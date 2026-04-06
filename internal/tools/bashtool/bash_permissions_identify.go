@@ -56,3 +56,13 @@ func CommandHasAnyCd(command string) bool {
 	}
 	return false
 }
+
+// CommandHasAnyGit mirrors readOnlyValidation.ts commandHasAnyGit.
+func CommandHasAnyGit(command string) bool {
+	for _, sub := range SplitCommandDeprecated(command) {
+		if IsNormalizedGitCommand(strings.TrimSpace(sub)) {
+			return true
+		}
+	}
+	return false
+}

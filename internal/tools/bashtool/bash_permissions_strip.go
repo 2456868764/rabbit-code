@@ -10,11 +10,11 @@ import (
 var bashSafeEnvVarNames = map[string]struct{}{
 	"GOEXPERIMENT": {}, "GOOS": {}, "GOARCH": {}, "CGO_ENABLED": {}, "GO111MODULE": {},
 	"RUST_BACKTRACE": {}, "RUST_LOG": {},
-	"NODE_ENV": {},
+	"NODE_ENV":         {},
 	"PYTHONUNBUFFERED": {}, "PYTHONDONTWRITEBYTECODE": {},
 	"PYTEST_DISABLE_PLUGIN_AUTOLOAD": {}, "PYTEST_DEBUG": {},
 	"ANTHROPIC_API_KEY": {},
-	"LANG": {}, "LANGUAGE": {}, "LC_ALL": {}, "LC_CTYPE": {}, "LC_TIME": {}, "CHARSET": {},
+	"LANG":              {}, "LANGUAGE": {}, "LC_ALL": {}, "LC_CTYPE": {}, "LC_TIME": {}, "CHARSET": {},
 	"TERM": {}, "COLORTERM": {}, "NO_COLOR": {}, "FORCE_COLOR": {}, "TZ": {},
 	"LS_COLORS": {}, "LSCOLORS": {}, "GREP_COLOR": {}, "GREP_COLORS": {}, "GCC_COLORS": {},
 	"TIME_STYLE": {}, "BLOCK_SIZE": {}, "BLOCKSIZE": {},
@@ -32,7 +32,7 @@ var bashAntOnlySafeEnvVarNames = map[string]struct{}{
 	"TEST_CROSSCHECK_LISTS_MATCH_UPDATE": {}, "DBT_PER_DEVELOPER_ENVIRONMENTS": {}, "STATSIG_FORD_DB_CHECKS": {},
 	"ANT_ENVIRONMENT": {}, "ANT_SERVICE": {}, "MONOREPO_ROOT_DIR": {},
 	"PYENV_VERSION": {},
-	"PGPASSWORD": {}, "GH_TOKEN": {}, "GROWTHBOOK_API_KEY": {},
+	"PGPASSWORD":    {}, "GH_TOKEN": {}, "GROWTHBOOK_API_KEY": {},
 }
 
 var (

@@ -143,8 +143,20 @@ func (b *Bash) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	if err := ValidatePipePermissionPreflight(cmdStr); err != nil {
 		return nil, err
 	}
-	if features.BashReadOnlyMode() && !IsExtractReadOnlyBashInputJSON(cmdStr) {
-		return nil, errors.New("bashtool: command not allowed in read-only bash mode (see memdir.IsExtractReadOnlyBash)")
+	cwd, errWd := os.Getwd()
+	if errWd != nil {
+		cwd = "."
+	}
+	if err := CheckPathConstraints(cmdStr, PathValidationOptions{Cwd: cwd, WorkdirRoot: features.BashWorkdirRoot()}); err != nil {
+		return nil, err
+	}
+	if features.BashReadOnlyMode() {
+		if !IsExtractReadOnlyBashInputJSON(cmdStr) {
+			return nil, errors.New("bashtool: command not allowed in read-only bash mode (see memdir.IsExtractReadOnlyBash)")
+		}
+		if err := CheckReadOnlyStructuralConstraints(cmdStr, cwd); err != nil {
+			return nil, err
+		}
 	}
 
 	runInBG := in.RunInBackground != nil && *in.RunInBackground
