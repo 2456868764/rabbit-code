@@ -499,6 +499,17 @@ func TestMonitorToolEnabled(t *testing.T) {
 	}
 }
 
+func TestBashReadOnlyEnv(t *testing.T) {
+	t.Setenv(EnvBashReadOnly, "")
+	if BashReadOnlyMode() {
+		t.Fatal()
+	}
+	t.Setenv(EnvBashReadOnly, "1")
+	if !BashReadOnlyMode() {
+		t.Fatal()
+	}
+}
+
 func TestCompactStreamingEnvGates(t *testing.T) {
 	t.Setenv(EnvCompactStreamingRetry, "")
 	if CompactStreamingRetryEnabled() {

@@ -441,6 +441,12 @@ const (
 	EnvBashExec                       = "RABBIT_CODE_BASH_EXEC"
 	// EnvMonitorTool gates MONITOR_TOOL-aligned behavior in headless builds (Bash sleep blocking, prompt bullets); matches feature('MONITOR_TOOL') when truthy.
 	EnvMonitorTool = "RABBIT_MONITOR_TOOL"
+	// EnvBashReadOnly when truthy, bashtool rejects commands that fail memdir.IsExtractReadOnlyBash (read-only subset).
+	EnvBashReadOnly = "RABBIT_CODE_BASH_READ_ONLY"
+	// EnvBashSandboxEnabled when truthy, bashtool.ShouldUseSandbox reports true (policy hint; no kernel sandbox).
+	EnvBashSandboxEnabled = "RABBIT_CODE_BASH_SANDBOX_ENABLED"
+	// EnvBashAllowUnsandboxed when truthy, dangerouslyDisableSandbox can force ShouldUseSandbox false.
+	EnvBashAllowUnsandboxed = "RABBIT_CODE_BASH_ALLOW_UNSANDBOXED"
 	EnvSnipCompact                    = "RABBIT_CODE_SNIP_COMPACT"
 	EnvSnipCompactMaxBytes            = "RABBIT_CODE_SNIP_COMPACT_MAX_BYTES"
 	EnvSnipCompactMaxRounds           = "RABBIT_CODE_SNIP_COMPACT_MAX_ROUNDS"
@@ -1122,6 +1128,13 @@ func HistorySnipEnabled() bool { return truthy(os.Getenv(EnvHistorySnip)) }
 func SnipCompactEnabled() bool { return truthy(os.Getenv(EnvSnipCompact)) }
 func BashExecEnabled() bool    { return truthy(os.Getenv(EnvBashExec)) }
 func MonitorToolEnabled() bool { return truthy(os.Getenv(EnvMonitorTool)) }
+func BashReadOnlyMode() bool   { return truthy(os.Getenv(EnvBashReadOnly)) }
+func BashSandboxPolicyEnabled() bool {
+	return truthy(os.Getenv(EnvBashSandboxEnabled))
+}
+func BashAllowUnsandboxedOverride() bool {
+	return truthy(os.Getenv(EnvBashAllowUnsandboxed))
+}
 
 func SnipCompactMaxBytes() int {
 	if !SnipCompactEnabled() {

@@ -1,10 +1,6 @@
 package filereadtool
 
-import (
-	"fmt"
-
-	"github.com/2456868764/rabbit-code/internal/tools/bashtool"
-)
+import "fmt"
 
 // FileReadToolName is FILE_READ_TOOL_NAME (FileReadTool/prompt.ts).
 const FileReadToolName = "Read"
@@ -63,6 +59,6 @@ Usage:
 		offsetInstruction,
 		LineFormatInstruction,
 		pdfLine,
-		bashtool.BashToolName,
+		"Bash",
 	)
 }

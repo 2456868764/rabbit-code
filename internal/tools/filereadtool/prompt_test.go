@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/2456868764/rabbit-code/internal/tools/bashtool"
 	"github.com/2456868764/rabbit-code/internal/tools/filereadtool"
 )
 
@@ -17,7 +16,7 @@ func TestRenderReadToolPrompt_upstreamShape(t *testing.T) {
 		}
 		t.Fatalf("prompt should include default line cap: %s", snip)
 	}
-	if !strings.Contains(p, bashtool.BashToolName) {
+	if !strings.Contains(p, "Bash") {
 		t.Fatal("missing Bash tool reference")
 	}
 	if !strings.Contains(p, "Jupyter notebooks") {

@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/2456868764/rabbit-code/internal/tools/bashtool"
 )
 
 // FileRead implements tools.Tool for the Read tool (FileReadTool.ts call / output shapes).
@@ -188,7 +186,7 @@ func (f *FileRead) runNotebook(_ context.Context, userPath, cacheKey, resolved s
 	}
 	if len(cellsJSON) > lim.MaxSizeBytes {
 		return nil, fmt.Errorf("Notebook content (%s) exceeds maximum allowed size (%s). Use %s with jq to read specific portions (see FileReadTool.ts).",
-			FormatFileSize(int64(len(cellsJSON))), FormatFileSize(int64(lim.MaxSizeBytes)), bashtool.BashToolName)
+			FormatFileSize(int64(len(cellsJSON))), FormatFileSize(int64(lim.MaxSizeBytes)), "Bash")
 	}
 	if err := ValidateContentTokens(string(cellsJSON), "ipynb", lim.MaxTokens, countFn(rc)); err != nil {
 		return nil, err

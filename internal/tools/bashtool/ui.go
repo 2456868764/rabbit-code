@@ -32,6 +32,7 @@ func MapBashToolResultForMessagesAPI(outJSON []byte) string {
 			processed = strings.TrimLeft(processed, " \t\n\r")
 		}
 		processed = strings.TrimRight(processed, " \t\n\r")
+		processed = StripEmptyLines(processed)
 	}
 	errMsg := strings.TrimSpace(o.Stderr)
 	if o.Interrupted {

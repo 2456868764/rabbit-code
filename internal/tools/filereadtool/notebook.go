@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/2456868764/rabbit-code/internal/tools/bashtool"
 )
 
 const (
@@ -222,7 +220,7 @@ func processNotebookCell(cell *rawCell, index int, codeLanguage string, includeL
 			out["outputs"] = []any{map[string]any{
 				"output_type": "stream",
 				"text": fmt.Sprintf("Outputs are too large to include. Use %s with: cat <notebook_path> | jq '.cells[%d].outputs'",
-					bashtool.BashToolName, index),
+					"Bash", index),
 			}}
 		} else {
 			out["outputs"] = proc

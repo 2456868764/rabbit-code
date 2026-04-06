@@ -140,6 +140,13 @@ func (b *Bash) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 		return nil, errors.New("bashtool: null byte in command")
 	}
 
+	if err := ValidatePipePermissionPreflight(cmdStr); err != nil {
+		return nil, err
+	}
+	if features.BashReadOnlyMode() && !IsExtractReadOnlyBashInputJSON(cmdStr) {
+		return nil, errors.New("bashtool: command not allowed in read-only bash mode (see memdir.IsExtractReadOnlyBash)")
+	}
+
 	runInBG := in.RunInBackground != nil && *in.RunInBackground
 
 	if features.MonitorToolEnabled() && !backgroundTasksDisabled() && !runInBG {
