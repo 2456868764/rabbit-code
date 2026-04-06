@@ -17,7 +17,7 @@ import (
 // blockedSleepFollowup mirrors BashTool.tsx validateInput message after "Blocked: …" (errorCode 10).
 const blockedSleepFollowup = " Run blocking commands in the background with run_in_background: true — you'll get a completion notification when done. For streaming events (watching logs, polling APIs), use the Monitor tool. If you genuinely need a delay (rate limiting, deliberate pacing), keep it under 2 seconds."
 
-// Bash implements tools.Tool for BashTool.tsx (headless Run: parse, timeout, exec).
+// Bash implements tools.Tool for BashTool.tsx (Run: parse, timeout, exec, background, semantics).
 type Bash struct{}
 
 // New returns a Bash tool.
@@ -33,21 +33,25 @@ type bashInputWithBG struct {
 	Timeout                   *int   `json:"timeout,omitempty"`
 	Description               string `json:"description,omitempty"`
 	RunInBackground           *bool  `json:"run_in_background,omitempty"`
-	DangerouslyDisableSandbox *bool `json:"dangerouslyDisableSandbox,omitempty"`
+	DangerouslyDisableSandbox *bool  `json:"dangerouslyDisableSandbox,omitempty"`
 }
 
 type bashInputNoBG struct {
 	Command                   string `json:"command"`
 	Timeout                   *int   `json:"timeout,omitempty"`
 	Description               string `json:"description,omitempty"`
-	DangerouslyDisableSandbox *bool `json:"dangerouslyDisableSandbox,omitempty"`
+	DangerouslyDisableSandbox *bool  `json:"dangerouslyDisableSandbox,omitempty"`
 }
 
 type bashOutput struct {
-	Stdout                    string `json:"stdout"`
-	Stderr                    string `json:"stderr"`
-	Interrupted               bool   `json:"interrupted"`
-	DangerouslyDisableSandbox *bool  `json:"dangerouslyDisableSandbox,omitempty"`
+	Stdout                    string  `json:"stdout"`
+	Stderr                    string  `json:"stderr"`
+	Interrupted               bool    `json:"interrupted"`
+	DangerouslyDisableSandbox *bool   `json:"dangerouslyDisableSandbox,omitempty"`
+	BackgroundTaskID          string  `json:"backgroundTaskId,omitempty"`
+	BackgroundTaskOutputPath  string  `json:"backgroundTaskOutputPath,omitempty"`
+	ReturnCodeInterpretation  *string `json:"returnCodeInterpretation,omitempty"`
+	NoOutputExpected          *bool   `json:"noOutputExpected,omitempty"`
 }
 
 func backgroundTasksDisabled() bool {
@@ -112,6 +116,13 @@ func NormalizeLegacyBashInput(inputJSON []byte) []byte {
 	return out
 }
 
+func applyDangerouslyDisableSandbox(out *bashOutput, in *bool) {
+	if in != nil {
+		v := *in
+		out.DangerouslyDisableSandbox = &v
+	}
+}
+
 // Run implements tools.Tool.
 func (b *Bash) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	if ctx.Err() != nil {
@@ -128,25 +139,13 @@ func (b *Bash) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	if strings.ContainsRune(cmdStr, 0) {
 		return nil, errors.New("bashtool: null byte in command")
 	}
-	if in.RunInBackground != nil && *in.RunInBackground {
-		return nil, errors.New("bashtool: run_in_background is not supported in this runner (defer LocalShellTask parity)")
-	}
 
-	if features.MonitorToolEnabled() && !backgroundTasksDisabled() {
-		if in.RunInBackground == nil || !*in.RunInBackground {
-			if hint := DetectBlockedSleepPattern(cmdStr); hint != "" {
-				return nil, fmt.Errorf("Blocked: %s.%s", hint, blockedSleepFollowup)
-			}
-		}
-	}
+	runInBG := in.RunInBackground != nil && *in.RunInBackground
 
-	if !features.BashExecEnabled() {
-		out := bashOutput{Stdout: "", Stderr: "", Interrupted: false}
-		if in.DangerouslyDisableSandbox != nil {
-			v := *in.DangerouslyDisableSandbox
-			out.DangerouslyDisableSandbox = &v
+	if features.MonitorToolEnabled() && !backgroundTasksDisabled() && !runInBG {
+		if hint := DetectBlockedSleepPattern(cmdStr); hint != "" {
+			return nil, fmt.Errorf("Blocked: %s.%s", hint, blockedSleepFollowup)
 		}
-		return json.Marshal(out)
 	}
 
 	ms := DefaultBashTimeoutMs()
@@ -155,6 +154,31 @@ func (b *Bash) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 		if ms > MaxBashTimeoutMs() {
 			ms = MaxBashTimeoutMs()
 		}
+	}
+
+	if !features.BashExecEnabled() {
+		out := bashOutput{Stdout: "", Stderr: "", Interrupted: false}
+		applyDangerouslyDisableSandbox(&out, in.DangerouslyDisableSandbox)
+		return json.Marshal(out)
+	}
+
+	// BashTool.tsx: run_in_background only when background tasks enabled; otherwise foreground.
+	if runInBG && !backgroundTasksDisabled() {
+		tid, path, err := startBackgroundCommand(cmdStr, ms)
+		if err != nil {
+			return nil, err
+		}
+		out := bashOutput{
+			Stdout:                   "",
+			Stderr:                   "",
+			Interrupted:              false,
+			BackgroundTaskID:         tid,
+			BackgroundTaskOutputPath: path,
+		}
+		applyDangerouslyDisableSandbox(&out, in.DangerouslyDisableSandbox)
+		silent := IsSilentBashCommand(cmdStr)
+		out.NoOutputExpected = &silent
+		return json.Marshal(out)
 	}
 
 	cctx, cancel := context.WithTimeout(ctx, time.Duration(ms)*time.Millisecond)
@@ -166,19 +190,41 @@ func (b *Bash) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	cmd.Stderr = &stderr
 	runErr := cmd.Run()
 
-	out := bashOutput{
-		Stdout:      stdout.String(),
-		Stderr:      stderr.String(),
-		Interrupted: errors.Is(cctx.Err(), context.DeadlineExceeded),
-	}
-	if in.DangerouslyDisableSandbox != nil {
-		v := *in.DangerouslyDisableSandbox
-		out.DangerouslyDisableSandbox = &v
-	}
-	if runErr != nil && !out.Interrupted {
-		if out.Stderr == "" {
-			out.Stderr = runErr.Error()
+	exitCode := 0
+	if runErr != nil {
+		var ee *exec.ExitError
+		if errors.As(runErr, &ee) {
+			exitCode = ee.ExitCode()
+		} else {
+			exitCode = -1
 		}
 	}
+
+	outStdout := stdout.String()
+	outStderr := stderr.String()
+	isErr, semMsg := InterpretCommandResult(cmdStr, exitCode, outStdout, outStderr)
+	interrupted := errors.Is(cctx.Err(), context.DeadlineExceeded)
+
+	if isErr && !interrupted {
+		if outStderr == "" && runErr != nil {
+			outStderr = runErr.Error()
+		}
+	}
+
+	var retInterp *string
+	if semMsg != "" {
+		s := semMsg
+		retInterp = &s
+	}
+
+	noExp := IsSilentBashCommand(cmdStr)
+	out := bashOutput{
+		Stdout:                   outStdout,
+		Stderr:                   outStderr,
+		Interrupted:              interrupted,
+		ReturnCodeInterpretation: retInterp,
+		NoOutputExpected:         &noExp,
+	}
+	applyDangerouslyDisableSandbox(&out, in.DangerouslyDisableSandbox)
 	return json.Marshal(out)
 }

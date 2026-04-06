@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/2456868764/rabbit-code/internal/features"
 	"github.com/2456868764/rabbit-code/internal/tools"
@@ -107,5 +108,66 @@ func TestBash_monitorAllowsSubTwoSecondSleep(t *testing.T) {
 	}
 	if !strings.Contains(string(out), `"interrupted"`) {
 		t.Fatalf("%s", out)
+	}
+}
+
+func TestBash_runInBackground(t *testing.T) {
+	t.Setenv(features.EnvBashExec, "1")
+	t.Setenv("CLAUDE_CODE_DISABLE_BACKGROUND_TASKS", "")
+	t.Setenv("RABBIT_CODE_DISABLE_BACKGROUND_TASKS", "")
+	out, err := bashtool.New().Run(context.Background(), []byte(`{"command":"echo bgdone","run_in_background":true}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var o struct {
+		BackgroundTaskID         string `json:"backgroundTaskId"`
+		BackgroundTaskOutputPath string `json:"backgroundTaskOutputPath"`
+		Stdout                   string `json:"stdout"`
+	}
+	if err := json.Unmarshal(out, &o); err != nil {
+		t.Fatal(err)
+	}
+	if o.BackgroundTaskID == "" || o.BackgroundTaskOutputPath == "" {
+		t.Fatalf("missing bg fields: %s", out)
+	}
+	if o.Stdout != "" {
+		t.Fatalf("stdout should be empty for bg spawn: %q", o.Stdout)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := bashtool.WaitBackgroundTask(ctx, o.BackgroundTaskID); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBash_testCommandFalseSemantic(t *testing.T) {
+	t.Setenv(features.EnvBashExec, "1")
+	out, err := bashtool.New().Run(context.Background(), []byte(`{"command":"test 1 -eq 2"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var o struct {
+		Stderr                   string  `json:"stderr"`
+		ReturnCodeInterpretation *string `json:"returnCodeInterpretation"`
+	}
+	if err := json.Unmarshal(out, &o); err != nil {
+		t.Fatal(err)
+	}
+	if o.ReturnCodeInterpretation == nil || !strings.Contains(*o.ReturnCodeInterpretation, "false") {
+		t.Fatalf("interpretation=%v out=%s", o.ReturnCodeInterpretation, out)
+	}
+}
+
+func TestMapBash_backgroundAndInterpretation(t *testing.T) {
+	s := bashtool.MapBashToolResultForMessagesAPI([]byte(`{
+	  "stdout":"",
+	  "stderr":"",
+	  "interrupted":false,
+	  "backgroundTaskId":"tid",
+	  "backgroundTaskOutputPath":"/tmp/x.out",
+	  "returnCodeInterpretation":"No matches found"
+	}`))
+	if !strings.Contains(s, "No matches found") || !strings.Contains(s, "tid") || !strings.Contains(s, "/tmp/x.out") {
+		t.Fatalf("%q", s)
 	}
 }
