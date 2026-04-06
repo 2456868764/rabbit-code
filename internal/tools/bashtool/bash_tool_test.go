@@ -88,3 +88,24 @@ func TestNormalizeLegacyBashInput(t *testing.T) {
 		t.Fatalf("%s", b)
 	}
 }
+
+func TestBash_monitorBlocksSleep2Plus(t *testing.T) {
+	t.Setenv(features.EnvMonitorTool, "1")
+	t.Setenv(features.EnvBashExec, "1")
+	_, err := bashtool.New().Run(context.Background(), []byte(`{"command":"sleep 2"}`))
+	if err == nil || !strings.Contains(err.Error(), "Blocked:") || !strings.Contains(err.Error(), "Monitor tool") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestBash_monitorAllowsSubTwoSecondSleep(t *testing.T) {
+	t.Setenv(features.EnvMonitorTool, "1")
+	t.Setenv(features.EnvBashExec, "1")
+	out, err := bashtool.New().Run(context.Background(), []byte(`{"command":"sleep 0"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), `"interrupted"`) {
+		t.Fatalf("%s", out)
+	}
+}

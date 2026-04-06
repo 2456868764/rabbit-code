@@ -439,6 +439,8 @@ const (
 	EnvTimeBasedMCKeepRecent          = "RABBIT_CODE_TIME_BASED_MC_KEEP_RECENT"
 	EnvHistorySnip                    = "RABBIT_CODE_HISTORY_SNIP"
 	EnvBashExec                       = "RABBIT_CODE_BASH_EXEC"
+	// EnvMonitorTool gates MONITOR_TOOL-aligned behavior in headless builds (Bash sleep blocking, prompt bullets); matches feature('MONITOR_TOOL') when truthy.
+	EnvMonitorTool = "RABBIT_MONITOR_TOOL"
 	EnvSnipCompact                    = "RABBIT_CODE_SNIP_COMPACT"
 	EnvSnipCompactMaxBytes            = "RABBIT_CODE_SNIP_COMPACT_MAX_BYTES"
 	EnvSnipCompactMaxRounds           = "RABBIT_CODE_SNIP_COMPACT_MAX_ROUNDS"
@@ -1119,6 +1121,7 @@ func TimeBasedMCKeepRecent() int {
 func HistorySnipEnabled() bool { return truthy(os.Getenv(EnvHistorySnip)) }
 func SnipCompactEnabled() bool { return truthy(os.Getenv(EnvSnipCompact)) }
 func BashExecEnabled() bool    { return truthy(os.Getenv(EnvBashExec)) }
+func MonitorToolEnabled() bool { return truthy(os.Getenv(EnvMonitorTool)) }
 
 func SnipCompactMaxBytes() int {
 	if !SnipCompactEnabled() {

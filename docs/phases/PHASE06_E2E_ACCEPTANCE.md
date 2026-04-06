@@ -29,7 +29,7 @@ make test-phase6
 | **`internal/tools/fileedittool`** | **`FileEdit.Run`**：replace/**replaceAll**、**`.ipynb`** 拒绝、**`MapEditToolResultForMessagesAPI`**；**未知字段拒绝**；**`GetEditToolPrompt`** / **`normalize_input`/`suggest_cwd`/`settings_validate`** 单测 |
 | **`internal/tools/greptool`** | **`Grep.Run`**：严格 JSON、缺 **`pattern`** / 非法 **`output_mode`**；**`MapGrepToolResultForMessagesAPI`**（content/count/files、分页）；无 **`rg`** 时相关用例 **Skip** |
 | **`internal/tools/notebookedittool`** | **`NotebookEdit.Run`**：replace（按 **id** / **cell-N**）、insert 首部、**`ReadFileState`** 门禁、严格 JSON、旧 **nbformat**（minor 小于 5）成功响应省略 **`cell_id`**；**`MapNotebookEditToolResultForMessagesAPI`**；**`ParseCellId`** |
-| **`internal/tools/bashtool`** | **`Bash.Run`**：**`command`**/**`timeout`**/**`dangerouslyDisableSandbox`**；**未知字段拒绝**；**`RABBIT_CODE_BASH_EXEC`** 开/关；**`MapBashToolResultForMessagesAPI`**；**`NormalizeLegacyBashInput`**（**`cmd`→`command`**） |
+| **`internal/tools/bashtool`** | **`Bash.Run`**：**`command`**/**`timeout`**/**`dangerouslyDisableSandbox`**；**未知字段拒绝**；**`RABBIT_CODE_BASH_EXEC`** 开/关；**`RABBIT_MONITOR_TOOL`** 开时 **`sleep`≥2s** 前置拦截（TS **`validateInput`**）；**`SplitCommandDeprecated`/`IsSearchOrReadBashCommand`/`GetSimplePrompt`**；**`MapBashToolResultForMessagesAPI`**；**`NormalizeLegacyBashInput`**（**`cmd`→`command`**） |
 
 ---
 

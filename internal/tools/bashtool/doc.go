@@ -1,5 +1,6 @@
 // Package bashtool implements the Bash tool (claude-code-sourcemap/restored-src/src/tools/BashTool/BashTool.tsx).
 //
-// TS mapping (incremental): BashTool.tsx → bash_tool.go; toolName.ts → toolname.go; prompt.ts getSimplePrompt/sandbox/git → defer (PromptLead + DescriptionFallback only); UI.tsx → ui.go (mapToolResult string). Other BashTool/*.ts (permissions, sandbox, sed, ast) → Phase 6 / H9 follow-on.
-// Timeouts: utils/timeouts.ts → timeouts.go (BASH_DEFAULT_TIMEOUT_MS / BASH_MAX_TIMEOUT_MS).
+// TS mapping: BashTool.tsx → bash_tool.go; toolName.ts → toolname.go; prompt.ts → prompt.go (GetSimplePrompt sans SandboxManager/git sections); UI.tsx → ui.go; utils/bash/commands.ts split paths → commands.go; BashTool.tsx isSearchOrRead/detectBlockedSleep → search_read.go.
+// Timeouts: utils/timeouts.ts → timeouts.go. MONITOR sleep gate: features.MonitorToolEnabled (RABBIT_MONITOR_TOOL) ↔ feature('MONITOR_TOOL').
+// Deferred vs TS: bashPermissions/readOnlyValidation/sed/LocalShellTask/background execution/sandbox AST (see PARITY_H9_BASH_PERMISSIONS.md).
 package bashtool

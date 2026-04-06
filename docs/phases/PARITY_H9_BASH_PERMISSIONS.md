@@ -42,7 +42,7 @@
 
 | 职责 | TS 参考 | Go | 状态 |
 |------|---------|-----|------|
-| Bash 工具执行（env 门控） | **`BashTool`** 管线 | **`query.BashExecToolRunner`** / **`BashStubToolRunner`**；**`RABBIT_CODE_BASH_EXEC`**（**`features.BashExecEnabled`**） | **[~]** |
+| Bash 工具执行（env 门控） | **`BashTool`** 管线 | **`query.BashExecToolRunner`** / **`BashStubToolRunner`**；**`RABBIT_CODE_BASH_EXEC`**（**`features.BashExecEnabled`**）；**`RABBIT_MONITOR_TOOL`**（**`features.MonitorToolEnabled`**）↔ **`validateInput` `sleep`** 拦截 | **[~]** |
 | Extract 子代理只读 bash | **`readOnlyValidation.ts`** + **`readOnlyCommandValidation.ts`** | **`memdir.IsExtractReadOnlyBash`**（**§4**） | **[~]**（extract 子集；非完整 BashTool） |
 | 孤儿权限 | hooks / **`useCanUseTool`** | **`query.OrphanPermissionError`**、**`engine.Config.OrphanPermissionAdvisor`**、**`EventKindOrphanPermission`**（**§5**） | **[~]** headless |
 
@@ -55,9 +55,9 @@
 | **`readOnlyCommandValidation.ts`** | 多词 **git** 命令、flag 白名单、危险 flag 拦截 | **`memdir.isExtractReadOnlyShellCommand`**：无管道/重定向；**`&&`/`||`/`;** 分段；**`git`** 子命令白名单 + **`stash list`**、**`remote`/`remote -v`/`remote show`**、**`config --get`**；**`blame`/`merge-base`/`shortlog`/`reflog`/`rev-list`/`cat-file`/`for-each-ref`/`whatchanged`/`name-rev`** 等 | **[~]** |
 | **`readOnlyValidation.ts`** | 复合命令、**cd**+**git**、bare repo 探测等 | **未镜像**（extract 仅单管道拒绝 + 分段） | **[ ]** Phase 6+ |
 | **`pathValidation.ts`** | 工作目录、删除路径、**cd** 写组合 | **`BashExecToolRunner`** 无 cwd/allowlist；**`AutoMemToolRunner`** 仅记忆目录写 | **[ ]** Phase 6 |
-| **`bashPermissions.ts`** / **`bashSecurity.ts`** | 权限模式、沙箱 | **`RABBIT_CODE_BASH_EXEC`** 门控 + **NUL** 拒绝；无沙箱 | **[ ]** Phase 6 |
+| **`bashPermissions.ts`** / **`bashSecurity.ts`** | 权限模式、沙箱 | **`RABBIT_CODE_BASH_EXEC`** 门控 + **NUL** 拒绝；**`RABBIT_MONITOR_TOOL`** → **`bashtool.Run`** **`sleep`** 前置拦截；无沙箱 | **[ ]** Phase 6 |
 
-**`query.BashExecToolRunner`**：不设只读校验（与 TS「全量 Bash 工具」分离）；extract 路径用 **`IsExtractReadOnlyBash`** 闸门。
+**`query.BashExecToolRunner`** / **`bashtool.Bash.Run`**：不设 **`readOnlyValidation`**（与 TS「全量 Bash 工具」分离）；**`bashtool`** 提供 **`SplitCommand*`**（**`utils/bash/commands.ts`** 子集）与 **`IsSearchOrReadBashCommand`**；extract 路径用 **`IsExtractReadOnlyBash`** 闸门。
 
 ## §5 `canUseTool` / 孤儿权限 ↔ Go（headless）
 

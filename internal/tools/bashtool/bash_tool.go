@@ -14,6 +14,9 @@ import (
 	"github.com/2456868764/rabbit-code/internal/features"
 )
 
+// blockedSleepFollowup mirrors BashTool.tsx validateInput message after "Blocked: …" (errorCode 10).
+const blockedSleepFollowup = " Run blocking commands in the background with run_in_background: true — you'll get a completion notification when done. For streaming events (watching logs, polling APIs), use the Monitor tool. If you genuinely need a delay (rate limiting, deliberate pacing), keep it under 2 seconds."
+
 // Bash implements tools.Tool for BashTool.tsx (headless Run: parse, timeout, exec).
 type Bash struct{}
 
@@ -127,6 +130,14 @@ func (b *Bash) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	}
 	if in.RunInBackground != nil && *in.RunInBackground {
 		return nil, errors.New("bashtool: run_in_background is not supported in this runner (defer LocalShellTask parity)")
+	}
+
+	if features.MonitorToolEnabled() && !backgroundTasksDisabled() {
+		if in.RunInBackground == nil || !*in.RunInBackground {
+			if hint := DetectBlockedSleepPattern(cmdStr); hint != "" {
+				return nil, fmt.Errorf("Blocked: %s.%s", hint, blockedSleepFollowup)
+			}
+		}
 	}
 
 	if !features.BashExecEnabled() {

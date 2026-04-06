@@ -488,6 +488,17 @@ func TestBashExecEnabled(t *testing.T) {
 	}
 }
 
+func TestMonitorToolEnabled(t *testing.T) {
+	t.Setenv(EnvMonitorTool, "")
+	if MonitorToolEnabled() {
+		t.Fatal("default off")
+	}
+	t.Setenv(EnvMonitorTool, "1")
+	if !MonitorToolEnabled() {
+		t.Fatal()
+	}
+}
+
 func TestCompactStreamingEnvGates(t *testing.T) {
 	t.Setenv(EnvCompactStreamingRetry, "")
 	if CompactStreamingRetryEnabled() {
