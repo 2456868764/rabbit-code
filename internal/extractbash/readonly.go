@@ -1,5 +1,5 @@
-// Package extractbash holds read-only bash command validation shared by memdir (extract) and bashtool (RABBIT_CODE_BASH_READ_ONLY).
-// Logic mirrors memdir.IsExtractReadOnlyBash / readOnlyCommandValidation.ts subset (no imports to query or memdir).
+// Package extractbash holds conservative read-only bash validation for memdir (extract fork) and as a fallback inside bashtool.ReadOnlyCommandLineAllowed.
+// Logic mirrors readOnlyCommandValidation.ts / readOnlyValidation.ts extract-style subset only (no COMMAND_ALLOWLIST flag engine; see internal/readonlycmd).
 package extractbash
 
 import (

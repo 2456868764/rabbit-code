@@ -441,9 +441,9 @@ const (
 	EnvBashExec                       = "RABBIT_CODE_BASH_EXEC"
 	// EnvMonitorTool gates MONITOR_TOOL-aligned behavior in headless builds (Bash sleep blocking, prompt bullets); matches feature('MONITOR_TOOL') when truthy.
 	EnvMonitorTool = "RABBIT_MONITOR_TOOL"
-	// EnvBashReadOnly when truthy, bashtool rejects commands that fail memdir.IsExtractReadOnlyBash (read-only subset).
+	// EnvBashReadOnly when truthy, bashtool rejects commands that fail ReadOnlyCommandLineAllowed (readonlycmd allowlist + validateFlags or extractbash subset); extract fork still uses memdir.IsExtractReadOnlyBash → extractbash.
 	EnvBashReadOnly = "RABBIT_CODE_BASH_READ_ONLY"
-	// EnvBashSandboxEnabled when truthy, bashtool.ShouldUseSandbox reports true (policy hint; no kernel sandbox).
+	// EnvBashSandboxEnabled when truthy, bashtool.ShouldUseSandbox reports true; bashtool may wrap sh in firejail/bwrap when installed.
 	EnvBashSandboxEnabled = "RABBIT_CODE_BASH_SANDBOX_ENABLED"
 	// EnvBashAllowUnsandboxed when truthy, dangerouslyDisableSandbox can force ShouldUseSandbox false.
 	EnvBashAllowUnsandboxed = "RABBIT_CODE_BASH_ALLOW_UNSANDBOXED"

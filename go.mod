@@ -21,6 +21,7 @@ require (
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/term v0.37.0
 	golang.org/x/text v0.33.0
+	mvdan.cc/sh/v3 v3.11.0
 )
 
 require (

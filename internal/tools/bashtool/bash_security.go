@@ -1,12 +1,25 @@
 package bashtool
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/2456868764/rabbit-code/internal/readonlycmd"
 )
 
 // Mirrors bashSecurity.ts CONTROL_CHAR_RE (excludes tab, LF, CR — handled elsewhere).
 var bashControlCharRE = regexp.MustCompile(`[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]`)
+
+// heredocInsideSubstitutionRE mirrors bashSecurity.ts HEREDOC_IN_SUBSTITUTION.
+var heredocInsideSubstitutionRE = regexp.MustCompile(`\$\([^)]*<<`)
+
+// zshDangerousCommands mirrors bashSecurity.ts ZSH_DANGEROUS_COMMANDS (first word of a simple command).
+var zshDangerousCommands = map[string]struct{}{
+	"zmodload": {}, "emulate": {}, "sysopen": {}, "sysread": {}, "syswrite": {}, "sysseek": {},
+	"zpty": {}, "ztcp": {}, "zsocket": {}, "mapfile": {}, "zf_rm": {}, "zf_mv": {}, "zf_ln": {},
+	"zf_chmod": {}, "zf_chown": {}, "zf_mkdir": {}, "zf_rmdir": {}, "zf_chgrp": {},
+}
 
 // unquotedOutsideSingleQuotes mirrors bashSecurity extractQuotedContent "withDoubleQuotes":
 // characters outside single quotes, including inside double quotes (where $ and ` expand).
@@ -127,6 +140,41 @@ func BashReadOnlySecurityRejectReason(command string) string {
 	for _, p := range bashDangerousPatterns {
 		if p.re.MatchString(u) {
 			return "command contains " + p.msg
+		}
+	}
+	if heredocInsideSubstitutionRE.MatchString(command) {
+		return "command may embed a heredoc inside command substitution"
+	}
+	if r := bashZshDangerousFirstWordRejectReason(command); r != "" {
+		return r
+	}
+	if r := bashShellParseSecurityRejectReason(command); r != "" {
+		return r
+	}
+	return ""
+}
+
+func bashZshDangerousFirstWordRejectReason(command string) string {
+	for _, seg := range shellSegments(command) {
+		for _, sub := range SplitCommandDeprecated(seg) {
+			sub = strings.TrimSpace(sub)
+			if sub == "" {
+				continue
+			}
+			toks, err := readonlycmd.TokenizeShellWords(sub)
+			var first string
+			if err != nil || len(toks) == 0 {
+				f := strings.Fields(sub)
+				if len(f) == 0 {
+					continue
+				}
+				first = f[0]
+			} else {
+				first = toks[0]
+			}
+			if _, bad := zshDangerousCommands[first]; bad {
+				return fmt.Sprintf("command invokes zsh-specific dangerous builtin %q", first)
+			}
 		}
 	}
 	return ""

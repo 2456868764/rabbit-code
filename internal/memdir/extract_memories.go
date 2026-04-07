@@ -16,7 +16,7 @@ import (
 	"github.com/2456868764/rabbit-code/internal/query"
 )
 
-// IsExtractReadOnlyBash is a conservative subset of BashTool/readOnlyCommandValidation (readOnlyValidation.ts + utils/shell/readOnlyCommandValidation.ts) for the extract fork (createAutoMemCanUseTool). Rejects NUL in the command string.
+// IsExtractReadOnlyBash is the extract-fork conservative subset (delegates to extractbash; not the full bashtool readonlycmd allowlist). Rejects NUL in the command string.
 func IsExtractReadOnlyBash(inputJSON []byte) bool {
 	return extractbash.IsReadOnlyBashInputJSON(inputJSON)
 }

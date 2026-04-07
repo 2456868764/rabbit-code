@@ -152,7 +152,7 @@ func (b *Bash) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	}
 	if features.BashReadOnlyMode() {
 		if !IsExtractReadOnlyBashInputJSON(cmdStr) {
-			return nil, errors.New("bashtool: command not allowed in read-only bash mode (see memdir.IsExtractReadOnlyBash)")
+			return nil, errors.New("bashtool: command not allowed in read-only bash mode (see bashtool.ReadOnlyCommandLineAllowed / PARITY_H9_BASH_PERMISSIONS.md §4)")
 		}
 		if err := CheckReadOnlyStructuralConstraints(cmdStr, cwd); err != nil {
 			return nil, err
@@ -183,7 +183,7 @@ func (b *Bash) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 
 	// BashTool.tsx: run_in_background only when background tasks enabled; otherwise foreground.
 	if runInBG && !backgroundTasksDisabled() {
-		tid, path, err := startBackgroundCommand(cmdStr, ms)
+		tid, path, err := startBackgroundCommand(cmdStr, ms, in.DangerouslyDisableSandbox)
 		if err != nil {
 			return nil, err
 		}
@@ -204,7 +204,7 @@ func (b *Bash) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	defer cancel()
 
 	var stdout, stderr bytes.Buffer
-	cmd := exec.CommandContext(cctx, "sh", "-c", cmdStr)
+	cmd := ExecCommandContextWithKernelSandbox(cctx, ShouldUseSandbox(cmdStr, in.DangerouslyDisableSandbox), "sh", "-c", cmdStr)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	runErr := cmd.Run()

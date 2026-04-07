@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -39,7 +38,7 @@ type bgEntry struct {
 var backgroundRegistry sync.Map // taskID -> *bgEntry
 
 // startBackgroundCommand spawns sh -c in a goroutine; stdout and stderr are merged to outPath. timeoutMs clamps like foreground.
-func startBackgroundCommand(cmdStr string, timeoutMs int) (taskID, outPath string, err error) {
+func startBackgroundCommand(cmdStr string, timeoutMs int, dangerouslyDisable *bool) (taskID, outPath string, err error) {
 	taskID = newBackgroundTaskID()
 	outPath = backgroundOutputPath(taskID)
 	f, err := os.OpenFile(outPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
@@ -54,7 +53,7 @@ func startBackgroundCommand(cmdStr string, timeoutMs int) (taskID, outPath strin
 		defer close(ent.done)
 		cctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
 		defer cancel()
-		cmd := exec.CommandContext(cctx, "sh", "-c", cmdStr)
+		cmd := ExecCommandContextWithKernelSandbox(cctx, ShouldUseSandbox(cmdStr, dangerouslyDisable), "sh", "-c", cmdStr)
 		cmd.Stdout = f
 		cmd.Stderr = f
 		ent.err = cmd.Run()

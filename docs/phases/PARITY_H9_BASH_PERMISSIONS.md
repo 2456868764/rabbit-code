@@ -1,6 +1,6 @@
 # H9：Bash / 权限栈 ↔ Go（Phase 6 工具层）
 
-**规则**：`PHASE_ITERATION_RULES.md` **§三**（清单牵引、测绿、一提交、文档同步）。**§3.1** 要求上游模块整包对照时，本文件列 **`src/tools/BashTool/`** 全量 **`.ts`**；Go 侧当前为 **headless 桥接**（**`internal/query/bash_tool_runner.go`** 等），非整目录 1:1 迁移完成声明。
+**规则**：`PHASE_ITERATION_RULES.md` **§三**（清单牵引、测绿、一提交、文档同步）。**§3.1** 要求上游模块整包对照时 **主本映射以本节为准**；Go 侧为 **headless 桥接**（**`internal/query/bash_tool_runner.go`** + **`internal/tools/bashtool`**），与 Ink/React **不等价**处已标 **defer**。
 
 **主进度表**：`PHASE05_CONTINUATION.md` **Headless 行 9（H9）**、**§3.0 H9 子计划**。
 
@@ -10,16 +10,19 @@
 
 | 序 | 状态 | 项 | 验收 |
 |----|------|-----|------|
-| 1 | ☑ | **`BashExecToolRunner`**：拒绝命令串中的 **null 字节**（与 TS 路径卫生同类）；**`RABBIT_CODE_BASH_EXEC`** 开启时生效 | **`go test ./internal/query/... -short`** |
-| 2 | ☑ | **`readOnlyValidation` / `readOnlyCommandValidation`** ↔ **`memdir.IsExtractReadOnlyBash`**（扩展只读 **git** 子命令、**`stash list` / `remote` / `config --get`**、**NUL 拒绝**）；**`pathValidation` / `bashPermissions`** 仍 **Phase 6**（见 **§4**） | **`go test ./internal/memdir/... -short`** |
-| 3 | ☑ | **`canUseTool` / 孤儿 tool_use** ↔ **`query.OrphanPermissionError`**、**`engine.Config.OrphanPermissionAdvisor`**、**`EventKindOrphanPermission`**（**§5**）；全量 **`canUseTool`** 仍 **PARITY_QUERY / DEFERRED** | 文档 + 现有 **`engine_test`** |
+| 1 | ☑ | **`BashExecToolRunner`**：命令串 **NUL** 拒绝；**`RABBIT_CODE_BASH_EXEC`**（**`features.BashExecEnabled`**） | **`go test ./internal/query/... -short`** |
+| 2 | ☑ | **Extract 只读**：**`memdir.IsExtractReadOnlyBash`** / **`extractbash`**（保守子集 + NUL）；与 **bashtool 只读模式**解耦（bashtool 见序 **4**） | **`go test ./internal/memdir/... ./internal/extractbash/... -short`** |
+| 3 | ☑ | **孤儿 tool_use**：**`OrphanPermissionError`**、**`OrphanPermissionAdvisor`**、**`EventKindOrphanPermission`** | **`go test ./internal/engine/... -short`** |
+| 4 | ☑ | **`readOnlyCommandValidation.ts`**（**`src/utils/shell/`**）↔ **`internal/readonlycmd`**（**`go:embed` JSON** + **`validateFlags`**）+ **`bashtool/read_only_gate.go`**（pipe / **`&&`/`||`/`;`** + **`IsCommandSafeViaFlagParsing`** 或 **`extractbash`**）；**`sed`** 钩子 → **`SedCommandAllowedByAllowlist`** | **`go test ./internal/readonlycmd/... ./internal/tools/bashtool/... -short`** |
+| 5 | ☑ | **`bashSecurity.ts`** 补强：**`bash_security.go`**（regex + **`HEREDOC_IN_SUBSTITUTION`** + **`ZSH_DANGEROUS_COMMANDS`**）+ **`bash_security_sh_parse.go`**（**`mvdan.cc/sh/v3`** **`CmdSubst`/`ProcSubst`**）；**`kernel_sandbox.go`**（**firejail**/**bwrap**）；**`sedEditParser.ts`** **`applySedSubstitution`** → **`ApplySedSubstitution`** | 同上 + **`bash_security_more_test`** |
+| 6 | ☐ | **`bashCommandIsSafe_DEPRECATED`** 余量（jq、brace expansion、IFS、Unicode 空白…）；**`BashTool.tsx`/`UI.tsx`** 权限 UI；**`LocalShellTask`** 全链 Bubble Tea；**SandboxManager** 级策略 | **defer**（TUI / Phase 9+）；**`internal/tui/local_shell_task.go`** 仅结构体占位 |
 
 ---
 
-## §3.1-1 上游 TS 清单（`src/tools/BashTool/`，平铺）
+## §3.1-1 上游清单（`src/tools/BashTool/`，平铺 + TSX）
 
-| # | `restored-src/src/tools/BashTool/*.ts` |
-|---|----------------------------------------|
+| # | `restored-src/src/tools/BashTool/*` |
+|---|-------------------------------------|
 | 1 | `bashCommandHelpers.ts` |
 | 2 | `bashPermissions.ts` |
 | 3 | `bashSecurity.ts` |
@@ -35,41 +38,97 @@
 | 13 | `shouldUseSandbox.ts` |
 | 14 | `toolName.ts` |
 | 15 | `utils.ts` |
+| 16 | `BashTool.tsx` |
+| 17 | `BashToolResultMessage.tsx` |
+| 18 | `UI.tsx` |
+
+**邻包（Bash 只读白名单源）**
+
+| # | `restored-src/src/utils/shell/readOnlyCommandValidation.ts` |
+|---|-------------------------------------------------------------|
+| A | 导出 **`GIT_READ_ONLY_COMMANDS`** 等 + **`validateFlags`** 数据；Go：**`internal/readonlycmd`** + 再生脚本 **`tools/dump_allowlist_from_bundle.mjs`**（输出 **`internal/readonlycmd/allowlist_shared.json`**） |
+
+**邻包（拆词 / 路径）**
+
+| # | `restored-src/src/utils/bash/commands.ts` |
+|---|-------------------------------------------|
+| B | **`SplitCommandDeprecated`** 等；Go：**`internal/tools/bashtool/commands.go`** |
 
 ---
 
-## Go 对照（当前 headless）
+## §3.1-2 Go 文件名 ↔ TS 主映射（`internal/tools/bashtool` + 卫星包）
+
+**说明**：与 **§3.1**「单 TS ↔ 单 `snake_case.go`」理想形态相比，历史实现将 **`bashPermissions.ts`** 等拆为多个 **`*.go`**；下表为**权威主本**，后续整包迁移时优先**合并回单文件**而非再增按功能命名文件。
+
+| TS / TSX | Go 交付物 |
+|----------|-----------|
+| `BashTool.tsx` | `bash_tool.go`；后台：`background.go`；超时：`timeouts.go` |
+| `BashToolResultMessage.tsx` | **defer**（消息渲染） |
+| `UI.tsx` | `ui.go` |
+| `bashCommandHelpers.ts` | `bash_command_helpers.go` |
+| `bashPermissions.ts` | `bash_permissions_strip.go`、`bash_permissions_identify.go`、`bash_pipe_preflight.go` |
+| `bashSecurity.ts` | `bash_security.go`、`bash_security_sh_parse.go` |
+| `commandSemantics.ts` | `command_semantics.go` |
+| `commentLabel.ts` | `comment_label.go` |
+| `destructiveCommandWarning.ts` | `destructive_command_warning.go` |
+| `modeValidation.ts` | `mode_validation.go` |
+| `pathValidation.ts` | `path_validation.go` |
+| `prompt.ts` | `prompt.go` |
+| `readOnlyValidation.ts` | `read_only_structural.go`、`read_only_gate.go`、`read_only_validation.go`；**`extractbash`**（共享子集）；**`internal/readonlycmd`**（白名单 + flags） |
+| `readOnlyCommandValidation.ts` | **`internal/readonlycmd/*.go`** + **`allowlist_*.json`** |
+| `sedEditParser.ts` | `sed_edit_parser.go`（**`ParseSedEditCommand`**、**`ApplySedSubstitution`**） |
+| `sedValidation.ts` | `sed_validation.go` |
+| `shouldUseSandbox.ts` | `should_use_sandbox.go`、`kernel_sandbox.go` |
+| `toolName.ts` | `toolname.go` |
+| `utils.ts` | `utils_bash_tool.go` |
+| `commands.ts`（utils/bash） | `commands.go`、`commands_test.go` |
+| （TS 静默命令辅助） | `silent_bash.go`、`search_read.go` |
+| （bare/UNC/git-internal） | `git_bare_detect.go`、`git_internal_writes.go`、`unc_path.go` |
+
+**`src/tasks/LocalShellTask/*`（查询层引用）**
+
+| TS | Go |
+|----|-----|
+| 任务模型占位 | `internal/tui/local_shell_task.go` |
+
+---
+
+## Go 对照（headless）
 
 | 职责 | TS 参考 | Go | 状态 |
 |------|---------|-----|------|
-| Bash 工具执行（env 门控） | **`BashTool`** 管线 | **`query.BashExecToolRunner`** / **`BashStubToolRunner`**；**`RABBIT_CODE_BASH_EXEC`**（**`features.BashExecEnabled`**）；**`RABBIT_MONITOR_TOOL`**（**`features.MonitorToolEnabled`**）↔ **`validateInput` `sleep`** 拦截 | **[~]** |
-| Extract 子代理只读 bash | **`readOnlyValidation.ts`** + **`readOnlyCommandValidation.ts`** | **`extractbash`** + **`memdir.IsExtractReadOnlyBash`**（**§4**）；**`bashtool`** 只读模式同规则 | **[~]**（extract 子集；非完整 BashTool） |
-| 孤儿权限 | hooks / **`useCanUseTool`** | **`query.OrphanPermissionError`**、**`engine.Config.OrphanPermissionAdvisor`**、**`EventKindOrphanPermission`**（**§5**） | **[~]** headless |
+| Bash 执行（env 门控） | **`BashTool.tsx`** | **`query.BashExecToolRunner`** / **`BashStubToolRunner`**；**`bashtool.Bash.Run`**（**`sh -c`**）；**`RABBIT_MONITOR_TOOL`** → sleep 拦截 | **[~]** |
+| 只读模式（全量白名单 + flags） | **`readOnlyCommandValidation.ts`** + **`readOnlyValidation.ts`** | **`readonlycmd`** + **`ReadOnlyCommandLineAllowed`** + **`CheckReadOnlyStructuralConstraints`**；回落 **`extractbash`** | **[~]** |
+| Extract 子代理只读 | 同上（保守子集） | **`memdir.IsExtractReadOnlyBash`** → **`extractbash`** | **[x]** 子集 |
+| 孤儿权限 | hooks | **`OrphanPermissionError`**、**`OrphanPermissionAdvisor`** | **[~]** |
 
 ---
 
-## §4 `readOnlyValidation` / `pathValidation` ↔ Go（headless）
+## §4 `readOnlyValidation` / `pathValidation` / `bashPermissions` ↔ Go（headless）
 
 | TS 区域 | 行为摘要 | Go | 状态 |
 |---------|----------|-----|------|
-| **`readOnlyCommandValidation.ts`** | 多词 **git** 命令、flag 白名单、危险 flag 拦截 | **`extractbash.IsReadOnlyBashInputJSON`** / **`IsReadOnlyShellCommand`**（与 memdir extract 子集同逻辑）；**`memdir.IsExtractReadOnlyBash`** 委托 **`extractbash`**；无管道/重定向；**`&&`/`||`/`;** 分段；**`git`** 子命令白名单同上 | **[~]** |
-| **`readOnlyValidation.ts`** | 复合命令、**cd**+**git**、bare repo 探测等 | **未镜像**（extract 仅单管道拒绝 + 分段） | **[ ]** Phase 6+ |
-| **`pathValidation.ts`** | 工作目录、删除路径、**cd** 写组合 | **`BashExecToolRunner`** 无 cwd/allowlist；**`AutoMemToolRunner`** 仅记忆目录写 | **[ ]** Phase 6 |
-| **`bashPermissions.ts`** / **`bashSecurity.ts`** | 权限模式、沙箱 | **`RABBIT_CODE_BASH_EXEC`** 门控 + **NUL** 拒绝；**`RABBIT_MONITOR_TOOL`** → **`bashtool.Run`** **`sleep`** 前置拦截；**`bashtool`** 管道/cd 预检、权限条带等（见 **`bashtool/doc.go`**）；无完整沙箱 | **[~]** Phase 6 |
+| **`readOnlyCommandValidation.ts`** | 多词 **git**、**COMMAND_ALLOWLIST**、**validateFlags**、hooks（**sed**/**ps**/…） | **`internal/readonlycmd`**（embed **`allowlist_shared.json`** + **`allowlist_extras.json`**）+ **`bashtool/read_only_gate.go`** | **[~]**（数据由上游 bundle 再生；与 TS 仍可能有 ANT_ONLY / 平台差） |
+| **`readOnlyValidation.ts`** | 复合、**cd**+**git**、bare、UNC、sandbox cwd | **`read_only_gate`** + **`read_only_structural.go`** + **`extractbash`** 回落 | **[~]** |
+| **`pathValidation.ts`** | 进程替换、危险 **rm**、**cd**+写、工作区根 | **`path_validation.go`** + **`features.BashWorkdirRoot`** | **[~]** |
+| **`bashPermissions.ts`** / **`bashSecurity.ts`** | 权限条带、危险模式 | **`bash_permissions_*`**、**`bash_security*.go`**、**`mvdan.cc/sh`**  walk | **[~]** |
+| **内核沙箱** | Claude **sandbox** 运行时 | **`kernel_sandbox.go`**（**firejail**/**bwrap**，可选） | **[~]** |
 
-**`query.BashExecToolRunner`** / **`bashtool.Bash.Run`**：**`RABBIT_CODE_BASH_READ_ONLY`**（**`features.BashReadOnlyMode`**）时用 **`bashtool.IsExtractReadOnlyBashInputJSON`** → **`extractbash`**；**`bashtool`** 另提供 **`SplitCommand*`**（**`utils/bash/commands.ts`** 子集）、**`IsSearchOrReadBashCommand`**、**`destructiveCommandWarning`** 等价等；extract 路径用 **`memdir.IsExtractReadOnlyBash`**（同上 **`extractbash`**）。
+**`bashtool` 只读门**：**`RABBIT_CODE_BASH_READ_ONLY`** 时 **`IsExtractReadOnlyBashInputJSON`** → **`ReadOnlyCommandLineAllowed`**（见 **`read_only_validation.go`**），**不是**仅 **`memdir.IsExtractReadOnlyBash`**。
+
+---
 
 ## §5 `canUseTool` / 孤儿权限 ↔ Go（headless）
 
 | TS | Go | 状态 |
 |----|-----|------|
-| **`canUseTool`** 拒绝、孤儿 **tool_use** | **`RunTool`** 返回 **`query.OrphanPermissionError{ToolUseID}`**；**`query.OrphanToolUseID(err)`** | **[x]** 子集 |
-| 成功后顾问扫描 | **`engine.Config.OrphanPermissionAdvisor`** → **`EventKindOrphanPermission`**（**`engine_test` `TestEngine_OrphanPermission_advisor`**） | **[x]** headless |
-| 全量 **`ToolUseContext` / MCP / 规则引擎** | **`ToolUseContextMirror`**、DEFERRED | **[ ]** / **[~]** 见 **PARITY_QUERY_QUERYENGINE.md** |
+| **`canUseTool`** 拒绝、孤儿 **tool_use** | **`OrphanPermissionError{ToolUseID}`**；**`OrphanToolUseID(err)`** | **[x]** 子集 |
+| 成功后顾问扫描 | **`OrphanPermissionAdvisor`** → **`EventKindOrphanPermission`** | **[x]** |
+| 全量 **`ToolUseContext` / MCP** | **`ToolUseContextMirror`**，DEFERRED | **[ ]** 见 **PARITY_QUERY_QUERYENGINE.md** |
 
 ---
 
 ## 维护
 
-- 完成 §3.0 一项：更新上表 **状态**、**`PHASE05_CONTINUATION.md`** H9 段、**`PHASE05_SPEC_AND_ACCEPTANCE.md` §6**。
-- 整包迁移 **`BashTool` → `internal/tools/bashtool`**（或等价包）时遵守 **§3.1** 文件名 **`snake_case.go` ↔ camelCase.ts**。
+- 完成 §3.0 一项：更新本节 **状态**、**`PHASE05_CONTINUATION.md`** H9 段、**`PHASE05_SPEC_AND_ACCEPTANCE.md` §6**。
+- 再生 allowlist：**`tools/README_READONLY_ALLOWLIST.md`**（输出 **`internal/readonlycmd/allowlist_shared.json`**）。

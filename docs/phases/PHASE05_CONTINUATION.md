@@ -17,8 +17,10 @@
 | 序 | 状态 | 项 | 验收 |
 |----|------|-----|------|
 | 1 | ☑ | **`BashExecToolRunner`** null 字节拒绝 + **`PARITY_H9_BASH_PERMISSIONS.md`** + H9 进度段 | **`go test ./internal/query/... -short`** |
-| 2 | ☑ | **`readOnlyCommandValidation` / `readOnlyValidation`** ↔ **`IsExtractReadOnlyBash`**（**git** 子集扩展、**NUL** 拒绝）；**`pathValidation`** / **`BashExec`** 对照见 **PARITY_H9** **§4** | **`go test ./internal/memdir/... -short`** |
+| 2 | ☑ | **Extract**：**`memdir.IsExtractReadOnlyBash`** → **`extractbash`**（保守子集、**NUL**） | **`go test ./internal/memdir/... ./internal/extractbash/... -short`** |
 | 3 | ☑ | **`canUseTool` / 孤儿** ↔ **`OrphanPermissionError`**、**`OrphanPermissionAdvisor`**、**`EventKindOrphanPermission`**（**PARITY_H9** **§5**）；全量 **`ToolRunner`/`canUseTool`** 仍 **DEFERRED** | 文档 + **`go test ./internal/engine/... -short`** |
+| 4 | ☑ | **`readOnlyCommandValidation.ts`** ↔ **`internal/readonlycmd`** + **`bashtool/read_only_gate.go`**；**`tools/*`** 输出 **`internal/readonlycmd/allowlist_shared.json`** | **`go test ./internal/readonlycmd/... ./internal/tools/bashtool/... -short`** |
+| 5 | ☑ | **`bashSecurity`**：**`bash_security_sh_parse.go`**（mvdan）、**`kernel_sandbox.go`**、**`ApplySedSubstitution`**；**PARITY_H9** §3.0 序 **6** 仍 defer | 同上 |
 
 ### §3.0 T1 子计划（**TUI 表行 A**：`thinking` / `processUserInput` / 系统块）
 
@@ -97,10 +99,12 @@
 #### H9 进度（Bash / 权限；Phase 6 headless 桥）
 
 - **`RABBIT_CODE_BASH_EXEC`**：**`query.BashExecToolRunner`**（**`sh -c`**，**`command` / `cmd`** JSON）；未开启时 **`BashStubToolRunner`**（**`PARITY_PHASE5_DEFERRED` P5 Tools**）。
-- **卫生**：命令串 **null 字节**拒绝（**`BashExecToolRunner`** + **`IsExtractReadOnlyBash`**；**`PARITY_H9_BASH_PERMISSIONS.md` §3.0 序 1–2**）。
-- **Extract**：**`memdir.IsExtractReadOnlyBash`** — **`readOnlyCommandValidation` / `readOnlyValidation`** 保守子集（**git** **`stash list` / `remote` / `config --get`** 等；**§4**）。
+- **卫生**：命令串 **null 字节**拒绝（**`BashExecToolRunner`**、**extractbash**、**bashtool**）。
+- **Extract**：**`memdir.IsExtractReadOnlyBash`** → **`extractbash`**（保守子集；与 bashtool 只读模式分离）。
+- **Bashtool 只读**：**`RABBIT_CODE_BASH_READ_ONLY`** → **`ReadOnlyCommandLineAllowed`**（**`internal/readonlycmd`** + **`validateFlags`** + **`extractbash`** 回落）；结构约束 **`CheckReadOnlyStructuralConstraints`**。
+- **安全 / 沙箱**：**`bash_security*.go`**、可选 **firejail/bwrap**（**`kernel_sandbox.go`**）；**`mvdan.cc/sh`** AST 补强。
 - **孤儿权限**：**`query.OrphanPermissionError`**、**`engine.Config.OrphanPermissionAdvisor`** → **`EventKindOrphanPermission`**（**§5**）。
-- **全量**：**`src/tools/BashTool/*`**（**pathValidation**、**bashPermissions**、**sandbox**、全量 **`canUseTool`**）仍 **Phase 6** / **PARITY_QUERY**；见 **`PARITY_H9_BASH_PERMISSIONS.md` §3.0**。
+- **余量**：**`bashCommandIsSafe`** 全校验器、**`BashTool.tsx`** UI、**SandboxManager** — **defer**；见 **`PARITY_H9_BASH_PERMISSIONS.md` §3.0 序 6**。
 
 #### H6 进度（迭代 14 起）
 

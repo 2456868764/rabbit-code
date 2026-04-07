@@ -160,3 +160,101 @@ func parseSedSubstParts(rest string) (pattern, replacement, flags string, ok boo
 }
 
 var sedEditValidFlagsRE = regexp.MustCompile(`^[gpimIM1-9]*$`)
+
+// Private-use runes as BRE→ERE conversion placeholders (sedEditParser.ts).
+const (
+	brePhBackslash = "\ue100"
+	brePhPlus      = "\ue101"
+	brePhQuest     = "\ue102"
+	brePhPipe      = "\ue103"
+	brePhLParen    = "\ue104"
+	brePhRParen    = "\ue105"
+)
+
+// ApplySedSubstitution mirrors sedEditParser.ts applySedSubstitution for SedEditInfo from ParseSedEditCommand.
+func ApplySedSubstitution(content string, sedInfo *SedEditInfo) string {
+	if sedInfo == nil {
+		return content
+	}
+	jsPattern := sedPatternToGoRegexpSource(sedInfo.Pattern, sedInfo.ExtendedRegex)
+	var prefix strings.Builder
+	if strings.ContainsAny(sedInfo.Flags, "iI") {
+		prefix.WriteString("(?i)")
+	}
+	if strings.ContainsAny(sedInfo.Flags, "mM") {
+		prefix.WriteString("(?m)")
+	}
+	full := prefix.String() + jsPattern
+	re, err := regexp.Compile(full)
+	if err != nil {
+		return content
+	}
+	rep := strings.ReplaceAll(sedInfo.Replacement, `\/`, `/`)
+	if strings.ContainsRune(sedInfo.Flags, 'g') {
+		return re.ReplaceAllStringFunc(content, func(m string) string {
+			return expandSedReplacement(rep, m)
+		})
+	}
+	loc := re.FindStringIndex(content)
+	if loc == nil {
+		return content
+	}
+	match := content[loc[0]:loc[1]]
+	return content[:loc[0]] + expandSedReplacement(rep, match) + content[loc[1]:]
+}
+
+func expandSedReplacement(rep string, fullMatch string) string {
+	var b strings.Builder
+	for i := 0; i < len(rep); {
+		c := rep[i]
+		if c == '\\' && i+1 < len(rep) {
+			switch rep[i+1] {
+			case '&':
+				b.WriteByte('&')
+				i += 2
+				continue
+			case 'n':
+				b.WriteByte('\n')
+				i += 2
+				continue
+			case '\\':
+				b.WriteByte('\\')
+				i += 2
+				continue
+			}
+		}
+		if c == '&' {
+			b.WriteString(fullMatch)
+			i++
+			continue
+		}
+		b.WriteByte(c)
+		i++
+	}
+	return b.String()
+}
+
+func sedPatternToGoRegexpSource(pattern string, extendedRegex bool) string {
+	pat := strings.ReplaceAll(pattern, `\/`, `/`)
+	if extendedRegex {
+		return pat
+	}
+	pat = strings.ReplaceAll(pat, `\\`, brePhBackslash)
+	pat = strings.ReplaceAll(pat, `\+`, brePhPlus)
+	pat = strings.ReplaceAll(pat, `\?`, brePhQuest)
+	pat = strings.ReplaceAll(pat, `\|`, brePhPipe)
+	pat = strings.ReplaceAll(pat, `\(`, brePhLParen)
+	pat = strings.ReplaceAll(pat, `\)`, brePhRParen)
+	pat = strings.ReplaceAll(pat, "+", `\+`)
+	pat = strings.ReplaceAll(pat, "?", `\?`)
+	pat = strings.ReplaceAll(pat, "|", `\|`)
+	pat = strings.ReplaceAll(pat, "(", `\(`)
+	pat = strings.ReplaceAll(pat, ")", `\)`)
+	pat = strings.ReplaceAll(pat, brePhBackslash, `\\`)
+	pat = strings.ReplaceAll(pat, brePhPlus, "+")
+	pat = strings.ReplaceAll(pat, brePhQuest, "?")
+	pat = strings.ReplaceAll(pat, brePhPipe, "|")
+	pat = strings.ReplaceAll(pat, brePhLParen, "(")
+	pat = strings.ReplaceAll(pat, brePhRParen, ")")
+	return pat
+}
