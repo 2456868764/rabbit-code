@@ -17,6 +17,20 @@ EOF
 	}
 }
 
+func TestBashReadOnlySecurityRejectReason_safeQuotedHeredocInSubst(t *testing.T) {
+	safe := "echo $(cat <<'EOF'\nx\nEOF\n)"
+	if BashReadOnlySecurityRejectReason(safe) != "" {
+		t.Fatalf("expected safe quoted heredoc in substitution allowed, got: %q", BashReadOnlySecurityRejectReason(safe))
+	}
+}
+
+func TestBashReadOnlySecurityRejectReason_safeHeredocInlineClose(t *testing.T) {
+	safe := "echo $(cat <<'EOF'\nx\nEOF)"
+	if BashReadOnlySecurityRejectReason(safe) != "" {
+		t.Fatalf("expected inline EOF) close allowed, got: %q", BashReadOnlySecurityRejectReason(safe))
+	}
+}
+
 func TestBashReadOnlySecurityRejectReason_doubleQuotedSubst(t *testing.T) {
 	if BashReadOnlySecurityRejectReason(`echo "$(date)"`) == "" {
 		t.Fatal("expected command substitution rejected")

@@ -104,7 +104,7 @@
 - **Bashtool 只读**：**`RABBIT_CODE_BASH_READ_ONLY`** → **`ReadOnlyCommandLineAllowed`**（**`internal/readonlycmd`** + **`validateFlags`** + **`extractbash`** 回落）；结构约束 **`CheckReadOnlyStructuralConstraints`**。
 - **安全 / 沙箱**：**`bash_security*.go`**、可选 **firejail/bwrap**（**`kernel_sandbox.go`**）；**`mvdan.cc/sh`** AST 补强。
 - **孤儿权限**：**`query.OrphanPermissionError`**、**`engine.Config.OrphanPermissionAdvisor`** → **`EventKindOrphanPermission`**（**§5**）。
-- **余量**：**`bashCommandIsSafe`** 中 **obfuscated flags 全校验**、**newlines / malformed token** 等 — **defer**；**`BashTool.tsx`** UI、**SandboxManager** — **defer**；见 **`PARITY_H9_BASH_PERMISSIONS.md` §3.0 序 6**。
+- **余量**：**`bashCommandIsSafe`** 中 **obfuscated flags 全校验**、**malformed token**（**`tryParseShellCommand`/`hasMalformedTokens`**）等 — **defer**；**`validateGitCommit` 早放行** headless 不接（见 **PARITY_H9** §3.0 序 **6**）；**`BashTool.tsx`** UI、**SandboxManager** — **defer**；见 **`PARITY_H9_BASH_PERMISSIONS.md` §3.0 序 6**。
 
 #### H6 进度（迭代 14 起）
 

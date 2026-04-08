@@ -136,10 +136,15 @@ var bashDangerousPatterns = []struct {
 }
 
 // BashReadOnlySecurityRejectReason returns a non-empty reason if the command should not auto-approve as read-only
-// (bashSecurity.ts bashCommandIsSafe_DEPRECATED: control/quote bug, incomplete, comment desync, quoted-newline, CR,
+// (bashSecurity.ts bashCommandIsSafe_DEPRECATED: control/quote bug, incomplete, validateSafeCommandSubstitution /
+// isSafeHeredoc early allow, comment desync, quoted-newline, CR,
 // Unicode/IFS/proc, obfuscated quotes, dangerous patterns + shell metacharacters, heredoc-in-subst, jq, dangerous vars,
 // newlines, redirections, backslash ws/operators, mid-word #, zsh/fc, brace expansion, mvdan CmdSubst).
 func BashReadOnlySecurityRejectReason(command string) string {
+	return bashReadOnlySecurityRejectReason(command, true)
+}
+
+func bashReadOnlySecurityRejectReason(command string, allowSafeHeredocEarlyAllow bool) string {
 	if bashControlCharRE.MatchString(command) {
 		return "command contains control characters that could bypass security checks"
 	}
@@ -148,6 +153,11 @@ func BashReadOnlySecurityRejectReason(command string) string {
 	}
 	if r := bashIncompleteCommandsRejectReason(command); r != "" {
 		return r
+	}
+	if allowSafeHeredocEarlyAllow && isSafeHeredoc(command, func(s string) string {
+		return bashReadOnlySecurityRejectReason(s, false)
+	}) {
+		return ""
 	}
 	if r := bashCommentQuoteDesyncRejectReason(command); r != "" {
 		return r
