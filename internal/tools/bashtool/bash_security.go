@@ -17,6 +17,14 @@ var heredocInsideSubstitutionRE = regexp.MustCompile(`\$\([^)]*<<`)
 // reFcDashE mirrors bashSecurity.ts validateZshDangerousCommands fc -e check.
 var reFcDashE = regexp.MustCompile(`\s-\S*e`)
 
+// reEnvAssignLead mirrors bashSecurity env var assignment prefix for base-command resolution.
+var reEnvAssignLead = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
+
+// zshPrecmdModifiers mirrors bashSecurity.ts ZSH_PRECOMMAND_MODIFIERS.
+var zshPrecmdModifiers = map[string]struct{}{
+	"command": {}, "builtin": {}, "noglob": {}, "nocorrect": {},
+}
+
 // zshDangerousCommands mirrors bashSecurity.ts ZSH_DANGEROUS_COMMANDS (first word of a simple command).
 var zshDangerousCommands = map[string]struct{}{
 	"zmodload": {}, "emulate": {}, "sysopen": {}, "sysread": {}, "syswrite": {}, "sysseek": {},
@@ -128,14 +136,24 @@ var bashDangerousPatterns = []struct {
 }
 
 // BashReadOnlySecurityRejectReason returns a non-empty reason if the command should not auto-approve as read-only
-// (bashSecurity.ts bashCommandIsSafe_DEPRECATED subset: control chars, quote bug, CR/IFS/proc/Unicode, obfuscated quotes,
-// validateDangerousPatterns, heredoc-in-subst, jq, dangerous variables, brace expansion, zsh/fc, mvdan CmdSubst).
+// (bashSecurity.ts bashCommandIsSafe_DEPRECATED: control/quote bug, incomplete, comment desync, quoted-newline, CR,
+// Unicode/IFS/proc, obfuscated quotes, dangerous patterns + shell metacharacters, heredoc-in-subst, jq, dangerous vars,
+// newlines, redirections, backslash ws/operators, mid-word #, zsh/fc, brace expansion, mvdan CmdSubst).
 func BashReadOnlySecurityRejectReason(command string) string {
 	if bashControlCharRE.MatchString(command) {
 		return "command contains control characters that could bypass security checks"
 	}
 	if hasShellQuoteSingleQuoteBug(command) {
 		return "command contains single-quoted backslash patterns that could confuse shell parsing"
+	}
+	if r := bashIncompleteCommandsRejectReason(command); r != "" {
+		return r
+	}
+	if r := bashCommentQuoteDesyncRejectReason(command); r != "" {
+		return r
+	}
+	if r := bashQuotedNewlineRejectReason(command); r != "" {
+		return r
 	}
 	if r := bashCarriageReturnRejectReason(command); r != "" {
 		return r
@@ -161,6 +179,9 @@ func BashReadOnlySecurityRejectReason(command string) string {
 			return "command contains " + p.msg
 		}
 	}
+	if r := bashShellMetacharactersRejectReason(u); r != "" {
+		return r
+	}
 	if heredocInsideSubstitutionRE.MatchString(command) {
 		return "command may embed a heredoc inside command substitution"
 	}
@@ -168,6 +189,21 @@ func BashReadOnlySecurityRejectReason(command string) string {
 		return r
 	}
 	if r := bashDangerousVarRejectReason(command); r != "" {
+		return r
+	}
+	if r := bashNewlinesRejectReason(command); r != "" {
+		return r
+	}
+	if r := bashRedirectionsRejectReason(command); r != "" {
+		return r
+	}
+	if r := bashBackslashEscapedWhitespaceRejectReason(command); r != "" {
+		return r
+	}
+	if r := bashBackslashEscapedOperatorsRejectReason(command); r != "" {
+		return r
+	}
+	if r := bashMidWordHashRejectReason(command); r != "" {
 		return r
 	}
 	if r := bashZshDangerousFirstWordRejectReason(command); r != "" {
@@ -190,15 +226,25 @@ func bashZshDangerousFirstWordRejectReason(command string) string {
 				continue
 			}
 			toks, err := readonlycmd.TokenizeShellWords(sub)
-			var first string
+			var words []string
 			if err != nil || len(toks) == 0 {
-				f := strings.Fields(sub)
-				if len(f) == 0 {
+				words = strings.Fields(sub)
+			} else {
+				words = toks
+			}
+			first := ""
+			for _, w := range words {
+				if reEnvAssignLead.MatchString(w) {
 					continue
 				}
-				first = f[0]
-			} else {
-				first = toks[0]
+				if _, mod := zshPrecmdModifiers[w]; mod {
+					continue
+				}
+				first = w
+				break
+			}
+			if first == "" {
+				continue
 			}
 			if first == "fc" && reFcDashE.MatchString(sub) {
 				return "command uses 'fc -e' which can execute arbitrary commands via editor"

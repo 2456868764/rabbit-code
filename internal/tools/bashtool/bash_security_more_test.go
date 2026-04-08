@@ -64,3 +64,27 @@ func TestBashReadOnlySecurityRejectReason_ansiCQuote(t *testing.T) {
 		t.Fatal("expected ANSI-C quoting rejected")
 	}
 }
+
+func TestBashReadOnlySecurityRejectReason_incompleteOperator(t *testing.T) {
+	if BashReadOnlySecurityRejectReason(`&& echo hi`) == "" {
+		t.Fatal("expected leading operator rejected")
+	}
+}
+
+func TestBashReadOnlySecurityRejectReason_redirection(t *testing.T) {
+	if BashReadOnlySecurityRejectReason(`echo x > /tmp/y`) == "" {
+		t.Fatal("expected output redirection rejected")
+	}
+}
+
+func TestBashReadOnlySecurityRejectReason_backslashOperator(t *testing.T) {
+	if BashReadOnlySecurityRejectReason(`cat a.txt \; echo b`) == "" {
+		t.Fatal("expected backslash before ; rejected")
+	}
+}
+
+func TestBashReadOnlySecurityRejectReason_zshPrecmdModifier(t *testing.T) {
+	if BashReadOnlySecurityRejectReason(`command zmodload zsh/mapfile`) == "" {
+		t.Fatal("expected zmodload after command modifier rejected")
+	}
+}

@@ -13,7 +13,9 @@ var (
 	reUnicodeWS           = regexp.MustCompile(`[\x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]`)
 	reObfuscatedANSI      = regexp.MustCompile(`\$'[^']*'`)
 	reObfuscatedLocale    = regexp.MustCompile(`\$"[^"]*"`)
-	reObfuscatedEmptyDash = regexp.MustCompile(`\$['"]{2}\s*-`)
+	reObfuscatedEmptyDash     = regexp.MustCompile(`\$['"]{2}\s*-`)
+	reObfuscatedEmptyQuotes   = regexp.MustCompile(`(?:^|\s)(?:''|"")+\s*-`)
+	reObfuscatedQuoteConcat   = regexp.MustCompile(`(?:""|'')+['"]-`)
 	reJqSystem            = regexp.MustCompile(`(?i)\bsystem\s*\(`)
 	reJqDangerousFlags    = regexp.MustCompile(`(?:^|\s)(?:-f\b|--from-file|--rawfile|--slurpfile|-L\b|--library-path)`)
 	reJqLineLead = regexp.MustCompile(`^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*jq\b`)
@@ -86,6 +88,10 @@ func bashObfuscatedQuotingRejectReason(command string) string {
 		return "command contains locale quoting ($\"...\") which can hide characters"
 	case reObfuscatedEmptyDash.MatchString(command):
 		return "command contains empty special quotes before dash (potential bypass)"
+	case reObfuscatedEmptyQuotes.MatchString(command):
+		return "command contains empty quotes before dash (potential bypass)"
+	case reObfuscatedQuoteConcat.MatchString(command):
+		return "command contains empty quote pair adjacent to quoted dash (potential flag obfuscation)"
 	}
 	return ""
 }
