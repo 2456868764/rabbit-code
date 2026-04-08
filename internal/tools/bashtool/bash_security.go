@@ -139,7 +139,8 @@ var bashDangerousPatterns = []struct {
 // (bashSecurity.ts bashCommandIsSafe_DEPRECATED: control/quote bug, incomplete, validateSafeCommandSubstitution /
 // isSafeHeredoc early allow, comment desync, quoted-newline, CR,
 // Unicode/IFS/proc, obfuscated quotes, dangerous patterns + shell metacharacters, heredoc-in-subst, jq, dangerous vars,
-// newlines, redirections, backslash ws/operators, mid-word #, zsh/fc, brace expansion, mvdan CmdSubst).
+// newlines, redirections, backslash ws/operators, mid-word #, zsh/fc, brace expansion,
+// malformed token injection (shell-quote parse), mvdan CmdSubst).
 func BashReadOnlySecurityRejectReason(command string) string {
 	return bashReadOnlySecurityRejectReason(command, true)
 }
@@ -220,6 +221,9 @@ func bashReadOnlySecurityRejectReason(command string, allowSafeHeredocEarlyAllow
 		return r
 	}
 	if r := bashBraceExpansionRejectReason(command); r != "" {
+		return r
+	}
+	if r := bashMalformedTokenInjectionRejectReason(command); r != "" {
 		return r
 	}
 	if r := bashShellParseSecurityRejectReason(command); r != "" {

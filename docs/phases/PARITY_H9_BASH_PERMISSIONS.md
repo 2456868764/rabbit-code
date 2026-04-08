@@ -15,7 +15,7 @@
 | 3 | ☑ | **孤儿 tool_use**：**`OrphanPermissionError`**、**`OrphanPermissionAdvisor`**、**`EventKindOrphanPermission`** | **`go test ./internal/engine/... -short`** |
 | 4 | ☑ | **`readOnlyCommandValidation.ts`**（**`src/utils/shell/`**）↔ **`internal/readonlycmd`**（**`go:embed` JSON** + **`validateFlags`**）+ **`bashtool/read_only_gate.go`**（pipe / **`&&`/`||`/`;`** + **`IsCommandSafeViaFlagParsing`** 或 **`extractbash`**）；**`sed`** 钩子 → **`SedCommandAllowedByAllowlist`** | **`go test ./internal/readonlycmd/... ./internal/tools/bashtool/... -short`** |
 | 5 | ☑ | **`bashSecurity.ts`** 补强：**`bash_security.go`**（regex + **`HEREDOC_IN_SUBSTITUTION`** + **`ZSH_DANGEROUS_COMMANDS`**）+ **`bash_security_sh_parse.go`**（**`mvdan.cc/sh/v3`** **`CmdSubst`/`ProcSubst`**）；**`kernel_sandbox.go`**（**firejail**/**bwrap**）；**`sedEditParser.ts`** **`applySedSubstitution`** → **`ApplySedSubstitution`** | 同上 + **`bash_security_more_test`** |
-| 6 | **[~]** | **`bashCommandIsSafe_DEPRECATED`**：已接 **incomplete、`isSafeHeredoc`/`validateSafeCommandSubstitution` 早放行**（**`bash_security_heredoc.go`**）、comment-quote-desync、quoted-newline、CR、newlines、redirections、backslash-ws/operators、mid-word #、shell metacharacters、obfuscated quotes 扩展、zsh precmd 修饰符 + 前述 jq/brace/IFS/proc/Unicode**（**`bash_security_remaining_validators.go`** 等）；仍 **defer**：**`validateGitCommit` 早放行**（headless 只读门有意不接：会放行 `.git` 写）、**`validateObfuscatedFlags` 引号内 flag 扫描全校验**、**`validateMalformedTokenInjection`**（**`tryParseShellCommand`**）；**`BashTool.tsx`/`UI.tsx`**、**`LocalShellTask`**、**SandboxManager** | headless 测绿；TUI Phase 9+ |
+| 6 | **[~]** | **`bashCommandIsSafe_DEPRECATED`**：已接 **incomplete、`isSafeHeredoc` 早放行**、**`validateMalformedTokenInjection`**（**`bash_security_shellquote_parse.go`**：`tryParseShellCommand`/`hasMalformedTokens` 与 **npm shell-quote `parse.js`** 对齐）、comment-quote-desync、quoted-newline、CR、newlines、redirections、backslash-ws/operators、mid-word #、shell metacharacters、obfuscated quotes 扩展、zsh precmd 修饰符 + 前述 jq/brace/IFS/proc/Unicode**（**`bash_security_remaining_validators.go`** 等）；仍 **defer**：**`validateGitCommit` 早放行**（headless 只读门有意不接）、**`validateObfuscatedFlags` 引号内 flag 扫描全校验**；**`BashTool.tsx`/`UI.tsx`**、**`LocalShellTask`**、**SandboxManager** | headless 测绿；TUI Phase 9+ |
 
 ---
 
@@ -67,7 +67,7 @@
 | `UI.tsx` | `ui.go` |
 | `bashCommandHelpers.ts` | `bash_command_helpers.go` |
 | `bashPermissions.ts` | `bash_permissions_strip.go`、`bash_permissions_identify.go`、`bash_pipe_preflight.go` |
-| `bashSecurity.ts` | `bash_security.go`、`bash_security_legacy_validators.go`、`bash_security_remaining_validators.go`、`bash_security_heredoc.go`、`bash_security_sh_parse.go` |
+| `bashSecurity.ts` | `bash_security.go`、`bash_security_legacy_validators.go`、`bash_security_remaining_validators.go`、`bash_security_heredoc.go`、`bash_security_shellquote_parse.go`、`bash_security_sh_parse.go` |
 | `commandSemantics.ts` | `command_semantics.go` |
 | `commentLabel.ts` | `comment_label.go` |
 | `destructiveCommandWarning.ts` | `destructive_command_warning.go` |
