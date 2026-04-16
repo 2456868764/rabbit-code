@@ -6,6 +6,28 @@ import (
 	"strings"
 )
 
+// ValidateInputResult mirrors the validateInput return shape in WebFetchTool.ts.
+type ValidateInputResult struct {
+	Result    bool
+	Message   string
+	Meta      map[string]string
+	ErrorCode int
+}
+
+// ValidateInput mirrors WebFetchTool.ts validateInput(input): only checks URL parseability.
+// Returns { result: true } on success or { result: false, message: ..., meta: {reason}, errorCode: 1 } on failure.
+func ValidateInput(rawURL string) ValidateInputResult {
+	if _, err := url.Parse(rawURL); err != nil || rawURL == "" {
+		return ValidateInputResult{
+			Result:    false,
+			Message:   fmt.Sprintf("Error: Invalid URL %q. The URL provided could not be parsed.", rawURL),
+			Meta:      map[string]string{"reason": "invalid_url"},
+			ErrorCode: 1,
+		}
+	}
+	return ValidateInputResult{Result: true}
+}
+
 func parseAndUpgradeURL(s string) (*url.URL, error) {
 	u, err := url.Parse(strings.TrimSpace(s))
 	if err != nil {

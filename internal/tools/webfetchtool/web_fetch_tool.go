@@ -1,6 +1,7 @@
 package webfetchtool
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -29,7 +30,8 @@ type webFetchInput struct {
 	Prompt string `json:"prompt"`
 }
 
-type webFetchOutput struct {
+// Output mirrors WebFetchTool.ts export type Output (outputSchema fields).
+type Output struct {
 	Bytes      int    `json:"bytes"`
 	Code       int    `json:"code"`
 	CodeText   string `json:"codeText"`
@@ -74,7 +76,9 @@ func (w *WebFetch) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 		return nil, err
 	}
 	var in webFetchInput
-	if err := json.Unmarshal(inputJSON, &in); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(inputJSON))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil {
 		return nil, fmt.Errorf("webfetchtool: invalid json: %w", err)
 	}
 	urlInput := strings.TrimSpace(in.URL)
@@ -145,7 +149,7 @@ Status: %d %s
 To complete your request, I need to fetch content from the redirected URL. Please use WebFetch again with these parameters:
 - url: "%s"
 - prompt: "%s"`, redir.OriginalURL, redir.RedirectURL, redir.StatusCode, st, redir.RedirectURL, prompt)
-			out, _ := json.Marshal(webFetchOutput{
+			out, _ := json.Marshal(Output{
 				Bytes:      len([]byte(msg)),
 				Code:       redir.StatusCode,
 				CodeText:   st,
@@ -199,12 +203,12 @@ To complete your request, I need to fetch content from the redirected URL. Pleas
 		nonInteractive = *rc.NonInteractive
 	}
 	var result string
-	if preapproved && contentTypeIncludes(ct, "text/markdown") && len(markdown) < maxMarkdownLength {
+	if preapproved && contentTypeIncludes(ct, "text/markdown") && len(markdown) < MaxMarkdownLength {
 		result = markdown
 	} else {
 		truncated := markdown
-		if len(truncated) > maxMarkdownLength {
-			truncated = truncateRunes(truncated, maxMarkdownLength) + "\n\n[Content truncated due to length...]"
+		if len(truncated) > MaxMarkdownLength {
+			truncated = truncateRunes(truncated, MaxMarkdownLength) + "\n\n[Content truncated due to length...]"
 		}
 		if rc != nil && rc.ApplyPrompt != nil {
 			var aerr error
@@ -225,11 +229,11 @@ To complete your request, I need to fetch content from the redirected URL. Pleas
 		result += fmt.Sprintf("\n\n[Binary content (%s, %s) also saved to %s]", ct, filereadtool.FormatFileSize(int64(sz)), persistedPath)
 	}
 
-	if len(result) > maxResultSizeChars {
-		result = truncateRunes(result, maxResultSizeChars) + "\n\n[Result truncated to maxResultSizeChars]"
+	if len(result) > MaxResultSizeChars {
+		result = truncateRunes(result, MaxResultSizeChars) + "\n\n[Result truncated to maxResultSizeChars]"
 	}
 
-	out, err := json.Marshal(webFetchOutput{
+	out, err := json.Marshal(Output{
 		Bytes:      rawBytes,
 		Code:       raw.StatusCode,
 		CodeText:   raw.StatusText,
