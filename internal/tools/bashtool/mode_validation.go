@@ -9,6 +9,8 @@ const (
 	ModeBypassPermissions PermissionMode = "bypassPermissions"
 	ModeDontAsk           PermissionMode = "dontAsk"
 	ModeAcceptEdits       PermissionMode = "acceptEdits"
+	// ModeDefault corresponds to the standard "default" mode in TS ToolPermissionContext.
+	ModeDefault PermissionMode = "default"
 )
 
 var acceptEditsFilesystemCommands = map[string]struct{}{
@@ -20,6 +22,19 @@ type ModeCheckResult struct {
 	Allow       bool
 	Passthrough bool
 	Reason      string
+}
+
+// GetAutoAllowedCommands mirrors modeValidation.ts getAutoAllowedCommands.
+// Returns the list of commands auto-allowed in the given mode (only non-empty for acceptEdits).
+func GetAutoAllowedCommands(mode PermissionMode) []string {
+	if mode != ModeAcceptEdits {
+		return nil
+	}
+	result := make([]string, 0, len(acceptEditsFilesystemCommands))
+	for k := range acceptEditsFilesystemCommands {
+		result = append(result, k)
+	}
+	return result
 }
 
 // CheckPermissionMode mirrors modeValidation.ts checkPermissionMode (Accept Edits filesystem auto-allow only).

@@ -114,6 +114,11 @@ func validateSedFlagsAgainstAllowlist(flags []string, allowed []string) bool {
 	return true
 }
 
+// IsLinePrintingCommand mirrors sedValidation.ts isLinePrintingCommand (exported for testing/API).
+func IsLinePrintingCommand(command string, expressions []string) bool {
+	return isLinePrintingSed(command, expressions)
+}
+
 // IsPrintCommand mirrors sedValidation.ts isPrintCommand.
 func IsPrintCommand(cmd string) bool {
 	cmd = strings.TrimSpace(cmd)
@@ -472,6 +477,103 @@ func SedCommandAllowedByAllowlist(command string) bool {
 // SedCommandAllowedByAllowlistWithFileWrites mirrors sedValidation.ts with allowFileWrites=true (acceptEdits-style).
 func SedCommandAllowedByAllowlistWithFileWrites(command string) bool {
 	return sedCommandAllowedByAllowlist(command, true)
+}
+
+// CheckSedConstraints mirrors sedValidation.ts checkSedConstraints.
+// Returns empty string (passthrough) or a rejection reason requiring user approval.
+// In acceptEdits mode, -i (in-place) substitution is allowed; dangerous ops are still blocked.
+func CheckSedConstraints(command string, mode PermissionMode) string {
+	for _, seg := range splitCommandAtShellOperators(command) {
+		trimmed := strings.TrimSpace(seg)
+		if trimmed == "" {
+			continue
+		}
+		base := strings.Fields(trimmed)[0]
+		if base != "sed" {
+			continue
+		}
+		allowFileWrites := mode == ModeAcceptEdits
+		if !sedCommandAllowedByAllowlist(trimmed, allowFileWrites) {
+			return "sed command requires approval (contains potentially dangerous operations)"
+		}
+	}
+	return ""
+}
+
+// splitCommandAtShellOperators splits a command at unquoted &&, ||, |, ; operators,
+// returning raw sub-command strings with shell quoting intact.
+// Mirrors the subset of splitCommand_DEPRECATED that TS uses for operator splitting only.
+func splitCommandAtShellOperators(command string) []string {
+	var result []string
+	inS, inD := false, false
+	start := 0
+	for i := 0; i < len(command); {
+		c := command[i]
+		if inS {
+			if c == '\'' {
+				inS = false
+			}
+			i++
+			continue
+		}
+		if inD {
+			if c == '\\' && i+1 < len(command) {
+				i += 2
+				continue
+			}
+			if c == '"' {
+				inD = false
+			}
+			i++
+			continue
+		}
+		if c == '\'' {
+			inS = true
+			i++
+			continue
+		}
+		if c == '"' {
+			inD = true
+			i++
+			continue
+		}
+		if c == '\\' && i+1 < len(command) {
+			i += 2
+			continue
+		}
+		seg := ""
+		advance := 0
+		switch {
+		case strings.HasPrefix(command[i:], "&&"):
+			seg = command[start:i]
+			advance = 2
+		case strings.HasPrefix(command[i:], "||"):
+			seg = command[start:i]
+			advance = 2
+		case c == ';':
+			seg = command[start:i]
+			advance = 1
+		case c == '|':
+			seg = command[start:i]
+			advance = 1
+		}
+		if advance > 0 {
+			if t := strings.TrimSpace(seg); t != "" {
+				result = append(result, t)
+			}
+			i += advance
+			start = i
+			continue
+		}
+		i++
+	}
+	if t := strings.TrimSpace(command[start:]); t != "" {
+		result = append(result, t)
+	}
+	if len(result) == 0 {
+		return []string{command}
+	}
+	return result
 }
 
 func sedCommandAllowedByAllowlist(command string, allowFileWrites bool) bool {

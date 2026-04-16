@@ -5,13 +5,16 @@ import (
 	"strings"
 )
 
+// CommandSemantic mirrors commandSemantics.ts CommandSemantic (function type).
+type CommandSemantic func(exitCode int, stdout, stderr string) (isError bool, message string)
+
 // InterpretCommandResult mirrors commandSemantics.ts interpretCommandResult (exit-code semantics for grep/rg/find/diff/test/[).
 func InterpretCommandResult(command string, exitCode int, stdout, stderr string) (isError bool, message string) {
 	sem := getCommandSemantic(command)
 	return sem(exitCode, stdout, stderr)
 }
 
-type commandSemantic func(exitCode int, stdout, stderr string) (isError bool, message string)
+type commandSemantic = CommandSemantic
 
 func defaultSemantic(exitCode int, _, _ string) (bool, string) {
 	if exitCode == 0 {

@@ -14,6 +14,12 @@ type SedEditInfo struct {
 	ExtendedRegex bool
 }
 
+// IsSedInPlaceEdit mirrors sedEditParser.ts isSedInPlaceEdit.
+// Returns true only for simple sed -i 's/pattern/replacement/flags' file commands.
+func IsSedInPlaceEdit(command string) bool {
+	return ParseSedEditCommand(command) != nil
+}
+
 // ParseSedEditCommand mirrors sedEditParser.ts parseSedEditCommand (slash-delimited s/// only).
 func ParseSedEditCommand(command string) *SedEditInfo {
 	without, ok := sedWithoutPrefix(command)
