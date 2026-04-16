@@ -3,6 +3,7 @@ package websearchtool
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -35,10 +36,27 @@ type SearchResultBlock struct {
 	Content   []SearchHit `json:"content"`
 }
 
-type output struct {
+// Output mirrors WebSearchTool.ts export type Output (outputSchema fields).
+type Output struct {
 	Query           string  `json:"query"`
 	Results         []any   `json:"results"`
 	DurationSeconds float64 `json:"durationSeconds"`
+}
+
+// IsEnabled mirrors isEnabled() in WebSearchTool.ts (provider/model gating).
+// provider is one of "firstParty", "vertex", "foundry", "bedrock", etc.
+func IsEnabled(provider, model string) bool {
+	switch provider {
+	case "firstParty":
+		return true
+	case "vertex":
+		return strings.Contains(model, "claude-opus-4") ||
+			strings.Contains(model, "claude-sonnet-4") ||
+			strings.Contains(model, "claude-haiku-4")
+	case "foundry":
+		return true
+	}
+	return false
 }
 
 const headlessNoBackend = "Web search is not available in this headless runner. Wire websearchtool.RunContext.ExecuteSearch to perform live search (Messages API web_search_20250305)."
@@ -69,7 +87,7 @@ func (w *WebSearch) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 		results = []any{headlessNoBackend}
 	}
 
-	out := output{
+	out := Output{
 		Query:           in.Query,
 		Results:         results,
 		DurationSeconds: time.Since(start).Seconds(),

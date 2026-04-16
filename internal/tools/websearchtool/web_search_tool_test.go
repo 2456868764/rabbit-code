@@ -53,7 +53,7 @@ func TestRunHeadless(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got output
+	var got Output
 	if err := json.Unmarshal(out, &got); err != nil {
 		t.Fatal(err)
 	}
