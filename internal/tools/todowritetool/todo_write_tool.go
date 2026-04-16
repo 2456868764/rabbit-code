@@ -32,6 +32,13 @@ type TodoItem struct {
 	ActiveForm string `json:"activeForm"`
 }
 
+// Output mirrors TodoWriteTool.ts export type Output (outputSchema fields).
+type Output struct {
+	OldTodos                []TodoItem `json:"oldTodos"`
+	NewTodos                []TodoItem `json:"newTodos"`
+	VerificationNudgeNeeded bool       `json:"verificationNudgeNeeded"`
+}
+
 type todoWriteInput struct {
 	Todos []TodoItem `json:"todos"`
 }
@@ -129,10 +136,10 @@ func (t *TodoWrite) Run(ctx context.Context, inputJSON []byte) ([]byte, error) {
 	if oldOut == nil {
 		oldOut = []TodoItem{}
 	}
-	out := map[string]any{
-		"oldTodos":                oldOut,
-		"newTodos":                in.Todos,
-		"verificationNudgeNeeded": verificationNudgeNeeded,
+	out := Output{
+		OldTodos:                oldOut,
+		NewTodos:                in.Todos,
+		VerificationNudgeNeeded: verificationNudgeNeeded,
 	}
 	return json.Marshal(out)
 }
